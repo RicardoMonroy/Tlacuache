@@ -88,6 +88,9 @@ mod imp {
         /// como acción de propiedad (`view.mode`) a los botones conmutados.
         #[property(get, set = Self::set_view_mode)]
         pub view_mode: RefCell<String>,
+        /// Carpeta actual (para el título de la pestaña).
+        #[property(get, nullable)]
+        pub directory: RefCell<Option<gio::File>>,
         pub(super) view: RefCell<Option<PageView>>,
         pub view_slot: adw::Bin,
         pub path_bar: PathBar,
@@ -225,6 +228,7 @@ impl TabPage {
 
         imp.history
             .replace(Some(History::new(dir.uri().to_string())));
+        imp.directory.replace(Some(dir.clone()));
         imp.path_bar.set_directory(dir);
         imp.view_mode.replace(mode.id().to_owned());
         self.install_view(PageView::new(mode, dir, show_hidden));
@@ -254,7 +258,8 @@ impl TabPage {
         self.focus_view();
     }
 
-    fn focus_view(&self) {
+    /// Lleva el foco del teclado a la vista de la carpeta.
+    pub fn focus_view(&self) {
         if let Some(view) = self.view() {
             view.focus();
         }
@@ -321,6 +326,8 @@ impl TabPage {
             view.show_directory(dir);
         }
         self.imp().path_bar.set_directory(dir);
+        self.imp().directory.replace(Some(dir.clone()));
+        self.notify_directory();
         self.update_nav_actions();
     }
 

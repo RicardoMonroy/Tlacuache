@@ -10,7 +10,7 @@ use gtk::{gio, glib};
 use tlacuache_core::config::Config;
 
 use crate::strings;
-use crate::ui::tab_page::TabPage;
+use crate::ui::pane::Pane;
 
 mod imp {
     use super::*;
@@ -64,14 +64,10 @@ glib::wrapper! {
 impl TlacuacheWindow {
     pub fn new(app: &adw::Application, config: Rc<Config>, start_dir: &gio::File) -> Self {
         let window: Self = glib::Object::builder().property("application", app).build();
-        // Por ahora una sola pestaña; panel con pestañas en hitos 2 y 3.
-        let page = TabPage::new(
-            start_dir,
-            config.general.show_hidden,
-            config.general.default_view,
-        );
+        // Un panel por ahora; el modo dual llega en la tarea 3.1.
+        let pane = Pane::new(start_dir, config);
         if let Some(toolbar) = window.imp().toolbar.get() {
-            toolbar.set_content(Some(&page));
+            toolbar.set_content(Some(&pane));
         }
         window
     }

@@ -15,6 +15,7 @@ use glib::subclass::Signal;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::path_input;
 
+use crate::fs::display::{display_name, display_path};
 use crate::strings;
 use crate::window;
 
@@ -260,7 +261,7 @@ impl PathBar {
                 sep.add_css_class("dim-label");
                 crumbs.append(&sep);
             }
-            let button = gtk::Button::with_label(&crumb_label(&file));
+            let button = gtk::Button::with_label(&display_name(&file));
             button.add_css_class("flat");
             button.add_css_class("crumb");
             button.set_focusable(false);
@@ -536,24 +537,4 @@ fn suggestion_name(row: &gtk::ListBoxRow) -> Option<String> {
     row.child()
         .and_downcast::<gtk::Label>()
         .map(|label| label.text().to_string())
-}
-
-fn display_path(file: &gio::File) -> String {
-    match file.path() {
-        Some(path) => path.display().to_string(),
-        None => file.uri().to_string(),
-    }
-}
-
-fn crumb_label(file: &gio::File) -> String {
-    if file.parent().is_none() {
-        return if file.has_uri_scheme("file") {
-            "/".to_owned()
-        } else {
-            file.uri().to_string()
-        };
-    }
-    file.basename()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_else(|| file.uri().to_string())
 }
