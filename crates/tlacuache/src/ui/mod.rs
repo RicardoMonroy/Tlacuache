@@ -6,6 +6,7 @@ pub mod favorites_section;
 pub mod filter_indicator;
 pub mod list_view;
 pub mod miller_view;
+pub mod ops_indicator;
 pub mod pane;
 pub mod path_bar;
 pub mod sidebar;

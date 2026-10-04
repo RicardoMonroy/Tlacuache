@@ -10,9 +10,12 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config::Config;
+use tlacuache_core::ops::{OpId, OpKind, OpState};
 use tlacuache_core::session::{Session, WindowSession};
 
+use crate::fs::ops_runner::OpsManager;
 use crate::strings;
+use crate::ui::ops_indicator::OpsIndicator;
 use crate::ui::pane::Pane;
 use crate::ui::sidebar::Sidebar;
 
@@ -43,6 +46,8 @@ mod imp {
         /// Barra lateral visible (F9).
         #[property(get, set = Self::set_show_sidebar)]
         pub show_sidebar: Cell<bool>,
+        /// Cola de operaciones de archivo de la ventana.
+        pub ops: OpsManager,
         /// Ya se guardó la sesión: el siguiente cierre es definitivo.
         pub session_saved: Cell<bool>,
     }
@@ -79,6 +84,17 @@ mod imp {
                 window.add_current_to_favorites();
                 glib::Propagation::Stop
             });
+            // Temporal (4.2): copiar/mover la selección al otro panel. F5/F6
+            // definitivos, con arrastrar y soltar, llegan en la tarea 4.3.
+            let ctrl_shift = gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::SHIFT_MASK;
+            klass.add_binding(gdk::Key::F5, ctrl_shift, |window| {
+                window.transfer_selection(OpKind::Copy);
+                glib::Propagation::Stop
+            });
+            klass.add_binding(gdk::Key::F6, ctrl_shift, |window| {
+                window.transfer_selection(OpKind::Move);
+                glib::Propagation::Stop
+            });
             klass.add_binding(gdk::Key::F9, gdk::ModifierType::empty(), |window| {
                 window.set_show_sidebar(!window.show_sidebar());
                 glib::Propagation::Stop
@@ -113,6 +129,12 @@ mod imp {
             let header = adw::HeaderBar::new();
             header.pack_start(&sidebar_toggle);
             header.pack_end(&dual);
+            header.pack_end(&OpsIndicator::new(&self.ops));
+            self.ops.connect_finished(glib::clone!(
+                #[weak]
+                obj,
+                move |_, id| obj.on_operation_finished(id)
+            ));
 
             self.toolbar.add_top_bar(&header);
             self.toast_overlay.set_child(Some(&self.toolbar));
@@ -267,6 +289,42 @@ impl TlacuacheWindow {
         imp.dual_pane.set(state.dual_pane);
         self.apply_dual_pane();
         self.set_active_pane(if state.dual_pane { active } else { 0 });
+    }
+
+    /// Copia o mueve la selección del panel activo a la carpeta del otro.
+    fn transfer_selection(&self, kind: OpKind) {
+        let active = self.imp().active.get();
+        let sources = self
+            .pane(active)
+            .map(Pane::selected_files)
+            .unwrap_or_default();
+        if sources.is_empty() {
+            self.show_toast(strings::OP_NOTHING_SELECTED);
+            return;
+        }
+        let Some(dest) = self.pane(1 - active).and_then(Pane::current_directory) else {
+            return;
+        };
+        self.imp().ops.enqueue(kind, &sources, Some(&dest));
+    }
+
+    fn on_operation_finished(&self, id: OpId) {
+        let Some(op) = self.imp().ops.operation(id) else {
+            return;
+        };
+        let text = match &op.state {
+            OpState::Done => {
+                let verb = match op.kind {
+                    OpKind::Move => strings::OP_MOVED,
+                    _ => strings::OP_COPIED,
+                };
+                strings::op_done(verb, op.sources.len() as u64)
+            }
+            OpState::Failed(message) => strings::op_failed(message),
+            OpState::Cancelled => strings::OP_CANCELLED.to_owned(),
+            _ => return,
+        };
+        self.show_toast(&text);
     }
 
     /// Abre `dir` en una pestaña nueva del panel activo.

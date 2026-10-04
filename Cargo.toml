@@ -20,6 +20,8 @@ sourceview5 = { version = "0.11.2", features = ["v5_18"] }
 # Directo solo para activar features de la glib del sistema (2.88):
 # `user_state_dir` necesita v2_72. Es la misma glib que re-exporta gtk.
 glib = { version = "0.22.10", features = ["v2_72"] }
+# `File::move_async` (mover con progreso y cancelación) necesita v2_72.
+gio = { version = "0.22.10", features = ["v2_72"] }
 anyhow = "1.0.104"
 thiserror = "2.0.21"
 serde = { version = "1.0.229", features = ["derive"] }

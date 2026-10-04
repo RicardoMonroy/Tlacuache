@@ -72,6 +72,13 @@ impl PageView {
         }
     }
 
+    fn selected_files(&self) -> Vec<gio::File> {
+        match self {
+            Self::Columns(view) => view.selected_files(),
+            Self::Details(view) => view.selected_files(),
+        }
+    }
+
     fn status(&self) -> ViewStatus {
         match self {
             Self::Columns(view) => view.status(),
@@ -322,6 +329,11 @@ impl TabPage {
         };
         self.install_view(PageView::new(mode, &dir, self.imp().show_hidden.get()));
         self.focus_view();
+    }
+
+    /// Archivos seleccionados en la vista.
+    pub fn selected_files(&self) -> Vec<gio::File> {
+        self.view().map(|v| v.selected_files()).unwrap_or_default()
     }
 
     /// Ocultos visibles en esta pestaña.

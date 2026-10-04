@@ -10,8 +10,13 @@ tlacuache-core.workspace = true
 gtk.workspace = true
 adw.workspace = true
 glib.workspace = true
+gio.workspace = true
+async-channel.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
 [build-dependencies]
 glib-build-tools.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

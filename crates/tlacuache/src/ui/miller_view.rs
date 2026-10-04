@@ -226,6 +226,15 @@ impl MillerView {
         );
     }
 
+    /// Archivo seleccionado en la columna activa.
+    pub fn selected_files(&self) -> Vec<gio::File> {
+        self.active_column()
+            .and_then(|c| c.selected_item())
+            .and_then(|item| item.file())
+            .into_iter()
+            .collect()
+    }
+
     /// Elementos y selección de la columna activa.
     pub fn status(&self) -> ViewStatus {
         let Some(column) = self.active_column() else {

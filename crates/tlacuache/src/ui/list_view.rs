@@ -214,22 +214,34 @@ impl FileListView {
         );
     }
 
-    /// Elementos visibles y resumen de la selección.
-    pub fn status(&self) -> ViewStatus {
+    fn selected_items(&self) -> Vec<FileItem> {
         let imp = self.imp();
         let (Some(model), Some(selection)) = (imp.model.get(), imp.selection.get()) else {
-            return ViewStatus::default();
+            return Vec::new();
         };
         let bitset = selection.selection();
-        let items: Vec<FileItem> = gtk::BitsetIter::init_first(&bitset)
+        gtk::BitsetIter::init_first(&bitset)
             .map(|(iter, first)| std::iter::once(first).chain(iter))
             .into_iter()
             .flatten()
             .filter_map(|position| model.item(position))
-            .collect();
+            .collect()
+    }
+
+    /// Archivos seleccionados (para copiar, mover, etc.).
+    pub fn selected_files(&self) -> Vec<gio::File> {
+        self.selected_items()
+            .iter()
+            .filter_map(FileItem::file)
+            .collect()
+    }
+
+    /// Elementos visibles y resumen de la selección.
+    pub fn status(&self) -> ViewStatus {
+        let items = self.selected_items();
         let entries: Vec<_> = items.iter().map(FileItem::entry).collect();
         ViewStatus {
-            items: model.model().n_items(),
+            items: self.imp().model.get().map_or(0, |m| m.model().n_items()),
             selection: SelectionSummary::from_entries(entries.iter().map(|e| &**e)),
         }
     }

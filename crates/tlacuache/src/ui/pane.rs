@@ -176,6 +176,13 @@ impl Pane {
         }
     }
 
+    /// Archivos seleccionados en la pestaña actual.
+    pub fn selected_files(&self) -> Vec<gio::File> {
+        self.current_page()
+            .map(|p| p.selected_files())
+            .unwrap_or_default()
+    }
+
     /// Carpeta de la pestaña seleccionada.
     pub fn current_directory(&self) -> Option<gio::File> {
         self.current_page().and_then(|p| p.directory())

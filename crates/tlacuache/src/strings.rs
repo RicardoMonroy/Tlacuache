@@ -23,6 +23,19 @@ pub const NAV_UP: &str = "Subir (Alt+↑)";
 pub const DUAL_PANE: &str = "Doble panel (F3)";
 pub const SHOW_SIDEBAR: &str = "Barra lateral (F9)";
 
+pub const OP_COPYING: &str = "Copiando";
+pub const OP_MOVING: &str = "Moviendo";
+pub const OP_COPIED: &str = "Copiados";
+pub const OP_MOVED: &str = "Movidos";
+pub const OP_PREPARING: &str = "Preparando…";
+pub const OP_CANCEL: &str = "Cancelar operación";
+pub const OP_CANCELLED: &str = "Operación cancelada";
+pub const OP_INTERRUPTED: &str = "La operación se interrumpió";
+pub const OP_NOT_SUPPORTED: &str = "Operación no disponible todavía";
+pub const OP_NO_NAME: &str = "El origen no tiene nombre de archivo";
+pub const OP_INTO_ITSELF: &str = "No se puede copiar ni mover una carpeta dentro de sí misma";
+pub const OP_NOTHING_SELECTED: &str = "No hay nada seleccionado";
+
 pub const SESSION_RESTORE_FAILED: &str = "No se pudo restaurar la sesión anterior";
 
 pub const SIDEBAR_PLACES: &str = "Lugares";
@@ -149,4 +162,29 @@ pub fn group_remove_confirm(name: &str, count: usize) -> String {
 
 pub fn favorites_save_failed(detail: &str) -> String {
     format!("No se guardaron los favoritos: {detail}")
+}
+
+pub fn op_exists(name: &str) -> String {
+    format!("«{name}» ya existe en el destino")
+}
+
+/// «Copiando 3 de 10 · archivo.txt».
+pub fn op_progress(verb: &str, done: u64, total: Option<u64>, current: Option<&str>) -> String {
+    let count = match total {
+        Some(total) => format!("{verb} {done} de {total}"),
+        None => format!("{verb}…"),
+    };
+    match current {
+        Some(name) => format!("{count} · {name}"),
+        None => count,
+    }
+}
+
+pub fn op_done(verb_past: &str, count: u64) -> String {
+    let items = if count == 1 { "elemento" } else { "elementos" };
+    format!("{verb_past} {count} {items}")
+}
+
+pub fn op_failed(message: &str) -> String {
+    format!("La operación falló: {message}")
 }
