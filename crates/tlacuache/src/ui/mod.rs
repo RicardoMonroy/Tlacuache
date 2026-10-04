@@ -1,5 +1,6 @@
 //! Widgets propios (un archivo por widget).
 
+pub mod drive_row;
 pub mod filter_indicator;
 pub mod list_view;
 pub mod miller_view;

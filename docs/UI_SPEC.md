@@ -56,8 +56,8 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 
 ## 5. Sidebar
 
-- **Unidades**: `gio::VolumeMonitor`; muestra punto de montaje, barra de uso y espacio libre; montar/desmontar/expulsar desde el menú contextual.
-- **Lugares**: carpetas XDG del usuario (`glib::user_special_dir`) + Inicio + Raíz + Papelera.
+- **Lugares**: Inicio + carpetas XDG del usuario (`glib::user_special_dir`; se omiten las que no existen o apuntan a `~`) + Papelera.
+- **Unidades**: «Sistema» (`/`) y los volúmenes/montajes de `gio::VolumeMonitor`; barra de uso (aviso ≥ 80 %, crítico ≥ 90 %) con el espacio libre en el tooltip; botón de expulsar/desmontar y menú contextual (Abrir, Montar, Desmontar, Expulsar). Abrir un volumen sin montar lo monta primero.
 - **Favoritos**: grupos nombrados, arrastrar carpetas para añadir, reordenar con arrastrar. Persistidos en config.
 
 ## 6. Atajos de teclado (por defecto, remapeables en config)

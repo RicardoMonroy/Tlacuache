@@ -182,3 +182,20 @@ listview.miller-column > row {
   font-size: 0.85em;
   opacity: 0.7;
 }
+
+/* Barra de uso de unidades en la barra lateral. */
+levelbar.drive-usage trough {
+  min-height: 4px;
+}
+
+levelbar.drive-usage block.filled {
+  background-color: var(--nord9);
+}
+
+levelbar.drive-usage.usage-warning block.filled {
+  background-color: var(--nord13);
+}
+
+levelbar.drive-usage.usage-critical block.filled {
+  background-color: var(--nord11);
+}

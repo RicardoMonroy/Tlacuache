@@ -1,4 +1,5 @@
-//! Lugares de la barra lateral: Inicio, carpetas XDG, Raíz y Papelera.
+//! Lugares de la barra lateral: Inicio, carpetas XDG y Papelera. La raíz
+//! se muestra en «Unidades» con su uso de disco.
 
 use std::path::{Path, PathBuf};
 
@@ -11,7 +12,6 @@ pub enum PlaceKind {
     Music,
     Pictures,
     Videos,
-    Root,
     Trash,
 }
 
@@ -61,10 +61,6 @@ where
         })
     }));
     list.push(Place {
-        kind: PlaceKind::Root,
-        target: PlaceTarget::Path(PathBuf::from("/")),
-    });
-    list.push(Place {
         kind: PlaceKind::Trash,
         target: PlaceTarget::Uri(TRASH_URI.to_owned()),
     });
@@ -93,7 +89,6 @@ mod tests {
                 PlaceKind::Music,
                 PlaceKind::Pictures,
                 PlaceKind::Videos,
-                PlaceKind::Root,
                 PlaceKind::Trash,
             ]
         );
@@ -114,12 +109,7 @@ mod tests {
         });
         assert_eq!(
             kinds(&list),
-            [
-                PlaceKind::Home,
-                PlaceKind::Documents,
-                PlaceKind::Root,
-                PlaceKind::Trash
-            ]
+            [PlaceKind::Home, PlaceKind::Documents, PlaceKind::Trash]
         );
     }
 }

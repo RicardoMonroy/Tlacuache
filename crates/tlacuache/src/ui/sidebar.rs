@@ -1,6 +1,6 @@
-//! Barra lateral: punto de partida de la navegación. Por ahora la sección
-//! «Lugares» (Inicio, carpetas XDG, Raíz, Papelera); unidades y favoritos
-//! llegan en las tareas 3.3 y 3.4.
+//! Barra lateral: punto de partida de la navegación. Secciones «Lugares»
+//! (Inicio, carpetas XDG, Papelera) y «Unidades» (sistema, volúmenes y
+//! montajes de `gio::VolumeMonitor`); favoritos llega en la tarea 3.4.
 
 use std::cell::RefCell;
 use std::sync::OnceLock;
@@ -12,6 +12,7 @@ use gtk::{gio, glib, pango};
 use tlacuache_core::places::{self, PlaceKind, PlaceTarget};
 
 use crate::strings;
+use crate::ui::drive_row::{DriveKind, DriveRow};
 
 mod imp {
     use super::*;
@@ -19,6 +20,9 @@ mod imp {
     #[derive(Default)]
     pub struct Sidebar {
         pub places: gtk::ListBox,
+        pub drives: gtk::ListBox,
+        /// Se conserva para seguir recibiendo sus señales.
+        pub volume_monitor: RefCell<Option<gio::VolumeMonitor>>,
         /// Destino de cada fila de `places`, por índice.
         pub place_files: RefCell<Vec<gio::File>>,
     }
@@ -81,6 +85,8 @@ impl Sidebar {
         let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
         content.append(&section_heading(strings::SIDEBAR_PLACES));
         content.append(&imp.places);
+        content.append(&section_heading(strings::SIDEBAR_DRIVES));
+        content.append(&imp.drives);
 
         imp.places.add_css_class("navigation-sidebar");
         imp.places.set_selection_mode(gtk::SelectionMode::None);
@@ -97,6 +103,15 @@ impl Sidebar {
             }
         ));
         self.fill_places();
+
+        imp.drives.add_css_class("navigation-sidebar");
+        imp.drives.set_selection_mode(gtk::SelectionMode::None);
+        imp.drives.connect_row_activated(|_, row| {
+            if let Some(row) = row.downcast_ref::<DriveRow>() {
+                row.open();
+            }
+        });
+        self.watch_volumes();
 
         let scrolled = gtk::ScrolledWindow::builder()
             .hscrollbar_policy(gtk::PolicyType::Never)
@@ -125,6 +140,58 @@ impl Sidebar {
     }
 }
 
+impl Sidebar {
+    fn watch_volumes(&self) {
+        let monitor = gio::VolumeMonitor::get();
+        // Cualquier cambio reconstruye la sección: son pocas filas.
+        let rebuild = glib::clone!(
+            #[weak(rename_to = sidebar)]
+            self,
+            move || sidebar.fill_drives()
+        );
+        let r = rebuild.clone();
+        monitor.connect_volume_added(move |_, _| r());
+        let r = rebuild.clone();
+        monitor.connect_volume_removed(move |_, _| r());
+        let r = rebuild.clone();
+        monitor.connect_volume_changed(move |_, _| r());
+        let r = rebuild.clone();
+        monitor.connect_mount_added(move |_, _| r());
+        let r = rebuild.clone();
+        monitor.connect_mount_removed(move |_, _| r());
+        monitor.connect_mount_changed(move |_, _| rebuild());
+        self.imp().volume_monitor.replace(Some(monitor));
+        self.fill_drives();
+    }
+
+    fn fill_drives(&self) {
+        let imp = self.imp();
+        let Some(monitor) = imp.volume_monitor.borrow().clone() else {
+            return;
+        };
+        imp.drives.remove_all();
+
+        let mut kinds = vec![DriveKind::Root];
+        kinds.extend(monitor.volumes().into_iter().map(DriveKind::Volume));
+        kinds.extend(
+            monitor
+                .mounts()
+                .into_iter()
+                .filter(|m| m.volume().is_none() && !m.is_shadowed())
+                .map(DriveKind::Mount),
+        );
+        for kind in kinds {
+            let row = DriveRow::new(kind);
+            row.connect_open(glib::clone!(
+                #[weak(rename_to = sidebar)]
+                self,
+                move |_, root| sidebar.emit_by_name::<()>("place-activated", &[root])
+            ));
+            imp.drives.append(&row);
+        }
+    }
+}
+
 fn xdg_directory(kind: PlaceKind) -> Option<glib::UserDirectory> {
     match kind {
         PlaceKind::Desktop => Some(glib::UserDirectory::Desktop),
@@ -133,7 +200,7 @@ fn xdg_directory(kind: PlaceKind) -> Option<glib::UserDirectory> {
         PlaceKind::Music => Some(glib::UserDirectory::Music),
         PlaceKind::Pictures => Some(glib::UserDirectory::Pictures),
         PlaceKind::Videos => Some(glib::UserDirectory::Videos),
-        PlaceKind::Home | PlaceKind::Root | PlaceKind::Trash => None,
+        PlaceKind::Home | PlaceKind::Trash => None,
     }
 }
 
@@ -146,7 +213,6 @@ fn place_appearance(kind: PlaceKind) -> (&'static str, &'static str) {
         PlaceKind::Music => ("folder-music-symbolic", strings::PLACE_MUSIC),
         PlaceKind::Pictures => ("folder-pictures-symbolic", strings::PLACE_PICTURES),
         PlaceKind::Videos => ("folder-videos-symbolic", strings::PLACE_VIDEOS),
-        PlaceKind::Root => ("drive-harddisk-symbolic", strings::PLACE_ROOT),
         PlaceKind::Trash => ("user-trash-symbolic", strings::PLACE_TRASH),
     }
 }

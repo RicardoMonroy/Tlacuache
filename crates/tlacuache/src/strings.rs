@@ -31,8 +31,15 @@ pub const PLACE_DOWNLOADS: &str = "Descargas";
 pub const PLACE_MUSIC: &str = "Música";
 pub const PLACE_PICTURES: &str = "Imágenes";
 pub const PLACE_VIDEOS: &str = "Vídeos";
-pub const PLACE_ROOT: &str = "Raíz";
 pub const PLACE_TRASH: &str = "Papelera";
+
+pub const SIDEBAR_DRIVES: &str = "Unidades";
+pub const DRIVE_SYSTEM: &str = "Sistema";
+pub const DRIVE_NOT_MOUNTED: &str = "Sin montar";
+pub const DRIVE_OPEN: &str = "Abrir";
+pub const DRIVE_MOUNT: &str = "Montar";
+pub const DRIVE_UNMOUNT: &str = "Desmontar";
+pub const DRIVE_EJECT: &str = "Expulsar";
 pub const TAB_NEW: &str = "Nueva pestaña (Ctrl+T)";
 
 pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";
@@ -107,4 +114,12 @@ pub fn free_space(free: u64, size: u64) -> String {
         glib::format_size(free),
         glib::format_size(size)
     )
+}
+
+pub fn drive_mount_failed(name: &str, err: &glib::Error) -> String {
+    format!("No se pudo montar «{name}»: {}", err.message())
+}
+
+pub fn drive_unmount_failed(name: &str, err: &glib::Error) -> String {
+    format!("No se pudo desmontar «{name}»: {}", err.message())
 }
