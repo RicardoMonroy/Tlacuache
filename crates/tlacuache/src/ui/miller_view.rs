@@ -16,6 +16,7 @@ use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::filter;
+use tlacuache_core::summary::{SelectionSummary, ViewStatus};
 
 use crate::fs::file_item::FileItem;
 use crate::fs::launch;
@@ -95,6 +96,9 @@ mod imp {
                     Signal::builder("directory-activated")
                         .param_types([gio::File::static_type()])
                         .build(),
+                    // Cambiaron los elementos o la selección de la columna
+                    // activa.
+                    Signal::builder("status-changed").build(),
                 ]
             })
         }
@@ -210,6 +214,32 @@ impl MillerView {
         self.notify_directory();
         self.focus_active();
         self.update_preview();
+        self.emit_status_changed();
+    }
+
+    pub fn connect_status_changed<F: Fn(&Self) + 'static>(&self, f: F) {
+        self.connect_closure(
+            "status-changed",
+            false,
+            glib::closure_local!(move |view: &Self| f(view)),
+        );
+    }
+
+    /// Elementos y selección de la columna activa.
+    pub fn status(&self) -> ViewStatus {
+        let Some(column) = self.active_column() else {
+            return ViewStatus::default();
+        };
+        let selected = column.selected_item();
+        let entry = selected.as_ref().map(FileItem::entry);
+        ViewStatus {
+            items: column.model.model().n_items(),
+            selection: SelectionSummary::from_entries(entry.as_deref()),
+        }
+    }
+
+    fn emit_status_changed(&self) {
+        self.emit_by_name::<()>("status-changed", &[]);
     }
 
     /// Lleva el foco del teclado a la columna activa.
@@ -301,9 +331,11 @@ impl MillerView {
             #[weak]
             list,
             move |_| {
-                if !view.imp().updating.get()
-                    && view.index_of(&list) == Some(view.imp().active.get())
-                {
+                if view.index_of(&list) != Some(view.imp().active.get()) {
+                    return;
+                }
+                view.emit_status_changed();
+                if !view.imp().updating.get() {
                     view.schedule_preview();
                 }
             }
@@ -368,6 +400,7 @@ impl MillerView {
             move |_, _, _, _| {
                 if view.index_of(&list) == Some(view.imp().active.get()) {
                     view.update_filter_indicator();
+                    view.emit_status_changed();
                 }
             }
         ));

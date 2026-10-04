@@ -5,4 +5,5 @@ pub mod list_view;
 pub mod miller_view;
 pub mod pane;
 pub mod path_bar;
+pub mod status_bar;
 pub mod tab_page;

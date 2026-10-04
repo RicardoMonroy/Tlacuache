@@ -14,6 +14,7 @@ use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::age::{Age, AgeBucket};
 use tlacuache_core::filter;
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
+use tlacuache_core::summary::{SelectionSummary, ViewStatus};
 
 use crate::fs::file_item::FileItem;
 use crate::fs::launch;
@@ -35,6 +36,7 @@ mod imp {
         #[property(get, nullable)]
         pub directory: RefCell<Option<gio::File>>,
         pub model: OnceCell<DirectoryModel>,
+        pub selection: OnceCell<gtk::MultiSelection>,
         pub column_view: OnceCell<gtk::ColumnView>,
         /// Al terminar de cargar, enfocar esta entrada (la carpeta de la que
         /// venimos al subir o retroceder).
@@ -62,6 +64,8 @@ mod imp {
                     Signal::builder("directory-activated")
                         .param_types([gio::File::static_type()])
                         .build(),
+                    // Cambiaron los elementos visibles o la selección.
+                    Signal::builder("status-changed").build(),
                 ]
             })
         }
@@ -97,7 +101,12 @@ impl FileListView {
         let model = DirectoryModel::new(dir, show_hidden);
 
         let selection = gtk::MultiSelection::new(Some(model.model().clone()));
-        let column_view = gtk::ColumnView::new(Some(selection));
+        selection.connect_selection_changed(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move |_, _, _| view.emit_by_name::<()>("status-changed", &[])
+        ));
+        let column_view = gtk::ColumnView::new(Some(selection.clone()));
         column_view.add_css_class("file-list");
         column_view.add_css_class("data-table");
 
@@ -182,12 +191,44 @@ impl FileListView {
         model.model().connect_items_changed(glib::clone!(
             #[weak(rename_to = view)]
             self,
-            move |_, _, _, _| view.update_filter_indicator()
+            move |_, _, _, _| {
+                view.update_filter_indicator();
+                view.emit_by_name::<()>("status-changed", &[]);
+            }
         ));
 
         imp.directory.replace(Some(dir.clone()));
         let _ = imp.model.set(model);
+        let _ = imp.selection.set(selection);
         let _ = imp.column_view.set(column_view);
+    }
+
+    pub fn connect_status_changed<F: Fn(&Self) + 'static>(&self, f: F) {
+        self.connect_closure(
+            "status-changed",
+            false,
+            glib::closure_local!(move |view: &Self| f(view)),
+        );
+    }
+
+    /// Elementos visibles y resumen de la selección.
+    pub fn status(&self) -> ViewStatus {
+        let imp = self.imp();
+        let (Some(model), Some(selection)) = (imp.model.get(), imp.selection.get()) else {
+            return ViewStatus::default();
+        };
+        let bitset = selection.selection();
+        let items: Vec<FileItem> = gtk::BitsetIter::init_first(&bitset)
+            .map(|(iter, first)| std::iter::once(first).chain(iter))
+            .into_iter()
+            .flatten()
+            .filter_map(|position| model.item(position))
+            .collect();
+        let entries: Vec<_> = items.iter().map(FileItem::entry).collect();
+        ViewStatus {
+            items: model.model().n_items(),
+            selection: SelectionSummary::from_entries(entries.iter().map(|e| &**e)),
+        }
     }
 
     /// Cambia la carpeta mostrada. Al terminar de cargar se enfoca la

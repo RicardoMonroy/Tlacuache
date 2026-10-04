@@ -6,6 +6,7 @@ use std::path::Path;
 
 use gtk::glib;
 use tlacuache_core::age::{Age, AgeUnit};
+use tlacuache_core::summary::ViewStatus;
 
 pub const APP_NAME: &str = "Tlacuache";
 
@@ -62,4 +63,35 @@ pub fn age(age: &Age) -> String {
 pub fn filter_indicator(query: &str, count: u32) -> String {
     let items = if count == 1 { "elemento" } else { "elementos" };
     format!("«{query}» · {count} {items}")
+}
+
+fn count(n: u32, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
+}
+
+/// «24 elementos · 3 seleccionados (1.2 MB)». El tamaño solo suma archivos.
+pub fn status_items(status: &ViewStatus) -> String {
+    let items = count(status.items, "elemento", "elementos");
+    let selection = &status.selection;
+    if selection.is_empty() {
+        return items;
+    }
+    let selected = count(selection.count(), "seleccionado", "seleccionados");
+    if selection.files > 0 {
+        format!(
+            "{items} · {selected} ({})",
+            glib::format_size(selection.bytes)
+        )
+    } else {
+        format!("{items} · {selected}")
+    }
+}
+
+/// «45.3 GB libres de 500 GB».
+pub fn free_space(free: u64, size: u64) -> String {
+    format!(
+        "{} libres de {}",
+        glib::format_size(free),
+        glib::format_size(size)
+    )
 }

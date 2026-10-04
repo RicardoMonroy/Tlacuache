@@ -10,6 +10,7 @@ pub mod filter;
 pub mod history;
 pub mod path_input;
 pub mod sort;
+pub mod summary;
 pub mod text;
 
 /// Identificador de la aplicación (D-Bus / desktop file).

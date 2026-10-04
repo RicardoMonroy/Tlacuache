@@ -9,11 +9,13 @@ use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config::ViewMode;
 use tlacuache_core::history::History;
+use tlacuache_core::summary::ViewStatus;
 
 use crate::strings;
 use crate::ui::list_view::FileListView;
 use crate::ui::miller_view::MillerView;
 use crate::ui::path_bar::PathBar;
+use crate::ui::status_bar::StatusBar;
 
 /// Botones laterales del ratón (atrás/adelante).
 const MOUSE_BUTTON_BACK: u32 = 8;
@@ -70,6 +72,20 @@ impl PageView {
         }
     }
 
+    fn status(&self) -> ViewStatus {
+        match self {
+            Self::Columns(view) => view.status(),
+            Self::Details(view) => view.status(),
+        }
+    }
+
+    fn connect_status_changed<F: Fn() + 'static>(&self, f: F) {
+        match self {
+            Self::Columns(view) => view.connect_status_changed(move |_| f()),
+            Self::Details(view) => view.connect_status_changed(move |_| f()),
+        }
+    }
+
     fn connect_directory_activated<F: Fn(&gio::File) + 'static>(&self, f: F) {
         match self {
             Self::Columns(view) => view.connect_directory_activated(move |_, dir| f(dir)),
@@ -94,6 +110,9 @@ mod imp {
         pub(super) view: RefCell<Option<PageView>>,
         pub view_slot: adw::Bin,
         pub path_bar: PathBar,
+        pub status_bar: StatusBar,
+        /// Consulta en curso del espacio libre.
+        pub free_space_query: RefCell<Option<glib::JoinHandle<()>>>,
         /// URIs visitadas (gio admite rutas no locales vía GVfs).
         pub history: RefCell<Option<History<String>>>,
         /// Ocultos visibles en esta pestaña; sobrevive al cambiar de vista.
@@ -225,6 +244,7 @@ impl TabPage {
         imp.view_slot.set_vexpand(true);
         self.append(&nav);
         self.append(&imp.view_slot);
+        self.append(&imp.status_bar);
 
         imp.history
             .replace(Some(History::new(dir.uri().to_string())));
@@ -233,6 +253,7 @@ impl TabPage {
         imp.view_mode.replace(mode.id().to_owned());
         self.install_view(PageView::new(mode, dir, show_hidden));
         self.update_nav_actions();
+        self.refresh_free_space(dir);
     }
 
     fn view(&self) -> Option<PageView> {
@@ -245,8 +266,53 @@ impl TabPage {
             self,
             move |dir| page.navigate_to(dir)
         ));
+        view.connect_status_changed(glib::clone!(
+            #[weak(rename_to = page)]
+            self,
+            move || page.update_status()
+        ));
         self.imp().view_slot.set_child(Some(&view.widget()));
         self.imp().view.replace(Some(view));
+        self.update_status();
+    }
+
+    fn update_status(&self) {
+        let status = self.view().map(|v| v.status()).unwrap_or_default();
+        self.imp().status_bar.set_status(&status);
+    }
+
+    /// Consulta en segundo plano el espacio libre de la unidad de `dir`.
+    fn refresh_free_space(&self, dir: &gio::File) {
+        let imp = self.imp();
+        if let Some(handle) = imp.free_space_query.take() {
+            handle.abort();
+        }
+        let dir = dir.clone();
+        let handle = glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = page)]
+            self,
+            async move {
+                let attrs = format!(
+                    "{},{}",
+                    gio::FILE_ATTRIBUTE_FILESYSTEM_FREE,
+                    gio::FILE_ATTRIBUTE_FILESYSTEM_SIZE
+                );
+                let space = dir
+                    .query_filesystem_info_future(&attrs, glib::Priority::DEFAULT)
+                    .await
+                    .ok()
+                    .filter(|info| info.has_attribute(gio::FILE_ATTRIBUTE_FILESYSTEM_SIZE))
+                    .map(|info| {
+                        (
+                            info.attribute_uint64(gio::FILE_ATTRIBUTE_FILESYSTEM_FREE),
+                            info.attribute_uint64(gio::FILE_ATTRIBUTE_FILESYSTEM_SIZE),
+                        )
+                    });
+                page.imp().free_space_query.take();
+                page.imp().status_bar.set_free_space(space);
+            }
+        ));
+        imp.free_space_query.replace(Some(handle));
     }
 
     /// Reemplaza la vista por otra en la misma carpeta (sin tocar historial).
@@ -329,6 +395,7 @@ impl TabPage {
         self.imp().directory.replace(Some(dir.clone()));
         self.notify_directory();
         self.update_nav_actions();
+        self.refresh_free_space(dir);
     }
 
     fn update_nav_actions(&self) {

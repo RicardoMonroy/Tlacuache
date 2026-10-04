@@ -22,7 +22,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **2.1 Vista Miller** con scroll automático a la columna activa. CA: navegar 6 niveles solo con flechas.
 - [x] **2.2 Alternar vista** Miller/lista por pestaña. Diseñar el selector para admitir más vistas (iconos en v0.2); cada pestaña, y por tanto cada panel del modo dual, tiene su propia vista.
 - [x] **2.3 Pestañas** con `adw::TabView` (Ctrl+T, Ctrl+W, Ctrl+Tab).
-- [ ] **2.4 Barra de estado** del panel (elementos, selección, espacio libre).
+- [x] **2.4 Barra de estado** del panel (elementos, selección, espacio libre).
 
 ## Hito 3 — Doble panel y sidebar
 - [ ] **3.1 Dos paneles** en `gtk::Paned`, F3 alterna, Tab cambia el panel activo con acento visual.
