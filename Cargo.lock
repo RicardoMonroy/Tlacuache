@@ -871,6 +871,7 @@ dependencies = [
  "glib-build-tools",
  "gtk4",
  "libadwaita",
+ "libc",
  "tempfile",
  "tlacuache-core",
  "tracing",

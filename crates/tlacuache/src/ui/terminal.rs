@@ -1,8 +1,14 @@
 //! Terminal de un panel: envuelve `vte4::Terminal` con el shell del usuario,
 //! la fuente de la config y la paleta Nord. Emite `exited` cuando el shell
 //! termina (el panel la oculta y la recrea en el siguiente F4).
+//!
+//! Panel → terminal: `change_directory` manda `cd` solo si el shell está en
+//! primer plano (grupo en primer plano del PTY = PID del shell). Si hay un
+//! programa corriendo o la carpeta no es local, muestra «Carpeta
+//! desincronizada» con un botón para sincronizar.
 
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell, RefCell};
+use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -11,6 +17,7 @@ use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::config::Config;
+use tlacuache_core::shell::{ShellKind, cd_command};
 use tlacuache_core::theme;
 use vte::prelude::*;
 
@@ -27,8 +34,14 @@ mod imp {
     #[derive(Default)]
     pub struct TerminalView {
         pub terminal: OnceCell<vte::Terminal>,
-        /// Ruta del shell lanzado (para elegir el escapado en 5.3).
+        /// Ruta del shell lanzado (elige el escapado).
         pub shell: OnceCell<String>,
+        pub shell_pid: Cell<Option<i32>>,
+        /// Carpeta en la que está la terminal según lo último enviado.
+        pub current_dir: RefCell<Option<gio::File>>,
+        /// Carpeta del panel que falta aplicar (programa corriendo).
+        pub pending_dir: RefCell<Option<gio::File>>,
+        pub desync: gtk::Revealer,
     }
 
     #[glib::object_subclass]
@@ -130,8 +143,114 @@ impl TerminalView {
         ));
         terminal.add_controller(keys);
 
-        self.set_child(Some(&terminal));
+        // Al volver a la terminal, aplicar la carpeta pendiente si el shell
+        // ya está libre.
+        let focus = gtk::EventControllerFocus::new();
+        focus.connect_enter(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move |_| {
+                view.apply_pending();
+            }
+        ));
+        terminal.add_controller(focus);
+
+        let overlay = gtk::Overlay::new();
+        overlay.set_child(Some(&terminal));
+        overlay.add_overlay(&self.build_desync_indicator());
+        self.set_child(Some(&overlay));
         let _ = self.imp().terminal.set(terminal);
+    }
+
+    /// Pastilla «Carpeta desincronizada · Sincronizar» (arriba a la derecha).
+    fn build_desync_indicator(&self) -> gtk::Revealer {
+        let label = gtk::Label::new(Some(strings::TERMINAL_DESYNC));
+        let sync = gtk::Button::with_label(strings::TERMINAL_SYNC);
+        sync.add_css_class("flat");
+        sync.set_focusable(false);
+        sync.connect_clicked(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move |_| {
+                if !view.apply_pending() {
+                    window::show_toast_from(&view, strings::TERMINAL_BUSY);
+                }
+            }
+        ));
+        let pill = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        pill.add_css_class("terminal-desync");
+        pill.append(&gtk::Image::from_icon_name("dialog-warning-symbolic"));
+        pill.append(&label);
+        pill.append(&sync);
+
+        let revealer = &self.imp().desync;
+        revealer.set_child(Some(&pill));
+        revealer.set_transition_type(gtk::RevealerTransitionType::Crossfade);
+        revealer.set_halign(gtk::Align::End);
+        revealer.set_valign(gtk::Align::Start);
+        revealer.clone()
+    }
+
+    /// El shell está esperando órdenes (no hay otro programa en primer
+    /// plano en la terminal).
+    pub fn is_shell_in_foreground(&self) -> bool {
+        let imp = self.imp();
+        let (Some(terminal), Some(pid)) = (imp.terminal.get(), imp.shell_pid.get()) else {
+            return false;
+        };
+        let Some(pty) = terminal.pty() else {
+            return false;
+        };
+        let fd = pty.fd();
+        // SAFETY: `tcgetpgrp` solo consulta el grupo de procesos en primer
+        // plano de un descriptor válido; `pty` lo mantiene abierto durante
+        // la llamada y no se toca memoria.
+        let foreground = unsafe { libc::tcgetpgrp(fd.as_raw_fd()) };
+        foreground > 0 && foreground == pid
+    }
+
+    /// Panel → terminal: cambia a `dir` si el shell está libre; si no,
+    /// queda pendiente y se muestra el aviso de desincronización.
+    pub fn change_directory(&self, dir: &gio::File) {
+        let imp = self.imp();
+        if imp
+            .current_dir
+            .borrow()
+            .as_ref()
+            .is_some_and(|d| d.equal(dir))
+        {
+            imp.pending_dir.replace(None);
+            imp.desync.set_reveal_child(false);
+            return;
+        }
+        imp.pending_dir.replace(Some(dir.clone()));
+        if !self.apply_pending() {
+            imp.desync.set_reveal_child(true);
+        }
+    }
+
+    /// Envía el `cd` pendiente si se puede. Devuelve `true` si quedó
+    /// sincronizada.
+    fn apply_pending(&self) -> bool {
+        let imp = self.imp();
+        let Some(dir) = imp.pending_dir.borrow().clone() else {
+            return true;
+        };
+        let (Some(path), Some(terminal)) = (dir.path(), imp.terminal.get()) else {
+            return false;
+        };
+        if !self.is_shell_in_foreground() {
+            return false;
+        }
+        // Ctrl+E y Ctrl+U limpian lo escrito a medias; el espacio inicial
+        // evita que el `cd` quede en el historial (HISTCONTROL=ignorespace).
+        let shell = ShellKind::from_shell_path(self.shell());
+        let line = format!("\x05\x15 {}", cd_command(&path.to_string_lossy(), shell));
+        terminal.feed_child(line.as_bytes());
+        imp.current_dir.replace(Some(dir));
+        imp.pending_dir.replace(None);
+        imp.desync.set_reveal_child(false);
+        true
     }
 
     fn spawn(&self, config: &Config, dir: Option<&gio::File>) {
@@ -141,11 +260,11 @@ impl TerminalView {
         let shell = resolve_shell(&config.terminal.shell);
         let _ = self.imp().shell.set(shell.clone());
         // Solo carpetas locales: VTE necesita una ruta del sistema.
-        let cwd = dir
-            .and_then(gio::File::path)
-            .unwrap_or_else(glib::home_dir)
-            .to_string_lossy()
-            .into_owned();
+        let cwd_path = dir.and_then(gio::File::path).unwrap_or_else(glib::home_dir);
+        self.imp()
+            .current_dir
+            .replace(Some(gio::File::for_path(&cwd_path)));
+        let cwd = cwd_path.to_string_lossy().into_owned();
         terminal.spawn_async(
             vte::PtyFlags::DEFAULT,
             Some(&cwd),
@@ -159,6 +278,9 @@ impl TerminalView {
                 #[weak(rename_to = view)]
                 self,
                 move |result| {
+                    if let Ok(pid) = &result {
+                        view.imp().shell_pid.set(Some(pid.0));
+                    }
                     if let Err(err) = result {
                         tracing::warn!("no se pudo iniciar el shell: {err}");
                         window::show_toast_from(

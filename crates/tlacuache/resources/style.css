@@ -219,3 +219,17 @@ levelbar.drive-usage.usage-critical block.filled {
 .pane-actions button {
   padding: 6px 4px;
 }
+
+/* Aviso de terminal desincronizada. */
+.terminal-desync {
+  margin: 8px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 8px;
+  background-color: var(--nord13);
+  color: var(--nord0);
+}
+
+.terminal-desync button {
+  color: var(--nord0);
+  font-weight: bold;
+}

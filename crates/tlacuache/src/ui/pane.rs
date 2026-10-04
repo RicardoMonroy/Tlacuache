@@ -113,6 +113,7 @@ impl Pane {
                     page.focus_view();
                 }
                 pane.emit_by_name::<()>("selection-changed", &[]);
+                pane.sync_terminal();
             }
         ));
 
@@ -189,6 +190,23 @@ impl Pane {
         terminal.grab_focus();
     }
 
+    /// Panel → terminal: lleva la terminal a la carpeta de la pestaña
+    /// actual (si existe y está activada la opción en la config).
+    fn sync_terminal(&self) {
+        let imp = self.imp();
+        let enabled = imp
+            .config
+            .get()
+            .is_some_and(|c| c.terminal.sync_panel_to_terminal);
+        if !enabled {
+            return;
+        }
+        let terminal = imp.terminal.borrow().clone();
+        if let (Some(terminal), Some(dir)) = (terminal, self.current_directory()) {
+            terminal.change_directory(&dir);
+        }
+    }
+
     fn hide_terminal(&self) {
         let imp = self.imp();
         imp.split_position.set(Some(imp.split.position()));
@@ -242,11 +260,16 @@ impl Pane {
         let tab = imp.tab_view.append(&page);
         update_tab_title(&tab, dir);
         page.connect_directory_notify(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
             #[weak]
             tab,
             move |page| {
                 if let Some(dir) = page.directory() {
                     update_tab_title(&tab, &dir);
+                }
+                if pane.current_page().as_ref() == Some(page) {
+                    pane.sync_terminal();
                 }
             }
         ));
