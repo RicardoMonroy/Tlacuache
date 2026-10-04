@@ -31,3 +31,8 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
 - **Contexto**: el filtro rápido se activa al escribir directamente, pero Backspace (subir nivel) y Espacio (vista previa) también son atajos del panel.
 - **Decisión**: si el filtro tiene texto, Backspace y Espacio editan el filtro; si está vacío, ejecutan su acción normal. Esc siempre limpia el filtro.
 - **Consecuencias**: el filtro admite espacios y se puede corregir sin salir de él. El despacho de teclas del panel debe consultar primero el estado del filtro (lógica testeable en `core::keymap`).
+
+## ADR-007 — Orden natural propio con plegado de acentos
+- **Contexto**: los nombres deben ordenarse de forma natural (`img2` < `img10`), y el autor usa nombres en español con acentos y `ñ`. Comparar por código Unicode deja `Árbol` después de `zeta`.
+- **Decisión**: implementar `core::sort::natural_cmp` a mano, sin crates: tramos numéricos por valor (sin desbordes), texto sin distinguir mayúsculas ni acentos latinos comunes, `ñ` entre `n` y `o`. Empates resueltos por ceros a la izquierda y luego por bytes para un orden total. Carpetas siempre primero.
+- **Consecuencias**: sin dependencias y con orden razonable para español. No es una collation completa por locale (p. ej. no maneja ligaduras ni alfabetos no latinos de forma especial); si hiciera falta, evaluar `icu_collator` con un ADR nuevo.

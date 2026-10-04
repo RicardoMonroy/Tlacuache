@@ -10,7 +10,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **0.5 CI local**: script `scripts/check.sh` que corre fmt, clippy y tests. CA: script en verde.
 
 ## Hito 1 — Un panel que navega
-- [ ] **1.1 FileEntry + sort + filter** en core con pruebas (orden natural, carpetas primero, ocultos).
+- [x] **1.1 FileEntry + sort + filter** en core con pruebas (orden natural, carpetas primero, ocultos).
 - [ ] **1.2 Lista detallada**: `ColumnView` con `DirectoryList` → filtro → orden. CA: abre `~` y una carpeta con 10 000 archivos sin congelar la UI.
 - [ ] **1.3 Navegación**: Enter/doble clic entra, Backspace sube, Alt+←/→ con `core::history`. CA: pruebas de history + prueba manual.
 - [ ] **1.4 Barra de ruta**: breadcrumb clicable y modo editable (Ctrl+L) con autocompletado. CA: navegar escribiendo una ruta.
