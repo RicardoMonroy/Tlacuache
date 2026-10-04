@@ -11,6 +11,7 @@ pub mod filter;
 pub mod history;
 pub mod path_input;
 pub mod places;
+pub mod session;
 pub mod sort;
 pub mod summary;
 pub mod text;

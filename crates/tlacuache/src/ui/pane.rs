@@ -11,7 +11,8 @@ use std::rc::Rc;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
-use tlacuache_core::config::Config;
+use tlacuache_core::config::{Config, ViewMode};
+use tlacuache_core::session::{PaneSession, TabSession};
 
 use crate::fs::display::{display_name, display_path};
 use crate::strings;
@@ -55,11 +56,11 @@ glib::wrapper! {
 }
 
 impl Pane {
-    pub fn new(dir: &gio::File, config: Rc<Config>) -> Self {
+    /// Panel sin pestañas: añadirlas con `add_tab` o `restore`.
+    pub fn new(config: Rc<Config>) -> Self {
         let pane: Self = glib::Object::new();
         let _ = pane.imp().config.set(config);
         pane.build();
-        pane.add_tab(dir);
         pane
     }
 
@@ -98,13 +99,19 @@ impl Pane {
         self.append(&imp.tab_view);
     }
 
-    /// Abre una pestaña en `dir` y la selecciona.
+    /// Abre una pestaña en `dir` con la vista y ocultos de la config, y la
+    /// selecciona.
     pub fn add_tab(&self, dir: &gio::File) {
-        let imp = self.imp();
-        let Some(config) = imp.config.get() else {
+        let Some(config) = self.imp().config.get() else {
             return;
         };
-        let page = TabPage::new(dir, config.general.show_hidden, config.general.default_view);
+        let (mode, show_hidden) = (config.general.default_view, config.general.show_hidden);
+        self.add_tab_with(dir, mode, show_hidden);
+    }
+
+    fn add_tab_with(&self, dir: &gio::File, mode: ViewMode, show_hidden: bool) {
+        let imp = self.imp();
+        let page = TabPage::new(dir, show_hidden, mode);
         let tab = imp.tab_view.append(&page);
         update_tab_title(&tab, dir);
         page.connect_directory_notify(glib::clone!(
@@ -117,6 +124,41 @@ impl Pane {
             }
         ));
         imp.tab_view.set_selected_page(&tab);
+    }
+
+    /// Restaura las pestañas de una sesión. Devuelve `false` si no había
+    /// ninguna (el llamador abre una por defecto).
+    pub fn restore(&self, session: &PaneSession) -> bool {
+        for tab in &session.tabs {
+            self.add_tab_with(&gio::File::for_uri(&tab.uri), tab.view, tab.show_hidden);
+        }
+        let view = &self.imp().tab_view;
+        if let Ok(selected) = i32::try_from(session.selected)
+            && selected < view.n_pages()
+        {
+            view.set_selected_page(&view.nth_page(selected));
+        }
+        !session.tabs.is_empty()
+    }
+
+    /// Estado actual de las pestañas para guardar la sesión.
+    pub fn session(&self) -> PaneSession {
+        let view = &self.imp().tab_view;
+        let tabs = (0..view.n_pages())
+            .filter_map(|i| view.nth_page(i).child().downcast::<TabPage>().ok())
+            .filter_map(|page| {
+                Some(TabSession {
+                    uri: page.directory()?.uri().to_string(),
+                    view: page.mode(),
+                    show_hidden: page.show_hidden(),
+                })
+            })
+            .collect();
+        let selected = view
+            .selected_page()
+            .and_then(|page| usize::try_from(view.page_position(&page)).ok())
+            .unwrap_or(0);
+        PaneSession { selected, tabs }
     }
 
     /// Navega la pestaña seleccionada a `dir` y le da el foco.

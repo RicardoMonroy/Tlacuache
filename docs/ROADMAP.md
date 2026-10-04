@@ -29,7 +29,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **3.2 Sidebar: lugares XDG** + Inicio + Raíz.
 - [x] **3.3 Sidebar: unidades** con `gio::VolumeMonitor`, uso de disco y montar/desmontar.
 - [x] **3.4 Sidebar: favoritos** agrupados, persistidos en config, arrastrar para añadir.
-- [ ] **3.5 Sesión**: restaurar pestañas y tamaños al reabrir.
+- [x] **3.5 Sesión**: restaurar pestañas y tamaños al reabrir.
 
 ## Hito 4 — Operaciones de archivo
 - [ ] **4.1 Cola de ops en core** (estados, progreso, cancelación) con pruebas.

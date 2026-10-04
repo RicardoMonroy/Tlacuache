@@ -1,5 +1,7 @@
-//! Construcción de la `adw::Application`, carga de config y acciones globales.
+//! Construcción de la `adw::Application`, carga de config y sesión, y
+//! acciones globales.
 
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -7,6 +9,7 @@ use adw::prelude::*;
 use gtk::{gio, glib};
 use tlacuache_core::APP_ID;
 use tlacuache_core::config::{self, ColorScheme, Config};
+use tlacuache_core::session::{self, Session};
 
 use crate::strings;
 use crate::window::TlacuacheWindow;
@@ -16,6 +19,13 @@ pub(crate) fn config_path() -> PathBuf {
     glib::user_config_dir()
         .join("tlacuache")
         .join(config::FILE_NAME)
+}
+
+/// Ruta de la sesión según XDG (`~/.local/state/tlacuache/session.toml`).
+pub(crate) fn session_path() -> PathBuf {
+    glib::user_state_dir()
+        .join("tlacuache")
+        .join(session::FILE_NAME)
 }
 
 /// Carga la config antes de arrancar el bucle de GTK. Si falla, usa los
@@ -34,6 +44,18 @@ fn load_config() -> (Config, Option<String>) {
     }
 }
 
+/// Carga la sesión anterior (antes del bucle de GTK). Si está dañada se
+/// ignora: la app arranca como la primera vez.
+fn load_session() -> (Option<Session>, Option<String>) {
+    match Session::load(&session_path()) {
+        Ok(session) => (session, None),
+        Err(err) => {
+            tracing::warn!("{err}");
+            (None, Some(strings::SESSION_RESTORE_FAILED.to_owned()))
+        }
+    }
+}
+
 fn adw_color_scheme(scheme: ColorScheme) -> adw::ColorScheme {
     match scheme {
         ColorScheme::Dark => adw::ColorScheme::ForceDark,
@@ -45,6 +67,11 @@ fn adw_color_scheme(scheme: ColorScheme) -> adw::ColorScheme {
 pub fn build() -> adw::Application {
     let (config, config_warning) = load_config();
     let config = Rc::new(config);
+    let (session, session_warning) = load_session();
+    // La sesión se usa una sola vez, en la primera ventana.
+    let session = Rc::new(RefCell::new(session));
+    let warnings: Rc<Vec<String>> =
+        Rc::new(config_warning.into_iter().chain(session_warning).collect());
 
     let app = adw::Application::builder()
         .application_id(APP_ID)
@@ -56,16 +83,20 @@ pub fn build() -> adw::Application {
         adw::StyleManager::default().set_color_scheme(scheme);
     });
 
-    let config_warning = Rc::new(config_warning);
-    let present = move |app: &adw::Application, start_dir: &gio::File| {
-        // Una sola ventana por ahora: reactivar la app la trae al frente.
-        if let Some(window) = app.active_window() {
+    let present = move |app: &adw::Application, dir: Option<&gio::File>| {
+        // Una sola ventana: si ya existe, la carpeta pedida se abre en una
+        // pestaña nueva del panel activo.
+        if let Some(window) = app.active_window().and_downcast::<TlacuacheWindow>() {
+            if let Some(dir) = dir {
+                window.open_in_new_tab(dir);
+            }
             window.present();
             return;
         }
-        let window = TlacuacheWindow::new(app, config.clone(), start_dir);
+        let session = session.borrow_mut().take();
+        let window = TlacuacheWindow::new(app, config.clone(), session, dir);
         window.present();
-        if let Some(warning) = config_warning.as_ref() {
+        for warning in warnings.iter() {
             window.show_toast(warning);
         }
     };
@@ -74,13 +105,10 @@ pub fn build() -> adw::Application {
     app.connect_activate(glib::clone!(
         #[strong]
         present,
-        move |app| present(app, &gio::File::for_path(glib::home_dir()))
+        move |app| present(app, None)
     ));
     // `tlacuache <carpeta>` abre esa carpeta.
-    app.connect_open(move |app, files, _hint| {
-        let home = gio::File::for_path(glib::home_dir());
-        present(app, files.first().unwrap_or(&home));
-    });
+    app.connect_open(move |app, files, _hint| present(app, files.first()));
 
     app
 }

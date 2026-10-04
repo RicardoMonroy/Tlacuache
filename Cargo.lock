@@ -806,6 +806,7 @@ dependencies = [
 name = "tlacuache"
 version = "0.1.0"
 dependencies = [
+ "glib",
  "glib-build-tools",
  "gtk4",
  "libadwaita",

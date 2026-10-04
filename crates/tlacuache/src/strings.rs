@@ -23,6 +23,8 @@ pub const NAV_UP: &str = "Subir (Alt+↑)";
 pub const DUAL_PANE: &str = "Doble panel (F3)";
 pub const SHOW_SIDEBAR: &str = "Barra lateral (F9)";
 
+pub const SESSION_RESTORE_FAILED: &str = "No se pudo restaurar la sesión anterior";
+
 pub const SIDEBAR_PLACES: &str = "Lugares";
 pub const PLACE_HOME: &str = "Inicio";
 pub const PLACE_DESKTOP: &str = "Escritorio";

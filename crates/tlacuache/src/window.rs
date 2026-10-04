@@ -1,7 +1,7 @@
 //! Ventana principal: header bar, barra lateral (F9) y área de paneles
-//! (uno o dos, F3). Lleva
-//! la cuenta del panel activo, que Tab alterna y que las operaciones entre
-//! paneles (F5/F6) usarán como origen.
+//! (uno o dos, F3). Lleva la cuenta del panel activo, que Tab alterna y que
+//! las operaciones entre paneles (F5/F6) usarán como origen. Restaura la
+//! sesión al abrir y la guarda al cerrar.
 
 use std::cell::{Cell, OnceCell};
 use std::rc::Rc;
@@ -10,13 +10,13 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config::Config;
+use tlacuache_core::session::{Session, WindowSession};
 
 use crate::strings;
 use crate::ui::pane::Pane;
 use crate::ui::sidebar::Sidebar;
 
-/// Ancho inicial y mínimo de la barra lateral (px).
-const SIDEBAR_WIDTH: i32 = 200;
+/// Ancho mínimo de la barra lateral (px); el inicial viene de la sesión.
 const SIDEBAR_MIN_WIDTH: i32 = 140;
 
 mod imp {
@@ -43,6 +43,8 @@ mod imp {
         /// Barra lateral visible (F9).
         #[property(get, set = Self::set_show_sidebar)]
         pub show_sidebar: Cell<bool>,
+        /// Ya se guardó la sesión: el siguiente cierre es definitivo.
+        pub session_saved: Cell<bool>,
     }
 
     impl TlacuacheWindow {
@@ -95,7 +97,6 @@ mod imp {
             let obj = self.obj();
 
             obj.set_title(Some(strings::APP_NAME));
-            obj.set_default_size(1200, 800);
 
             let dual = gtk::ToggleButton::builder()
                 .icon_name("view-dual-symbolic")
@@ -133,7 +134,16 @@ mod imp {
     }
 
     impl WidgetImpl for TlacuacheWindow {}
-    impl WindowImpl for TlacuacheWindow {}
+    impl WindowImpl for TlacuacheWindow {
+        /// Aplaza el cierre hasta guardar la sesión en un hilo de trabajo.
+        fn close_request(&self) -> glib::Propagation {
+            if self.session_saved.get() {
+                return self.parent_close_request();
+            }
+            self.obj().save_session_and_close();
+            glib::Propagation::Stop
+        }
+    }
     impl ApplicationWindowImpl for TlacuacheWindow {}
     impl AdwApplicationWindowImpl for TlacuacheWindow {}
 }
@@ -146,19 +156,54 @@ glib::wrapper! {
 }
 
 impl TlacuacheWindow {
-    pub fn new(app: &adw::Application, config: Rc<Config>, start_dir: &gio::File) -> Self {
+    /// Crea la ventana restaurando `session` si la hay. `open_dir` (de
+    /// `tlacuache <carpeta>`) se abre en una pestaña nueva del panel
+    /// izquierdo, o como su única pestaña si no hay sesión.
+    pub fn new(
+        app: &adw::Application,
+        config: Rc<Config>,
+        session: Option<Session>,
+        open_dir: Option<&gio::File>,
+    ) -> Self {
         let window: Self = glib::Object::builder().property("application", app).build();
-        window.build_panes(&config, start_dir);
+        let window_session = session
+            .as_ref()
+            .map(|s| s.window.clone())
+            .unwrap_or_else(|| WindowSession {
+                dual_pane: config.general.dual_pane,
+                ..WindowSession::default()
+            });
+        window.set_default_size(window_session.width, window_session.height);
+        if window_session.maximized {
+            window.maximize();
+        }
+        window.build_panes(&config, &window_session, session.as_ref(), open_dir);
         window
     }
 
-    fn build_panes(&self, config: &Rc<Config>, start_dir: &gio::File) {
+    fn build_panes(
+        &self,
+        config: &Rc<Config>,
+        state: &WindowSession,
+        session: Option<&Session>,
+        open_dir: Option<&gio::File>,
+    ) {
         let imp = self.imp();
-        let panes = [
-            Pane::new(start_dir, config.clone()),
-            Pane::new(start_dir, config.clone()),
-        ];
+        let home = gio::File::for_path(glib::home_dir());
+        let start = open_dir.unwrap_or(&home);
+        let panes = [Pane::new(config.clone()), Pane::new(config.clone())];
         for (index, pane) in panes.iter().enumerate() {
+            let restored = session
+                .and_then(|s| s.panes.get(index))
+                .is_some_and(|p| pane.restore(p));
+            if !restored {
+                pane.add_tab(start);
+            } else if index == 0
+                && let Some(dir) = open_dir
+            {
+                pane.add_tab(dir);
+            }
+
             let focus = gtk::EventControllerFocus::new();
             focus.connect_enter(glib::clone!(
                 #[weak(rename_to = window)]
@@ -174,18 +219,28 @@ impl TlacuacheWindow {
         paned.set_end_child(Some(&panes[1]));
         paned.set_shrink_start_child(false);
         paned.set_shrink_end_child(false);
-        // Mitad y mitad la primera vez que se muestra.
-        paned.connect_map(|paned| {
-            glib::idle_add_local_once(glib::clone!(
-                #[weak]
-                paned,
-                move || {
-                    if paned.position() == 0 || paned.width() > 0 {
-                        paned.set_position(paned.width() / 2);
+        // Al mostrarse: posición guardada o mitad y mitad; y foco al panel
+        // activo.
+        let saved_position = state.panes_position;
+        let active = state.active_pane;
+        paned.connect_map(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |paned| {
+                glib::idle_add_local_once(glib::clone!(
+                    #[weak]
+                    window,
+                    #[weak]
+                    paned,
+                    move || {
+                        paned.set_position(saved_position.unwrap_or(paned.width() / 2));
+                        if let Some(pane) = window.pane(active) {
+                            pane.focus_current();
+                        }
                     }
-                }
-            ));
-        });
+                ));
+            }
+        ));
 
         imp.sidebar.set_width_request(SIDEBAR_MIN_WIDTH);
         imp.sidebar.connect_place_activated(glib::clone!(
@@ -193,7 +248,8 @@ impl TlacuacheWindow {
             self,
             move |_, file| window.navigate_active(file)
         ));
-        imp.show_sidebar.set(true);
+        imp.show_sidebar.set(state.sidebar_visible);
+        imp.sidebar.set_visible(state.sidebar_visible);
         imp.sidebar
             .set_favorites(config.favorites.clone(), crate::app::config_path());
 
@@ -204,13 +260,64 @@ impl TlacuacheWindow {
         outer.set_resize_start_child(false);
         outer.set_shrink_start_child(false);
         outer.set_shrink_end_child(false);
-        outer.set_position(SIDEBAR_WIDTH);
+        outer.set_position(state.sidebar_width);
         imp.toolbar.set_content(Some(outer));
 
         let _ = imp.panes.set(panes);
-        imp.dual_pane.set(config.general.dual_pane);
+        imp.dual_pane.set(state.dual_pane);
         self.apply_dual_pane();
-        self.set_active_pane(0);
+        self.set_active_pane(if state.dual_pane { active } else { 0 });
+    }
+
+    /// Abre `dir` en una pestaña nueva del panel activo.
+    pub fn open_in_new_tab(&self, dir: &gio::File) {
+        if let Some(pane) = self.pane(self.imp().active.get()) {
+            pane.add_tab(dir);
+            pane.focus_current();
+        }
+    }
+
+    /// Estado actual para restaurarlo la próxima vez.
+    fn current_session(&self) -> Session {
+        let imp = self.imp();
+        let (width, height) = self.default_size();
+        Session {
+            window: WindowSession {
+                width,
+                height,
+                maximized: self.is_maximized(),
+                sidebar_visible: self.show_sidebar(),
+                sidebar_width: imp.outer.position(),
+                dual_pane: self.dual_pane(),
+                panes_position: Some(imp.paned.position()).filter(|p| *p > 0),
+                active_pane: imp.active.get(),
+            },
+            panes: (0..2)
+                .filter_map(|i| self.pane(i))
+                .map(Pane::session)
+                .collect(),
+        }
+        .sanitized()
+    }
+
+    /// Guarda la sesión fuera del hilo de GTK y luego cierra la ventana.
+    /// Si falla, se registra y se cierra igual: no debe impedir salir.
+    fn save_session_and_close(&self) {
+        let session = self.current_session();
+        let path = crate::app::session_path();
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                match gio::spawn_blocking(move || session.save(&path)).await {
+                    Ok(Ok(())) => tracing::debug!("sesión guardada"),
+                    Ok(Err(err)) => tracing::warn!("{err}"),
+                    Err(_) => tracing::warn!("falló el hilo que guarda la sesión"),
+                }
+                window.imp().session_saved.set(true);
+                window.close();
+            }
+        ));
     }
 
     /// Navega el panel activo a `dir` (barra lateral, favoritos…).

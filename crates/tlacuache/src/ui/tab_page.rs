@@ -324,6 +324,16 @@ impl TabPage {
         self.focus_view();
     }
 
+    /// Ocultos visibles en esta pestaña.
+    pub fn show_hidden(&self) -> bool {
+        self.imp().show_hidden.get()
+    }
+
+    /// Vista actual de la pestaña.
+    pub fn mode(&self) -> ViewMode {
+        ViewMode::from_id(&self.view_mode()).unwrap_or_default()
+    }
+
     /// Lleva el foco del teclado a la vista de la carpeta.
     pub fn focus_view(&self) {
         if let Some(view) = self.view() {
