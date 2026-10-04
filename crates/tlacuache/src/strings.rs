@@ -30,6 +30,10 @@ pub fn listing_failed(err: &glib::Error) -> String {
     format!("No se pudo abrir la carpeta: {}", err.message())
 }
 
+pub fn open_failed(name: &str, err: &glib::Error) -> String {
+    format!("No se pudo abrir «{name}»: {}", err.message())
+}
+
 pub fn path_not_found(text: &str) -> String {
     format!("No existe la ruta: {text}")
 }

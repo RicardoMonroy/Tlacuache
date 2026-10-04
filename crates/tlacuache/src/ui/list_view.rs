@@ -16,6 +16,7 @@ use tlacuache_core::age::{Age, AgeBucket};
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 
 use crate::fs::file_item::FileItem;
+use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
 use crate::window::TlacuacheWindow;
@@ -52,7 +53,8 @@ mod imp {
             static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
             SIGNALS.get_or_init(|| {
                 vec![
-                    // Enter o doble clic sobre una carpeta.
+                    // Enter o doble clic sobre una carpeta (los archivos se
+                    // abren aquí mismo con su app predeterminada).
                     Signal::builder("directory-activated")
                         .param_types([gio::File::static_type()])
                         .build(),
@@ -193,11 +195,29 @@ impl FileListView {
         else {
             return;
         };
-        let is_dir = item.entry().is_dir;
-        if is_dir && let Some(dir) = item.file() {
-            self.emit_by_name::<()>("directory-activated", &[&dir]);
+        let Some(file) = item.file() else {
+            return;
+        };
+        if item.entry().is_dir {
+            self.emit_by_name::<()>("directory-activated", &[&file]);
+        } else {
+            self.open_file(file, item.entry().name.clone());
         }
-        // Abrir archivos con su app predeterminada: tarea 1.6.
+    }
+
+    fn open_file(&self, file: gio::File, name: String) {
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            async move {
+                if let Err(err) = launch::open_default(&file, &view).await {
+                    tracing::warn!("no se pudo abrir {}: {err}", file.uri());
+                    if let Some(window) = view.root().and_downcast::<TlacuacheWindow>() {
+                        window.show_toast(&strings::open_failed(&name, &err));
+                    }
+                }
+            }
+        ));
     }
 
     /// Selecciona la carpeta de la que venimos o, si no está, la primera fila.
