@@ -1,0 +1,8 @@
+[package]
+name = "tlacuache-core"
+description = "Lógica de Tlacuache Browser independiente de GTK"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
