@@ -17,7 +17,7 @@ use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::config::Config;
-use tlacuache_core::shell::{self, ShellKind, cd_command};
+use tlacuache_core::shell::{self, ShellKind, cd_command, paste_paths};
 use tlacuache_core::theme;
 use vte::prelude::*;
 
@@ -165,6 +165,18 @@ impl TerminalView {
                 }
             }
         ));
+
+        // Soltar archivos: escribe sus rutas escapadas (sin ejecutar). Solo
+        // COPY: aceptar MOVE haría que la app de origen borrara los archivos.
+        let drop = gtk::DropTarget::new(gdk::FileList::static_type(), gdk::DragAction::COPY);
+        drop.connect_drop(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            #[upgrade_or]
+            false,
+            move |_, value, _, _| view.paste_dropped(value)
+        ));
+        terminal.add_controller(drop);
 
         // Al volver a la terminal, aplicar la carpeta pendiente si el shell
         // ya está libre.
@@ -356,6 +368,29 @@ impl TerminalView {
         imp.pending_dir.replace(None);
         imp.desync.set_reveal_child(false);
         self.emit_by_name::<()>("directory-changed", &[&dir]);
+    }
+
+    /// Escribe en la línea de comandos las rutas de los archivos soltados.
+    fn paste_dropped(&self, value: &glib::Value) -> bool {
+        let (Ok(files), Some(terminal)) = (value.get::<gdk::FileList>(), self.terminal()) else {
+            return false;
+        };
+        let paths: Vec<String> = files
+            .files()
+            .iter()
+            .map(|f| {
+                f.path()
+                    .map_or_else(|| f.uri().to_string(), |p| p.to_string_lossy().into_owned())
+            })
+            .collect();
+        if paths.is_empty() {
+            return false;
+        }
+        let shell = ShellKind::from_shell_path(self.shell());
+        let text = paste_paths(paths.iter().map(String::as_str), shell);
+        terminal.feed_child(text.as_bytes());
+        terminal.grab_focus();
+        true
     }
 
     pub fn connect_directory_changed<F: Fn(&Self, &gio::File) + 'static>(&self, f: F) {

@@ -55,6 +55,19 @@ pub fn cd_command(path: &str, shell: ShellKind) -> String {
     format!("cd -- {}\n", quote(path, shell))
 }
 
+/// Texto a escribir en la terminal al soltar archivos: cada ruta escapada,
+/// separadas por espacio y con un espacio final para seguir escribiendo.
+/// Sin salto de línea: no se ejecuta nada.
+pub fn paste_paths<'a, I>(paths: I, shell: ShellKind) -> String
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    paths
+        .into_iter()
+        .map(|path| format!("{} ", quote(path, shell)))
+        .collect()
+}
+
 /// Archivo de inicio para bash (`bash --rcfile`): carga la configuración
 /// habitual del usuario y añade un gancho que emite OSC 7 (carpeta actual)
 /// en cada prompt, para que el panel siga a la terminal.
@@ -253,6 +266,15 @@ mod tests {
             all.contains("GANCHO-USUARIO"),
             "se perdió el gancho del usuario: {all:?}"
         );
+    }
+
+    #[test]
+    fn paste_paths_quotes_each_and_never_executes() {
+        let text = paste_paths(["/tmp/a b", "/tmp/it's"], POSIX);
+        assert_eq!(text, "'/tmp/a b' '/tmp/it'\\''s' ");
+        assert!(!text.contains('\n'));
+        assert_eq!(paste_paths([], POSIX), "");
+        assert_eq!(paste_paths([r"C:\x"], FISH), r"'C:\\x' ");
     }
 
     #[test]
