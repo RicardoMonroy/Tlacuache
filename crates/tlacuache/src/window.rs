@@ -65,7 +65,11 @@ impl TlacuacheWindow {
     pub fn new(app: &adw::Application, config: Rc<Config>, start_dir: &gio::File) -> Self {
         let window: Self = glib::Object::builder().property("application", app).build();
         // Por ahora una sola pestaña; panel con pestañas en hitos 2 y 3.
-        let page = TabPage::new(start_dir, config.general.show_hidden);
+        let page = TabPage::new(
+            start_dir,
+            config.general.show_hidden,
+            config.general.default_view,
+        );
         if let Some(toolbar) = window.imp().toolbar.get() {
             toolbar.set_content(Some(&page));
         }

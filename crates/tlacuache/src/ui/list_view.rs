@@ -210,14 +210,11 @@ impl FileListView {
         self.notify_directory();
     }
 
-    /// Alterna los archivos ocultos (Ctrl+H) y devuelve el estado nuevo.
-    pub fn toggle_show_hidden(&self) -> bool {
-        let Some(model) = self.imp().model.get() else {
-            return false;
-        };
-        let show = !model.show_hidden();
-        model.set_show_hidden(show);
-        show
+    /// Muestra u oculta los archivos ocultos.
+    pub fn set_show_hidden(&self, show: bool) {
+        if let Some(model) = self.imp().model.get() {
+            model.set_show_hidden(show);
+        }
     }
 
     fn on_key(&self, key: gdk::Key, mods: gdk::ModifierType) -> glib::Propagation {

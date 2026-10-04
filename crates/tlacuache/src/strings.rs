@@ -19,6 +19,9 @@ pub const NAV_BACK: &str = "Atrás (Alt+←)";
 pub const NAV_FORWARD: &str = "Adelante (Alt+→)";
 pub const NAV_UP: &str = "Subir (Alt+↑)";
 
+pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";
+pub const VIEW_DETAILS: &str = "Detalles (Ctrl+2)";
+
 pub fn config_load_failed(path: &Path) -> String {
     format!(
         "No se pudo cargar {}; se usan valores por defecto",

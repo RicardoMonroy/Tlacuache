@@ -3,5 +3,7 @@
   <!-- adw::Application carga style.css de esta ruta base. -->
   <gresource prefix="/io/github/rmonroy/Tlacuache">
     <file>style.css</file>
+    <!-- Iconos propios: GtkApplication añade <ruta base>/icons al tema. -->
+    <file>icons/scalable/actions/view-columns-symbolic.svg</file>
   </gresource>
 </gresources>

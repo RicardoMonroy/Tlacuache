@@ -20,7 +20,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 
 ## Hito 2 — Columnas Miller y pestañas
 - [x] **2.1 Vista Miller** con scroll automático a la columna activa. CA: navegar 6 niveles solo con flechas.
-- [ ] **2.2 Alternar vista** Miller/lista por pestaña. Diseñar el selector para admitir más vistas (iconos en v0.2); cada pestaña, y por tanto cada panel del modo dual, tiene su propia vista.
+- [x] **2.2 Alternar vista** Miller/lista por pestaña. Diseñar el selector para admitir más vistas (iconos en v0.2); cada pestaña, y por tanto cada panel del modo dual, tiene su propia vista.
 - [ ] **2.3 Pestañas** con `adw::TabView` (Ctrl+T, Ctrl+W, Ctrl+Tab).
 - [ ] **2.4 Barra de estado** del panel (elementos, selección, espacio libre).
 

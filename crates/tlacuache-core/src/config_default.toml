@@ -5,6 +5,7 @@
 show_hidden = false
 dual_pane = true
 confirm_trash = false
+default_view = "columns"   # columns (Miller) | details (lista)
 
 [preview]
 position = "bottom"        # bottom | right

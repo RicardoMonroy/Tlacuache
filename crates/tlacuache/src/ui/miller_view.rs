@@ -217,15 +217,12 @@ impl MillerView {
         self.focus_active();
     }
 
-    /// Alterna los archivos ocultos (Ctrl+H) en todas las columnas.
-    pub fn toggle_show_hidden(&self) -> bool {
-        let imp = self.imp();
-        let show = !imp.show_hidden.get();
-        imp.show_hidden.set(show);
+    /// Muestra u oculta los archivos ocultos en todas las columnas.
+    pub fn set_show_hidden(&self, show: bool) {
+        self.imp().show_hidden.set(show);
         for column in self.columns_snapshot() {
             column.model.set_show_hidden(show);
         }
-        show
     }
 
     fn columns_snapshot(&self) -> Vec<Column> {

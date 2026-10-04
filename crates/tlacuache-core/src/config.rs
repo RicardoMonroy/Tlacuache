@@ -28,12 +28,42 @@ pub struct Config {
     pub keys: BTreeMap<String, String>,
 }
 
+/// Vista de una pestaña. Al añadir una (p. ej. iconos), el compilador
+/// señala cada lugar que debe manejarla.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ViewMode {
+    /// Columnas Miller.
+    #[default]
+    Columns,
+    /// Lista detallada.
+    Details,
+}
+
+impl ViewMode {
+    pub const ALL: [Self; 2] = [Self::Columns, Self::Details];
+
+    /// Identificador estable (el mismo que en el TOML).
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Columns => "columns",
+            Self::Details => "details",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.id() == id)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct General {
     pub show_hidden: bool,
     pub dual_pane: bool,
     pub confirm_trash: bool,
+    /// Vista con la que se abren las pestañas nuevas.
+    pub default_view: ViewMode,
 }
 
 impl Default for General {
@@ -42,6 +72,7 @@ impl Default for General {
             show_hidden: false,
             dual_pane: true,
             confirm_trash: false,
+            default_view: ViewMode::Columns,
         }
     }
 }
@@ -191,6 +222,7 @@ mod tests {
         assert!(!c.general.show_hidden);
         assert!(c.general.dual_pane);
         assert!(!c.general.confirm_trash);
+        assert_eq!(c.general.default_view, ViewMode::Columns);
         assert_eq!(c.preview.position, PreviewPosition::Bottom);
         assert_eq!(c.preview.max_text_bytes, 1_048_576);
         assert_eq!(c.terminal.shell, "");
@@ -231,6 +263,7 @@ mod tests {
             show_hidden = true
             dual_pane = false
             confirm_trash = true
+            default_view = "details"
 
             [preview]
             position = "right"
@@ -258,6 +291,7 @@ mod tests {
         "#;
         let c = Config::from_toml(text).unwrap();
         assert!(!c.general.dual_pane);
+        assert_eq!(c.general.default_view, ViewMode::Details);
         assert_eq!(c.preview.position, PreviewPosition::Right);
         assert_eq!(c.preview.max_text_bytes, 2048);
         assert_eq!(c.terminal.shell, "/usr/bin/zsh");
@@ -270,6 +304,14 @@ mod tests {
             c.keys.get("toggle_terminal").map(String::as_str),
             Some("F4")
         );
+    }
+
+    #[test]
+    fn view_mode_ids_round_trip() {
+        for mode in ViewMode::ALL {
+            assert_eq!(ViewMode::from_id(mode.id()), Some(mode));
+        }
+        assert_eq!(ViewMode::from_id("icons"), None);
     }
 
     #[test]
