@@ -81,6 +81,22 @@ impl DirectoryModel {
         &self.dir_list
     }
 
+    pub fn set_directory(&self, dir: &gio::File) {
+        self.dir_list.set_file(Some(dir));
+    }
+
+    /// Posición (en el modelo ordenado y filtrado) de la entrada cuyo archivo
+    /// es `file`.
+    pub fn position_of(&self, file: &gio::File) -> Option<u32> {
+        (0..self.selection.n_items()).find(|&i| {
+            self.selection
+                .item(i)
+                .and_downcast::<FileItem>()
+                .and_then(|item| item.file())
+                .is_some_and(|f| f.equal(file))
+        })
+    }
+
     pub fn set_sort(&self, spec: SortSpec) {
         if self.sort_spec.replace(spec) != spec {
             self.sorter.changed(gtk::SorterChange::Different);

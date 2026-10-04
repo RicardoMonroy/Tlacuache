@@ -6,6 +6,7 @@
 pub mod config;
 pub mod entry;
 pub mod filter;
+pub mod history;
 pub mod sort;
 
 /// Identificador de la aplicación (D-Bus / desktop file).

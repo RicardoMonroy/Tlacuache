@@ -4,6 +4,7 @@
 use std::cell::{Ref, RefCell};
 use std::time::{Duration, SystemTime};
 
+use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 use gtk::{gio, glib};
 use tlacuache_core::entry::FileEntry;
@@ -44,6 +45,16 @@ impl FileItem {
 
     pub fn info(&self) -> Option<gio::FileInfo> {
         self.imp().info.borrow().clone()
+    }
+
+    /// Archivo de la entrada; `DirectoryList` lo guarda en `standard::file`.
+    pub fn file(&self) -> Option<gio::File> {
+        self.imp()
+            .info
+            .borrow()
+            .as_ref()?
+            .attribute_object("standard::file")
+            .and_downcast()
     }
 }
 
