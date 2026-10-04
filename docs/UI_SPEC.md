@@ -91,6 +91,6 @@ Los atajos de la ventana no deben capturarse cuando la terminal tiene el foco (e
 ## 7. Tema
 
 - Oscuro por defecto con paleta Nord (`#2E3440`, `#3B4252`, `#434C5E`, `#4C566A`, `#D8DEE9`, `#E5E9F0`, `#ECEFF4`, `#8FBCBB`, `#88C0D0`, `#81A1C1`, `#5E81AC`, `#BF616A`, `#D08770`, `#EBCB8B`, `#A3BE8C`, `#B48EAD`).
-- Implementar vía CSS de GTK cargado con `gtk::CssProvider`; respetar `adw::StyleManager` (claro/oscuro del sistema) como opción.
+- Implementar vía `resources/style.css` en un gresource: `adw::Application` lo carga solo desde su ruta base (`/io/github/rmonroy/Tlacuache/`). La paleta se expone como variables `--nord0`…`--nord15` y se mapea sobre los colores con nombre de libadwaita (`--window-bg-color`, `--accent-bg-color`, …) dentro de `@media (prefers-color-scheme: dark)` (`style-dark.css` está obsoleto desde libadwaita 1.9). Respetar `adw::StyleManager` (claro/oscuro del sistema) como opción.
 - La paleta de la terminal VTE usa los mismos 16 colores.
 - Densidad compacta: filas de 24–26 px.

@@ -1,0 +1,67 @@
+/* Paleta Nord (https://www.nordtheme.com). Disponible para todos los widgets. */
+:root {
+  /* Polar Night */
+  --nord0: #2e3440;
+  --nord1: #3b4252;
+  --nord2: #434c5e;
+  --nord3: #4c566a;
+  /* Snow Storm */
+  --nord4: #d8dee9;
+  --nord5: #e5e9f0;
+  --nord6: #eceff4;
+  /* Frost */
+  --nord7: #8fbcbb;
+  --nord8: #88c0d0;
+  --nord9: #81a1c1;
+  --nord10: #5e81ac;
+  /* Aurora */
+  --nord11: #bf616a;
+  --nord12: #d08770;
+  --nord13: #ebcb8b;
+  --nord14: #a3be8c;
+  --nord15: #b48ead;
+}
+
+/* Tema oscuro: mapea Nord sobre los colores con nombre de libadwaita. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --window-bg-color: var(--nord0);
+    --window-fg-color: var(--nord5);
+    --view-bg-color: var(--nord0);
+    --view-fg-color: var(--nord5);
+
+    --headerbar-bg-color: var(--nord1);
+    --headerbar-fg-color: var(--nord6);
+    --headerbar-backdrop-color: var(--nord0);
+    --headerbar-border-color: var(--nord3);
+
+    --sidebar-bg-color: var(--nord1);
+    --sidebar-fg-color: var(--nord5);
+    --sidebar-backdrop-color: var(--nord1);
+    --sidebar-border-color: var(--nord3);
+
+    --card-bg-color: var(--nord1);
+    --card-fg-color: var(--nord5);
+    --popover-bg-color: var(--nord1);
+    --popover-fg-color: var(--nord5);
+    --dialog-bg-color: var(--nord1);
+    --dialog-fg-color: var(--nord5);
+
+    --accent-bg-color: var(--nord10);
+    --accent-fg-color: var(--nord6);
+    --accent-color: var(--nord8);
+
+    --destructive-bg-color: var(--nord11);
+    --destructive-fg-color: var(--nord6);
+    --destructive-color: var(--nord11);
+    --success-bg-color: var(--nord14);
+    --success-fg-color: var(--nord0);
+    --success-color: var(--nord14);
+    --warning-bg-color: var(--nord13);
+    --warning-fg-color: var(--nord0);
+    --warning-color: var(--nord13);
+    --error-bg-color: var(--nord11);
+    --error-fg-color: var(--nord6);
+    --error-color: var(--nord11);
+  }
+}

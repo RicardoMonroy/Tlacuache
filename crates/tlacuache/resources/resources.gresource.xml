@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <!-- adw::Application carga style.css de esta ruta base. -->
+  <gresource prefix="/io/github/rmonroy/Tlacuache">
+    <file>style.css</file>
+  </gresource>
+</gresources>

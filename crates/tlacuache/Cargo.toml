@@ -11,3 +11,6 @@ gtk.workspace = true
 adw.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+
+[build-dependencies]
+glib-build-tools.workspace = true
