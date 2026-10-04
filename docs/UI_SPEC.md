@@ -93,7 +93,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 
 **Filtro rápido activo**: mientras el filtro tiene texto, Backspace borra un carácter del filtro y Espacio inserta un espacio; Esc limpia el filtro. Sin filtro activo, Backspace sube de nivel y Espacio alterna la vista previa.
 
-Los atajos de la ventana no deben capturarse cuando la terminal tiene el foco (excepto F4 y Tab con modificador configurable para salir de la terminal: Ctrl+Shift+Tab).
+Con el foco en la terminal, todas las teclas son del programa que corre en ella, salvo dos que captura el panel: alternar la terminal (F4) y salir de ella sin cerrarla (Ctrl+Shift+Tab). Ambas se remapean en `[keys]` (`toggle_terminal`, `leave_terminal`). Los atajos de pestañas de `adw::TabView` (Ctrl+Tab, Ctrl+RePág/AvPág, Alt+1…9) solo están activos en el panel activo y se desactivan mientras su terminal tiene el foco.
 
 ## 7. Tema
 

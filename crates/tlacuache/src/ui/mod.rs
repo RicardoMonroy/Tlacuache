@@ -27,3 +27,47 @@ pub fn has_focus_within(widget: &impl IsA<gtk::Widget>) -> bool {
         .and_then(|root| root.focus())
         .is_some_and(|focus| focus == *widget || focus.is_ancestor(widget))
 }
+
+/// Atajo de teclado configurable (`[keys]`), ya interpretado.
+#[derive(Clone, Copy, Debug)]
+pub struct Accel {
+    key: gtk::gdk::Key,
+    mods: gtk::gdk::ModifierType,
+}
+
+impl Accel {
+    /// El de la config o, si no se puede interpretar, el predeterminado.
+    pub fn for_action(
+        action: tlacuache_core::keymap::Action,
+        keys: &std::collections::BTreeMap<String, String>,
+    ) -> Self {
+        let text = tlacuache_core::keymap::accelerator(action, keys);
+        let parsed = gtk::accelerator_parse(text).or_else(|| {
+            tracing::warn!("atajo no válido para {}: {text:?}", action.id());
+            gtk::accelerator_parse(action.default_accelerator())
+        });
+        let (key, mods) =
+            parsed.unwrap_or((gtk::gdk::Key::VoidSymbol, gtk::gdk::ModifierType::empty()));
+        Self {
+            key: normalize(key),
+            mods,
+        }
+    }
+
+    pub fn matches(&self, key: gtk::gdk::Key, mods: gtk::gdk::ModifierType) -> bool {
+        let relevant = gtk::gdk::ModifierType::CONTROL_MASK
+            | gtk::gdk::ModifierType::SHIFT_MASK
+            | gtk::gdk::ModifierType::ALT_MASK
+            | gtk::gdk::ModifierType::SUPER_MASK;
+        normalize(key) == self.key && (mods & relevant) == self.mods
+    }
+}
+
+/// Con Shift, Tab llega como `ISO_Left_Tab` y las letras en mayúscula.
+fn normalize(key: gtk::gdk::Key) -> gtk::gdk::Key {
+    if key == gtk::gdk::Key::ISO_Left_Tab {
+        gtk::gdk::Key::Tab
+    } else {
+        key.to_lower()
+    }
+}

@@ -48,7 +48,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **5.3 Panel → terminal**: `cd` al navegar, solo si el shell está en primer plano; indicador de desincronizado.
 - [x] **5.4 Terminal → panel** vía OSC 7 sin bucles. CA: `cd ~/dev` en la terminal mueve el panel.
 - [x] **5.5 Arrastrar archivo a la terminal** pega la ruta escapada.
-- [ ] **5.6 Gestión de foco**: atajos globales no interfieren con la terminal.
+- [x] **5.6 Gestión de foco**: atajos globales no interfieren con la terminal.
 
 ## Hito 6 — Vista previa
 - [ ] **6.1 Contenedor de preview + detalles** por panel (Espacio alterna), debounce y cancelación.
@@ -67,3 +67,11 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [ ] Renombrado masivo con regex y vista previa.
 - [ ] Notas por carpeta.
 - [ ] PKGBUILD, archivo `.desktop` e icono; publicar en AUR.
+
+## Pendientes y mejoras anotadas (sin hito asignado)
+Surgieron al probar; revisar al cerrar el MVP o asignarlas a un hito.
+- [ ] Archivos cortados (Ctrl+X) atenuados en la vista hasta pegarlos.
+- [ ] Diálogo de conflictos con tamaño y fecha de cada versión.
+- [ ] Integración OSC 7 automática para zsh (`ZDOTDIR`); hoy solo bash (fish la trae). Ver ADR-008.
+- [ ] Guardar en la sesión la altura y visibilidad de la terminal de cada panel.
+- [ ] Probar el escapado de rutas con fish real (solo se probó con bash y sh).

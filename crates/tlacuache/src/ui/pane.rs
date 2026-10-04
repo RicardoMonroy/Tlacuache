@@ -12,10 +12,12 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config::{Config, ViewMode};
+use tlacuache_core::keymap::Action;
 use tlacuache_core::session::{PaneSession, TabSession};
 
 use crate::fs::display::{display_name, display_path};
 use crate::strings;
+use crate::ui::Accel;
 use crate::ui::tab_page::TabPage;
 use crate::ui::terminal::TerminalView;
 
@@ -36,6 +38,12 @@ mod imp {
         pub split: gtk::Paned,
         /// Terminal del panel: se crea en el primer F4.
         pub terminal: std::cell::RefCell<Option<TerminalView>>,
+        /// Es el panel activo de la ventana.
+        pub active: std::cell::Cell<bool>,
+        /// La terminal tiene el foco.
+        pub terminal_focused: std::cell::Cell<bool>,
+        /// Atajos configurables: alternar y salir de la terminal.
+        pub accels: OnceCell<(Accel, Accel)>,
         /// Altura de la zona de pestañas recordada al ocultar la terminal.
         pub split_position: std::cell::Cell<Option<i32>>,
     }
@@ -140,8 +148,16 @@ impl Pane {
         imp.split.set_shrink_end_child(false);
         imp.split.set_vexpand(true);
 
-        // F4 en captura: llega antes que a VTE, así funciona también con
-        // el foco dentro de la terminal.
+        if let Some(config) = imp.config.get() {
+            let _ = imp.accels.set((
+                Accel::for_action(Action::ToggleTerminal, &config.keys),
+                Accel::for_action(Action::LeaveTerminal, &config.keys),
+            ));
+        }
+
+        // En captura: llegan antes que a VTE, así funcionan con el foco en
+        // la terminal. Son las únicas teclas que la app le quita a la
+        // terminal: alternarla (F4) y salir de ella (Ctrl+Shift+Tab).
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         keys.connect_key_pressed(glib::clone!(
@@ -149,23 +165,49 @@ impl Pane {
             self,
             #[upgrade_or]
             glib::Propagation::Proceed,
-            move |_, key, _, mods| {
-                let modifiers = gdk::ModifierType::CONTROL_MASK
-                    | gdk::ModifierType::ALT_MASK
-                    | gdk::ModifierType::SHIFT_MASK
-                    | gdk::ModifierType::SUPER_MASK;
-                if key == gdk::Key::F4 && !mods.intersects(modifiers) {
-                    pane.toggle_terminal();
-                    glib::Propagation::Stop
-                } else {
-                    glib::Propagation::Proceed
-                }
-            }
+            move |_, key, _, mods| pane.on_key(key, mods)
         ));
         self.add_controller(keys);
 
         self.append(&imp.tab_bar);
         self.append(&imp.split);
+    }
+
+    fn on_key(&self, key: gdk::Key, mods: gdk::ModifierType) -> glib::Propagation {
+        let imp = self.imp();
+        let Some((toggle, leave)) = imp.accels.get() else {
+            return glib::Propagation::Proceed;
+        };
+        if toggle.matches(key, mods) {
+            self.toggle_terminal();
+            return glib::Propagation::Stop;
+        }
+        if imp.terminal_focused.get() && leave.matches(key, mods) {
+            self.focus_current();
+            return glib::Propagation::Stop;
+        }
+        glib::Propagation::Proceed
+    }
+
+    /// Lo marca la ventana: los atajos de pestañas (Ctrl+Tab, Alt+1…9…)
+    /// solo valen en el panel activo.
+    pub fn set_active(&self, active: bool) {
+        self.imp().active.set(active);
+        self.update_tab_shortcuts();
+    }
+
+    /// Los atajos de `adw::TabView` son de toda la ventana: con dos paneles
+    /// competirían, y dentro de la terminal le quitarían teclas a los
+    /// programas (tmux, nvim…). Solo en el panel activo y fuera de la
+    /// terminal.
+    fn update_tab_shortcuts(&self) {
+        let imp = self.imp();
+        let enabled = imp.active.get() && !imp.terminal_focused.get();
+        imp.tab_view.set_shortcuts(if enabled {
+            adw::TabViewShortcuts::ALL_SHORTCUTS
+        } else {
+            adw::TabViewShortcuts::NONE
+        });
     }
 
     /// F4: muestra la terminal (creándola la primera vez, en la carpeta
@@ -195,6 +237,16 @@ impl Pane {
                     self,
                     move |_, dir| pane.follow_terminal(dir)
                 ));
+                let focus = gtk::EventControllerFocus::new();
+                focus.connect_contains_focus_notify(glib::clone!(
+                    #[weak(rename_to = pane)]
+                    self,
+                    move |focus| {
+                        pane.imp().terminal_focused.set(focus.contains_focus());
+                        pane.update_tab_shortcuts();
+                    }
+                ));
+                terminal.add_controller(focus);
                 imp.split.set_end_child(Some(&terminal));
                 imp.terminal.replace(Some(terminal.clone()));
                 terminal
@@ -273,6 +325,8 @@ impl Pane {
         }
         imp.split.set_end_child(None::<&gtk::Widget>);
         imp.terminal.replace(None);
+        imp.terminal_focused.set(false);
+        self.update_tab_shortcuts();
         self.set_terminal_state(false);
         if had_focus {
             self.focus_current();

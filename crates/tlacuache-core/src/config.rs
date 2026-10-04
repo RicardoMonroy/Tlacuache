@@ -442,7 +442,11 @@ mod tests {
         assert_eq!(first, second);
         // Al quitar los favoritos el comentario vuelve al final.
         let cleared = update_favorites_toml(&second, &[]).unwrap();
-        assert!(cleared.trim_end().ends_with("# toggle_terminal = \"F4\""));
+        assert!(
+            cleared
+                .trim_end()
+                .ends_with("# leave_terminal = \"<Control><Shift>Tab\"")
+        );
     }
 
     #[test]

@@ -10,6 +10,7 @@ pub mod entry;
 pub mod favorites;
 pub mod filter;
 pub mod history;
+pub mod keymap;
 pub mod names;
 pub mod ops;
 pub mod path_input;

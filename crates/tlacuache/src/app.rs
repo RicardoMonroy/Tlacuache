@@ -66,6 +66,9 @@ fn adw_color_scheme(scheme: ColorScheme) -> adw::ColorScheme {
 
 pub fn build() -> adw::Application {
     let (config, config_warning) = load_config();
+    for name in tlacuache_core::keymap::unknown_actions(&config.keys) {
+        tracing::warn!("acción desconocida en [keys]: {name}");
+    }
     let config = Rc::new(config);
     let (session, session_warning) = load_session();
     // La sesión se usa una sola vez, en la primera ventana.

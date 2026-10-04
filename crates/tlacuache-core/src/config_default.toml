@@ -27,6 +27,7 @@ color_scheme = "dark"      # dark | light | system
 # group = "Proyectos"
 # paths = ["~/dev", "~/Documentos/clases"]
 
-# Atajos remapeados: acción = "acelerador"
+# Atajos remapeables (sintaxis de GTK): acción = "acelerador"
 [keys]
 # toggle_terminal = "F4"
+# leave_terminal = "<Control><Shift>Tab"

@@ -643,6 +643,11 @@ impl TlacuacheWindow {
 
     fn set_active_pane(&self, index: usize) {
         self.imp().active.set(index);
+        for i in 0..2 {
+            if let Some(pane) = self.pane(i) {
+                pane.set_active(i == index);
+            }
+        }
         self.imp().pane_actions.set_left_active(index == 0);
         self.update_active_style();
         self.update_transfer_actions();
