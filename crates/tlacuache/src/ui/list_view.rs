@@ -42,6 +42,9 @@ mod imp {
         /// Al terminar de cargar, enfocar esta entrada (la carpeta de la que
         /// venimos al subir o retroceder).
         pub pending_focus: RefCell<Option<gio::File>>,
+        /// Seleccionar este archivo en cuanto aparezca (recién creado o
+        /// renombrado; el monitor de la carpeta lo añade después).
+        pub pending_select: RefCell<Option<gio::File>>,
         /// Texto del filtro rápido (vacío = inactivo).
         pub query: RefCell<String>,
         pub indicator: FilterIndicator,
@@ -208,6 +211,7 @@ impl FileListView {
             self,
             move |_, _, _, _| {
                 view.update_filter_indicator();
+                view.try_select_pending();
                 view.emit_by_name::<()>("status-changed", &[]);
             }
         ));
@@ -276,6 +280,29 @@ impl FileListView {
         }
         model.set_directory(dir);
         self.notify_directory();
+    }
+
+    /// Selecciona `file` ahora o en cuanto aparezca en la lista.
+    pub fn select_when_present(&self, file: &gio::File) {
+        self.imp().pending_select.replace(Some(file.clone()));
+        self.try_select_pending();
+    }
+
+    fn try_select_pending(&self) {
+        let imp = self.imp();
+        let (Some(model), Some(column_view)) = (imp.model.get(), imp.column_view.get()) else {
+            return;
+        };
+        let position = imp
+            .pending_select
+            .borrow()
+            .as_ref()
+            .and_then(|f| model.position_of(f));
+        if let Some(position) = position {
+            imp.pending_select.replace(None);
+            let flags = gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT;
+            column_view.scroll_to(position, None, flags, None);
+        }
     }
 
     /// Muestra u oculta los archivos ocultos.

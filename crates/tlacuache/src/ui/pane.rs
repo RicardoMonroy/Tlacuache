@@ -207,6 +207,13 @@ impl Pane {
         );
     }
 
+    /// Selecciona `file` en la pestaña actual en cuanto aparezca.
+    pub fn select_when_present(&self, file: &gio::File) {
+        if let Some(page) = self.current_page() {
+            page.select_when_present(file);
+        }
+    }
+
     /// Archivos seleccionados en la pestaña actual.
     pub fn selected_files(&self) -> Vec<gio::File> {
         self.current_page()

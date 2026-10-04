@@ -226,6 +226,31 @@ impl MillerView {
         );
     }
 
+    /// Selecciona `file` en la columna activa ahora o en cuanto aparezca.
+    pub fn select_when_present(&self, file: &gio::File) {
+        if let Some(column) = self.active_column() {
+            column.pending_select.replace(Some(file.clone()));
+        }
+        self.try_select_pending();
+    }
+
+    fn try_select_pending(&self) {
+        let Some(column) = self.active_column() else {
+            return;
+        };
+        let position = column
+            .pending_select
+            .borrow()
+            .as_ref()
+            .and_then(|f| column.model.position_of(f));
+        if let Some(position) = position {
+            column.pending_select.replace(None);
+            let flags = gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT;
+            column.list.scroll_to(position, flags, None);
+            column.list.grab_focus();
+        }
+    }
+
     /// Archivo seleccionado en la columna activa.
     pub fn selected_files(&self) -> Vec<gio::File> {
         self.active_column()
@@ -416,6 +441,7 @@ impl MillerView {
             move |_, _, _, _| {
                 if view.index_of(&list) == Some(view.imp().active.get()) {
                     view.update_filter_indicator();
+                    view.try_select_pending();
                     view.emit_status_changed();
                 }
             }

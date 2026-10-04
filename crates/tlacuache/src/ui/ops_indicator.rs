@@ -114,6 +114,9 @@ impl OpsIndicator {
             OpKind::Move => strings::OP_MOVING,
             OpKind::Trash => strings::OP_TRASHING,
             OpKind::Delete => strings::OP_DELETING,
+            OpKind::Mkdir => strings::OP_CREATING_FOLDER,
+            OpKind::CreateFile => strings::OP_CREATING_FILE,
+            OpKind::Rename => strings::OP_RENAMING,
             _ => strings::OP_COPYING,
         };
         let progress = &op.progress;

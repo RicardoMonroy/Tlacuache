@@ -35,6 +35,16 @@ pub const TRASH_TITLE: &str = "¿Mover a la papelera?";
 pub const DELETE_TITLE: &str = "¿Eliminar permanentemente?";
 pub const ACTION_TRASH: &str = "Mover a la papelera";
 pub const ACTION_DELETE: &str = "Eliminar";
+pub const OP_CREATING_FOLDER: &str = "Creando carpeta";
+pub const OP_CREATING_FILE: &str = "Creando archivo";
+pub const OP_RENAMING: &str = "Renombrando";
+pub const NEW_FOLDER_NAME: &str = "Nueva carpeta";
+pub const NEW_FILE_NAME: &str = "Nuevo archivo";
+pub const NEW_FOLDER_TITLE: &str = "Nueva carpeta";
+pub const NEW_FILE_TITLE: &str = "Nuevo archivo";
+pub const RENAME_TITLE: &str = "Renombrar";
+pub const RENAME_SINGLE_ONLY: &str =
+    "Selecciona un solo elemento para renombrar (el renombrado masivo llegará en la v0.2)";
 pub const OP_PREPARING: &str = "Preparando…";
 pub const OP_CANCEL: &str = "Cancelar operación";
 pub const OP_CANCELLED: &str = "Operación cancelada";

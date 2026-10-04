@@ -72,6 +72,13 @@ impl PageView {
         }
     }
 
+    fn select_when_present(&self, file: &gio::File) {
+        match self {
+            Self::Columns(view) => view.select_when_present(file),
+            Self::Details(view) => view.select_when_present(file),
+        }
+    }
+
     fn selected_files(&self) -> Vec<gio::File> {
         match self {
             Self::Columns(view) => view.selected_files(),
@@ -347,6 +354,13 @@ impl TabPage {
         };
         self.install_view(PageView::new(mode, &dir, self.imp().show_hidden.get()));
         self.focus_view();
+    }
+
+    /// Selecciona `file` en cuanto aparezca en la vista.
+    pub fn select_when_present(&self, file: &gio::File) {
+        if let Some(view) = self.view() {
+            view.select_when_present(file);
+        }
     }
 
     /// Archivos seleccionados en la vista.

@@ -10,6 +10,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config::Config;
+use tlacuache_core::names;
 use tlacuache_core::ops::{OpId, OpKind, OpState};
 use tlacuache_core::session::{Session, WindowSession};
 
@@ -111,6 +112,27 @@ mod imp {
             let shift = gdk::ModifierType::SHIFT_MASK;
             klass.add_binding_action(gdk::Key::Delete, shift, "files.delete");
             klass.add_binding_action(gdk::Key::KP_Delete, shift, "files.delete");
+
+            // Renombrar (F2), nueva carpeta (F7 / Ctrl+Shift+N) y nuevo
+            // archivo (Ctrl+Alt+N).
+            klass.install_action("files.rename", None, |window, _, _| {
+                window.rename_selection()
+            });
+            klass.install_action("files.new-folder", None, |window, _, _| {
+                window.create_item(true);
+            });
+            klass.install_action("files.new-file", None, |window, _, _| {
+                window.create_item(false)
+            });
+            klass.add_binding_action(gdk::Key::F2, none, "files.rename");
+            klass.add_binding_action(gdk::Key::F7, none, "files.new-folder");
+            let ctrl = gdk::ModifierType::CONTROL_MASK;
+            klass.add_binding_action(gdk::Key::N, ctrl | shift, "files.new-folder");
+            klass.add_binding_action(
+                gdk::Key::n,
+                ctrl | gdk::ModifierType::ALT_MASK,
+                "files.new-file",
+            );
             klass.add_binding(gdk::Key::F9, gdk::ModifierType::empty(), |window| {
                 window.set_show_sidebar(!window.show_sidebar());
                 glib::Propagation::Stop
@@ -345,6 +367,12 @@ impl TlacuacheWindow {
             return;
         };
         let text = match &op.state {
+            // Crear y renombrar son inmediatos y ya se ven en la lista.
+            OpState::Done
+                if matches!(op.kind, OpKind::Mkdir | OpKind::CreateFile | OpKind::Rename) =>
+            {
+                return;
+            }
             OpState::Done => {
                 let verb = match op.kind {
                     OpKind::Move => strings::OP_MOVED,
@@ -508,6 +536,155 @@ impl TlacuacheWindow {
         self.action_set_enabled("panes.move-to-other", transfer);
         self.action_set_enabled("files.trash", has_selection);
         self.action_set_enabled("files.delete", has_selection);
+        self.action_set_enabled("files.rename", has_selection);
+    }
+
+    /// F2: renombra el elemento seleccionado (uno solo).
+    fn rename_selection(&self) {
+        let (files, _) = self.active_selection();
+        let [file] = files.as_slice() else {
+            if !files.is_empty() {
+                self.show_toast(strings::RENAME_SINGLE_ONLY);
+            }
+            return;
+        };
+        let (Some(parent), Some(name)) = (file.parent(), file.basename()) else {
+            return;
+        };
+        let file = file.clone();
+        let current = name.to_string_lossy().into_owned();
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                let is_dir = file
+                    .query_info_future(
+                        gio::FILE_ATTRIBUTE_STANDARD_TYPE,
+                        gio::FileQueryInfoFlags::NOFOLLOW_SYMLINKS,
+                        glib::Priority::DEFAULT,
+                    )
+                    .await
+                    .is_ok_and(|info| info.file_type() == gio::FileType::Directory);
+                let stem = names::stem_len(&current, is_dir);
+                let new_name = window
+                    .ask_name(
+                        strings::RENAME_TITLE,
+                        strings::ACTION_RENAME,
+                        &current,
+                        stem,
+                    )
+                    .await;
+                let Some(new_name) = new_name.filter(|n| *n != current) else {
+                    return;
+                };
+                let dest = parent.child(&new_name);
+                window
+                    .imp()
+                    .ops
+                    .enqueue(OpKind::Rename, &[file], Some(&dest));
+                window.select_in_active(&dest);
+            }
+        ));
+    }
+
+    /// F7 / Ctrl+Alt+N: crea una carpeta o un archivo vacío en la carpeta
+    /// del panel activo, proponiendo un nombre libre.
+    fn create_item(&self, folder: bool) {
+        let Some(dir) = self
+            .pane(self.imp().active.get())
+            .and_then(Pane::current_directory)
+        else {
+            return;
+        };
+        let (base, title) = if folder {
+            (strings::NEW_FOLDER_NAME, strings::NEW_FOLDER_TITLE)
+        } else {
+            (strings::NEW_FILE_NAME, strings::NEW_FILE_TITLE)
+        };
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                let initial = free_name(&dir, base).await;
+                let all = initial.chars().count();
+                let Some(name) = window
+                    .ask_name(title, strings::ACTION_CREATE, &initial, all)
+                    .await
+                else {
+                    return;
+                };
+                let target = dir.child(&name);
+                let kind = if folder {
+                    OpKind::Mkdir
+                } else {
+                    OpKind::CreateFile
+                };
+                window
+                    .imp()
+                    .ops
+                    .enqueue(kind, std::slice::from_ref(&target), None);
+                window.select_in_active(&target);
+            }
+        ));
+    }
+
+    fn select_in_active(&self, file: &gio::File) {
+        if let Some(pane) = self.pane(self.imp().active.get()) {
+            pane.select_when_present(file);
+        }
+    }
+
+    /// Pide un nombre validándolo mientras se escribe (el botón de aceptar
+    /// se deshabilita si no es válido). Selecciona los primeros `select`
+    /// caracteres (p. ej. el nombre sin extensión al renombrar).
+    async fn ask_name(
+        &self,
+        title: &str,
+        accept: &str,
+        initial: &str,
+        select: usize,
+    ) -> Option<String> {
+        let entry = gtk::Entry::builder()
+            .text(initial)
+            .activates_default(true)
+            .build();
+        let error = gtk::Label::builder().xalign(0.0).wrap(true).build();
+        error.add_css_class("error");
+        error.add_css_class("caption");
+        let content = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        content.append(&entry);
+        content.append(&error);
+
+        let dialog = adw::AlertDialog::new(Some(title), None);
+        dialog.add_responses(&[("cancel", strings::ACTION_CANCEL), ("accept", accept)]);
+        dialog.set_response_appearance("accept", adw::ResponseAppearance::Suggested);
+        dialog.set_default_response(Some("accept"));
+        dialog.set_close_response("cancel");
+        dialog.set_extra_child(Some(&content));
+
+        let validate = glib::clone!(
+            #[weak]
+            dialog,
+            #[weak]
+            error,
+            move |entry: &gtk::Entry| {
+                let result = names::validate_name(&entry.text());
+                dialog.set_response_enabled("accept", result.is_ok());
+                error.set_text(&result.err().map(|e| e.to_string()).unwrap_or_default());
+                error.set_visible(result.is_err());
+            }
+        );
+        validate(&entry);
+        entry.connect_changed(validate);
+        // Al mostrarse: foco y selección (p. ej. sin la extensión).
+        let select = i32::try_from(select).unwrap_or(-1);
+        entry.connect_map(move |entry| {
+            entry.grab_focus();
+            entry.select_region(0, select);
+        });
+
+        let response = dialog.choose_future(Some(self)).await;
+        (response == "accept").then(|| entry.text().to_string())
     }
 
     /// Selección del panel activo y su carpeta.
@@ -669,4 +846,23 @@ pub fn enqueue_from(
 
 fn display_names(files: &[gio::File]) -> Vec<String> {
     files.iter().map(crate::fs::display::display_name).collect()
+}
+
+/// Primer nombre libre en `dir`: `base`, `base (2)`, `base (3)`…
+async fn free_name(dir: &gio::File, base: &str) -> String {
+    for candidate in names::numbered_names(base).take(1000) {
+        let taken = dir
+            .child(&candidate)
+            .query_info_future(
+                gio::FILE_ATTRIBUTE_STANDARD_TYPE,
+                gio::FileQueryInfoFlags::NOFOLLOW_SYMLINKS,
+                glib::Priority::DEFAULT,
+            )
+            .await
+            .is_ok();
+        if !taken {
+            return candidate;
+        }
+    }
+    base.to_owned()
 }

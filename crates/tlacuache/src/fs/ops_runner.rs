@@ -173,6 +173,9 @@ impl OpsManager {
                     }
                     (OpKind::Trash, _) => trash_all(&sources, &cancellable, &report).await,
                     (OpKind::Delete, _) => delete_all(&sources, &cancellable, &report).await,
+                    (OpKind::Mkdir, _) => create_items(&sources, true).await,
+                    (OpKind::CreateFile, _) => create_items(&sources, false).await,
+                    (OpKind::Rename, Some(dest)) => rename(&sources, &dest).await,
                     _ => Err(glib::Error::new(
                         gio::IOErrorEnum::NotSupported,
                         strings::OP_NOT_SUPPORTED,
@@ -513,6 +516,36 @@ async fn delete_all(
     Ok(())
 }
 
+/// Crea carpetas (`dirs`) o archivos vacíos. Falla si ya existen.
+async fn create_items(items: &[gio::File], dirs: bool) -> Result<(), glib::Error> {
+    for item in items {
+        if dirs {
+            item.make_directory_future(glib::Priority::DEFAULT).await?;
+        } else {
+            let stream = item
+                .create_future(gio::FileCreateFlags::NONE, glib::Priority::DEFAULT)
+                .await?;
+            stream.close_future(glib::Priority::DEFAULT).await?;
+        }
+    }
+    Ok(())
+}
+
+/// Renombra el primer origen al nombre de `dest`. `set_display_name`
+/// falla si ya existe un elemento con ese nombre (no lo pisa).
+async fn rename(sources: &[gio::File], dest: &gio::File) -> Result<(), glib::Error> {
+    let source = sources
+        .first()
+        .ok_or_else(|| error(gio::IOErrorEnum::InvalidArgument, strings::OP_NO_NAME))?;
+    let name = dest
+        .basename()
+        .ok_or_else(|| error(gio::IOErrorEnum::InvalidFilename, strings::OP_NO_NAME))?;
+    source
+        .set_display_name_future(&name.to_string_lossy(), glib::Priority::DEFAULT)
+        .await?;
+    Ok(())
+}
+
 /// Mueve `sources` dentro de `dest_dir`.
 async fn move_tree(
     sources: &[gio::File],
@@ -811,6 +844,37 @@ mod tests {
         let err = block_on(delete_all(&[file(&target)], &cancellable, &no_report())).unwrap_err();
         assert!(err.matches(gio::IOErrorEnum::Cancelled));
         assert!(target.exists());
+    }
+
+    #[test]
+    fn creates_and_renames_without_overwriting() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("Nueva carpeta");
+        let empty = tmp.path().join("vacío.txt");
+        block_on(create_items(&[file(&dir)], true)).unwrap();
+        block_on(create_items(&[file(&empty)], false)).unwrap();
+        assert!(dir.is_dir());
+        assert_eq!(fs::read(&empty).unwrap().len(), 0);
+
+        let err = block_on(create_items(&[file(&dir)], true)).unwrap_err();
+        assert!(err.matches(gio::IOErrorEnum::Exists));
+
+        let renamed = tmp.path().join("renombrado.txt");
+        block_on(rename(&[file(&empty)], &file(&renamed))).unwrap();
+        assert!(renamed.exists() && !empty.exists());
+
+        // No pisa un archivo existente.
+        fs::write(tmp.path().join("otro.txt"), "contenido").unwrap();
+        let err = block_on(rename(
+            &[file(&renamed)],
+            &file(&tmp.path().join("otro.txt")),
+        ))
+        .unwrap_err();
+        assert!(err.matches(gio::IOErrorEnum::Exists));
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("otro.txt")).unwrap(),
+            "contenido"
+        );
     }
 
     #[test]

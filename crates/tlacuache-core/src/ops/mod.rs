@@ -18,6 +18,8 @@ pub enum OpKind {
     /// Borrado permanente (requiere confirmación en la UI).
     Delete,
     Mkdir,
+    /// Crear un archivo vacío.
+    CreateFile,
     Rename,
 }
 
@@ -79,9 +81,10 @@ impl Progress {
 pub struct Operation {
     pub id: OpId,
     pub kind: OpKind,
-    /// URIs de origen (para Mkdir: la carpeta a crear).
+    /// URIs de origen (Mkdir/CreateFile: el elemento a crear).
     pub sources: Vec<String>,
-    /// URI de destino: carpeta para Copy/Move, nombre nuevo para Rename.
+    /// URI de destino: carpeta para Copy/Move; para Rename, el elemento ya
+    /// renombrado (misma carpeta, nombre nuevo).
     pub dest: Option<String>,
     pub state: OpState,
     pub progress: Progress,

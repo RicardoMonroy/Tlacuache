@@ -73,6 +73,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Copiar a otro panel | F5 |
 | Mover a otro panel | F6 |
 | Nueva carpeta | F7 / Ctrl+Shift+N |
+| Nuevo archivo vacío | Ctrl+Alt+N |
 | Papelera | Supr |
 | Borrado permanente | Shift+Supr (con confirmación) |
 | Renombrar | F2 |
