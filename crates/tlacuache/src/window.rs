@@ -1,12 +1,16 @@
 //! Ventana principal: header bar + (más adelante) sidebar y área de paneles.
 
 use std::cell::OnceCell;
+use std::rc::Rc;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 
+use tlacuache_core::config::Config;
+
 use crate::strings;
+use crate::ui::list_view::FileListView;
 
 mod imp {
     use super::*;
@@ -14,6 +18,7 @@ mod imp {
     #[derive(Default)]
     pub struct TlacuacheWindow {
         pub toast_overlay: OnceCell<adw::ToastOverlay>,
+        pub toolbar: OnceCell<adw::ToolbarView>,
     }
 
     #[glib::object_subclass]
@@ -32,16 +37,14 @@ mod imp {
             obj.set_default_size(1200, 800);
 
             let header = adw::HeaderBar::new();
-            let content = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-
             let toolbar = adw::ToolbarView::new();
             toolbar.add_top_bar(&header);
-            toolbar.set_content(Some(&content));
 
             let toast_overlay = adw::ToastOverlay::new();
             toast_overlay.set_child(Some(&toolbar));
             obj.set_content(Some(&toast_overlay));
             let _ = self.toast_overlay.set(toast_overlay);
+            let _ = self.toolbar.set(toolbar);
         }
     }
 
@@ -59,8 +62,14 @@ glib::wrapper! {
 }
 
 impl TlacuacheWindow {
-    pub fn new(app: &adw::Application) -> Self {
-        glib::Object::builder().property("application", app).build()
+    pub fn new(app: &adw::Application, config: Rc<Config>, start_dir: &gio::File) -> Self {
+        let window: Self = glib::Object::builder().property("application", app).build();
+        // Por ahora una sola lista; paneles y pestañas llegan en hitos 2 y 3.
+        let list = FileListView::new(start_dir, config.general.show_hidden);
+        if let Some(toolbar) = window.imp().toolbar.get() {
+            toolbar.set_content(Some(&list));
+        }
+        window
     }
 
     /// Muestra un aviso no bloqueante en la parte inferior de la ventana.

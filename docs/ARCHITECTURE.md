@@ -56,7 +56,9 @@ tlacuache/
 
 - Usar `gtk::DirectoryList` (asíncrono, incremental, con `monitored = true` para refrescar ante cambios del sistema de archivos).
 - Atributos a solicitar: `standard::*,time::modified,time::created,unix::mode,owner::user`.
-- Encadenar modelos: `DirectoryList` → `gtk::FilterListModel` (ocultos + filtro rápido) → `gtk::SortListModel` (sorter que delega en `tlacuache-core::sort`) → `gtk::MultiSelection`.
+- Encadenar modelos: `DirectoryList` → `gtk::MapListModel` (envuelve cada `gio::FileInfo` en un `FileItem` que cachea su `FileEntry`) → `gtk::FilterListModel` (`gtk::CustomFilter` que delega en `tlacuache-core::filter`) → `gtk::SortListModel` (`gtk::CustomSorter` que delega en `tlacuache-core::sort`) → `gtk::MultiSelection`.
+- Filtro y orden **no incrementales**: en modo incremental la vista se queda anclada a una fila intermedia mientras llegan lotes. Medido: 10 000 entradas sin pausas perceptibles del hilo principal.
+- Los encabezados del `ColumnView` tienen sorters simbólicos; al cambiar el `ColumnViewSorter` se traduce columna/dirección a `SortSpec`, de modo que las carpetas quedan primero también en orden descendente.
 - Columnas Miller: un `gtk::ListView` por nivel dentro de un `gtk::Box` horizontal en `gtk::ScrolledWindow`; al seleccionar una carpeta se truncan las columnas a la derecha y se añade una nueva. Reutilizar factories (`SignalListItemFactory`).
 - Listas virtualizadas: `ListView`/`ColumnView` solo crean filas visibles, requisito para 10 000+ entradas.
 

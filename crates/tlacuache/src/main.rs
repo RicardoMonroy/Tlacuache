@@ -1,5 +1,7 @@
 mod app;
+mod fs;
 mod strings;
+mod ui;
 mod window;
 
 use adw::prelude::*;

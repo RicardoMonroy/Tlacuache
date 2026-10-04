@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use adw::prelude::*;
-use gtk::glib;
+use gtk::{gio, glib};
 use tlacuache_core::APP_ID;
 use tlacuache_core::config::{self, ColorScheme, Config};
 
@@ -46,24 +46,40 @@ pub fn build() -> adw::Application {
     let (config, config_warning) = load_config();
     let config = Rc::new(config);
 
-    let app = adw::Application::builder().application_id(APP_ID).build();
+    let app = adw::Application::builder()
+        .application_id(APP_ID)
+        .flags(gio::ApplicationFlags::HANDLES_OPEN)
+        .build();
 
     let scheme = adw_color_scheme(config.theme.color_scheme);
     app.connect_startup(move |_| {
         adw::StyleManager::default().set_color_scheme(scheme);
     });
 
-    app.connect_activate(move |app| {
+    let config_warning = Rc::new(config_warning);
+    let present = move |app: &adw::Application, start_dir: &gio::File| {
         // Una sola ventana por ahora: reactivar la app la trae al frente.
         if let Some(window) = app.active_window() {
             window.present();
             return;
         }
-        let window = TlacuacheWindow::new(app);
+        let window = TlacuacheWindow::new(app, config.clone(), start_dir);
         window.present();
-        if let Some(warning) = &config_warning {
+        if let Some(warning) = config_warning.as_ref() {
             window.show_toast(warning);
         }
+    };
+    let present = Rc::new(present);
+
+    app.connect_activate(glib::clone!(
+        #[strong]
+        present,
+        move |app| present(app, &gio::File::for_path(glib::home_dir()))
+    ));
+    // `tlacuache <carpeta>` abre esa carpeta.
+    app.connect_open(move |app, files, _hint| {
+        let home = gio::File::for_path(glib::home_dir());
+        present(app, files.first().unwrap_or(&home));
     });
 
     app

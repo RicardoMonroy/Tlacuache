@@ -4,7 +4,7 @@
 
 use std::time::SystemTime;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FileEntry {
     /// Nombre visible (sin ruta).
     pub name: String,

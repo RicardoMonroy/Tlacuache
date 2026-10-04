@@ -65,3 +65,13 @@
     --error-color: var(--nord11);
   }
 }
+
+/* Listas de archivos: densidad compacta (filas de 24–26 px). */
+columnview.file-list > listview > row {
+  min-height: 24px;
+}
+
+columnview.file-list > listview > row > cell {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
