@@ -1,5 +1,6 @@
 //! Acceso al sistema de archivos vía gio.
 
+pub mod clipboard;
 pub mod display;
 pub mod file_item;
 pub mod launch;

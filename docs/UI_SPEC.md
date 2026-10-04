@@ -77,6 +77,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Papelera | Supr |
 | Borrado permanente | Shift+Supr (con confirmación) |
 | Renombrar | F2 |
+| Copiar / cortar / pegar archivos | Ctrl+C / Ctrl+X / Ctrl+V |
 | Deshacer la última operación | Ctrl+Z |
 | Vista previa | Espacio (alternar) |
 | Sidebar | F9 |

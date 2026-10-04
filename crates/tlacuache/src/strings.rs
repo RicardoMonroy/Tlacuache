@@ -68,6 +68,8 @@ pub const OPS_PANEL: &str = "Operaciones";
 pub const OPS_CLEAR: &str = "Limpiar";
 pub const ACTION_UNDO: &str = "Deshacer";
 pub const UNDO_NOTHING: &str = "No hay nada que deshacer";
+pub const CLIPBOARD_FAILED: &str = "No se pudo usar el portapapeles";
+pub const CLIPBOARD_EMPTY: &str = "El portapapeles no contiene archivos";
 pub const OP_PREPARING: &str = "Preparando…";
 pub const OP_CANCEL: &str = "Cancelar operación";
 pub const OP_CANCELLED: &str = "Operación cancelada";
@@ -300,4 +302,9 @@ pub fn ops_finished(count: usize) -> String {
     } else {
         format!("{count} terminadas")
     }
+}
+
+pub fn clipboard_copied(count: usize, cut: bool) -> String {
+    let action = if cut { "cortados" } else { "copiados" };
+    format!("{} {action} al portapapeles", items_count(count))
 }

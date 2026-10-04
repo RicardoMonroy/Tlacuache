@@ -4,6 +4,7 @@
 //! cola de operaciones) vive aquí.
 
 pub mod age;
+pub mod clipboard;
 pub mod config;
 pub mod entry;
 pub mod favorites;

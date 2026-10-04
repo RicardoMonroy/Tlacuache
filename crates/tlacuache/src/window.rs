@@ -125,6 +125,20 @@ mod imp {
                 window.create_item(false)
             });
             klass.add_binding_action(gdk::Key::F2, none, "files.rename");
+            // Portapapeles de archivos. En el entry de la ruta, Ctrl+C/X/V
+            // actúan sobre el texto (lo consume antes).
+            klass.install_action("clipboard.copy", None, |window, _, _| {
+                window.copy_to_clipboard(false);
+            });
+            klass.install_action("clipboard.cut", None, |window, _, _| {
+                window.copy_to_clipboard(true);
+            });
+            klass.install_action("clipboard.paste", None, |window, _, _| window.paste());
+            let ctrl = gdk::ModifierType::CONTROL_MASK;
+            klass.add_binding_action(gdk::Key::c, ctrl, "clipboard.copy");
+            klass.add_binding_action(gdk::Key::x, ctrl, "clipboard.cut");
+            klass.add_binding_action(gdk::Key::v, ctrl, "clipboard.paste");
+
             // Ctrl+Z: deshacer la última operación (el entry de la ruta
             // usa su propio Ctrl+Z al editar).
             klass.add_binding(gdk::Key::z, gdk::ModifierType::CONTROL_MASK, |window| {
@@ -628,6 +642,63 @@ impl TlacuacheWindow {
         self.action_set_enabled("files.trash", has_selection);
         self.action_set_enabled("files.delete", has_selection);
         self.action_set_enabled("files.rename", has_selection);
+        self.action_set_enabled("clipboard.copy", has_selection);
+        self.action_set_enabled("clipboard.cut", has_selection);
+    }
+
+    /// Ctrl+C / Ctrl+X: la selección del panel activo al portapapeles.
+    fn copy_to_clipboard(&self, cut: bool) {
+        let (files, _) = self.active_selection();
+        if files.is_empty() {
+            return;
+        }
+        match crate::fs::clipboard::set_files(&WidgetExt::display(self), &files, cut) {
+            Ok(()) => self.show_toast(&strings::clipboard_copied(files.len(), cut)),
+            Err(err) => {
+                tracing::warn!("no se pudo usar el portapapeles: {err}");
+                self.show_toast(strings::CLIPBOARD_FAILED);
+            }
+        }
+    }
+
+    /// Ctrl+V: copia (o mueve, si se cortó) lo del portapapeles a la
+    /// carpeta del panel activo, por la cola de operaciones.
+    fn paste(&self) {
+        let (_, dir) = self.active_selection();
+        let Some(dir) = dir else {
+            return;
+        };
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                let display = WidgetExt::display(&window);
+                let files = match crate::fs::clipboard::read_files(&display).await {
+                    Ok(Some(files)) => files,
+                    Ok(None) => {
+                        window.show_toast(strings::CLIPBOARD_EMPTY);
+                        return;
+                    }
+                    Err(err) => {
+                        tracing::warn!("no se pudo leer el portapapeles: {err}");
+                        window.show_toast(strings::CLIPBOARD_EMPTY);
+                        return;
+                    }
+                };
+                let sources: Vec<gio::File> =
+                    files.uris.iter().map(|u| gio::File::for_uri(u)).collect();
+                let kind = if files.cut {
+                    OpKind::Move
+                } else {
+                    OpKind::Copy
+                };
+                window.imp().ops.enqueue(kind, &sources, Some(&dir));
+                // Lo cortado ya se movió: no se puede volver a pegar.
+                if files.cut {
+                    crate::fs::clipboard::clear(&display);
+                }
+            }
+        ));
     }
 
     /// F2: renombra el elemento seleccionado (uno solo).
