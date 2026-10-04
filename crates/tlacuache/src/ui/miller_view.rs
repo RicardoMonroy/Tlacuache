@@ -181,6 +181,9 @@ impl MillerView {
     /// coinciden con su ruta (incluida la de vista previa al entrar) y
     /// recrea el resto.
     pub fn show_directory(&self, dir: &gio::File) {
+        // Solo conservar el foco si ya lo tenía: si el cambio viene de la
+        // terminal (OSC 7) no hay que quitárselo mientras se escribe.
+        let had_focus = crate::ui::has_focus_within(self);
         tracing::debug!("carpeta: {}", dir.uri());
         let imp = self.imp();
         self.cancel_preview();
@@ -213,7 +216,7 @@ impl MillerView {
         imp.updating.set(false);
 
         self.notify_directory();
-        self.focus_active();
+        self.focus_active(had_focus);
         self.update_preview();
         self.emit_status_changed();
     }
@@ -288,7 +291,7 @@ impl MillerView {
 
     /// Lleva el foco del teclado a la columna activa.
     pub fn focus_list(&self) {
-        self.focus_active();
+        self.focus_active(true);
     }
 
     /// Muestra u oculta los archivos ocultos en todas las columnas.
@@ -476,7 +479,7 @@ impl MillerView {
             self.imp().updating.set(false);
         }
         if is_active {
-            self.focus_active();
+            self.focus_active(crate::ui::has_focus_within(self));
             self.update_preview();
         }
     }
@@ -501,18 +504,28 @@ impl MillerView {
     }
 
     /// Enfoca la fila seleccionada de la columna activa (o la primera).
-    fn focus_active(&self) {
+    /// Selecciona la fila actual de la columna activa y, con `take_focus`,
+    /// le da el foco de teclado.
+    fn focus_active(&self, take_focus: bool) {
         let Some(column) = self.active_column() else {
             return;
         };
         if column.model.model().n_items() == 0 {
-            column.list.grab_focus();
+            if take_focus {
+                column.list.grab_focus();
+            }
             return;
         }
         let position = match column.selection.selected() {
             gtk::INVALID_LIST_POSITION => 0,
             selected => selected,
         };
+        if !take_focus {
+            column
+                .list
+                .scroll_to(position, gtk::ListScrollFlags::SELECT, None);
+            return;
+        }
         let flags = gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT;
         column.list.scroll_to(position, flags, None);
         // `FOCUS` solo mueve la fila enfocada dentro de la lista; si el foco

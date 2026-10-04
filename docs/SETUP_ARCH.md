@@ -21,13 +21,13 @@ pkg-config --modversion gtk4 libadwaita-1 vte-2.91-gtk4 gtksourceview-5
 
 ## Integración del shell (para sincronizar terminal → panel)
 
-VTE necesita que el shell informe su carpeta actual (OSC 7). En bash o zsh, añadir al rc:
+VTE necesita que el shell informe su carpeta actual (OSC 7). Para **bash** Tlacuache lo configura solo (ADR-008): no hay que tocar `.bashrc`. **fish** lo emite por sí mismo. Para **zsh** (aún sin integración automática) añadir al `.zshrc`:
 
 ```bash
 [ -f /etc/profile.d/vte.sh ] && source /etc/profile.d/vte.sh
 ```
 
-Para fish y otros shells, verificar si emiten OSC 7 o añadir un hook equivalente.
+Se puede desactivar con `shell_integration = false` en `[terminal]`.
 
 ## Ejecutar con depuración
 

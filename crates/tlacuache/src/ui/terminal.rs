@@ -17,7 +17,7 @@ use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::config::Config;
-use tlacuache_core::shell::{ShellKind, cd_command};
+use tlacuache_core::shell::{self, ShellKind, cd_command};
 use tlacuache_core::theme;
 use vte::prelude::*;
 
@@ -54,7 +54,15 @@ mod imp {
     impl ObjectImpl for TerminalView {
         fn signals() -> &'static [Signal] {
             static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
-            SIGNALS.get_or_init(|| vec![Signal::builder("exited").build()])
+            SIGNALS.get_or_init(|| {
+                vec![
+                    Signal::builder("exited").build(),
+                    // El shell cambió de carpeta (OSC 7): terminal → panel.
+                    Signal::builder("directory-changed")
+                        .param_types([gio::File::static_type()])
+                        .build(),
+                ]
+            })
         }
     }
 
@@ -142,6 +150,21 @@ impl TerminalView {
             }
         ));
         terminal.add_controller(keys);
+
+        // Terminal → panel. `current_directory_uri` está obsoleta desde VTE
+        // 0.78, pero su reemplazo (`ref_termprop_uri`) no está expuesto en
+        // vte4 0.10; sigue funcionando.
+        #[allow(deprecated)]
+        terminal.connect_current_directory_uri_notify(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move |terminal| {
+                #[allow(deprecated)]
+                if let Some(uri) = terminal.current_directory_uri() {
+                    view.on_directory_reported(&uri);
+                }
+            }
+        ));
 
         // Al volver a la terminal, aplicar la carpeta pendiente si el shell
         // ya está libre.
@@ -254,9 +277,6 @@ impl TerminalView {
     }
 
     fn spawn(&self, config: &Config, dir: Option<&gio::File>) {
-        let Some(terminal) = self.terminal() else {
-            return;
-        };
         let shell = resolve_shell(&config.terminal.shell);
         let _ = self.imp().shell.set(shell.clone());
         // Solo carpetas locales: VTE necesita una ruta del sistema.
@@ -265,10 +285,36 @@ impl TerminalView {
             .current_dir
             .replace(Some(gio::File::for_path(&cwd_path)));
         let cwd = cwd_path.to_string_lossy().into_owned();
+        let integrate = config.terminal.shell_integration && is_bash(&shell);
+
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            async move {
+                let mut argv = vec![shell.clone()];
+                if integrate {
+                    // El rcfile se escribe fuera del hilo de GTK. Si falla, se
+                    // lanza bash normal (sin seguir sus `cd`).
+                    match gio::spawn_blocking(write_bash_rc).await {
+                        Ok(Ok(rc)) => argv.extend(["--rcfile".to_owned(), rc]),
+                        Ok(Err(err)) => tracing::warn!("sin integración de bash: {err}"),
+                        Err(_) => tracing::warn!("sin integración de bash: falló el hilo"),
+                    }
+                }
+                view.launch(&cwd, &argv);
+            }
+        ));
+    }
+
+    fn launch(&self, cwd: &str, argv: &[String]) {
+        let Some(terminal) = self.terminal() else {
+            return;
+        };
+        let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
         terminal.spawn_async(
             vte::PtyFlags::DEFAULT,
-            Some(&cwd),
-            &[&shell],
+            Some(cwd),
+            &argv,
             &[],
             glib::SpawnFlags::DEFAULT,
             || {},
@@ -277,11 +323,9 @@ impl TerminalView {
             glib::clone!(
                 #[weak(rename_to = view)]
                 self,
-                move |result| {
-                    if let Ok(pid) = &result {
-                        view.imp().shell_pid.set(Some(pid.0));
-                    }
-                    if let Err(err) = result {
+                move |result| match result {
+                    Ok(pid) => view.imp().shell_pid.set(Some(pid.0)),
+                    Err(err) => {
                         tracing::warn!("no se pudo iniciar el shell: {err}");
                         window::show_toast_from(
                             &view,
@@ -293,6 +337,48 @@ impl TerminalView {
             ),
         );
     }
+
+    /// Terminal → panel: el shell informó su carpeta (OSC 7). Si es la que
+    /// ya se conocía (p. ej. tras un `cd` enviado por el panel) no se avisa,
+    /// así no hay bucles.
+    fn on_directory_reported(&self, uri: &str) {
+        let imp = self.imp();
+        let dir = gio::File::for_uri(uri);
+        if imp
+            .current_dir
+            .borrow()
+            .as_ref()
+            .is_some_and(|d| d.equal(&dir))
+        {
+            return;
+        }
+        imp.current_dir.replace(Some(dir.clone()));
+        imp.pending_dir.replace(None);
+        imp.desync.set_reveal_child(false);
+        self.emit_by_name::<()>("directory-changed", &[&dir]);
+    }
+
+    pub fn connect_directory_changed<F: Fn(&Self, &gio::File) + 'static>(&self, f: F) {
+        self.connect_closure(
+            "directory-changed",
+            false,
+            glib::closure_local!(move |view: &Self, dir: &gio::File| f(view, dir)),
+        );
+    }
+}
+
+fn is_bash(shell: &str) -> bool {
+    Path::new(shell).file_name().and_then(|n| n.to_str()) == Some("bash")
+}
+
+/// Escribe el rcfile de integración en `$XDG_RUNTIME_DIR/tlacuache/` y
+/// devuelve su ruta. E/S bloqueante: se llama desde un hilo de trabajo.
+fn write_bash_rc() -> std::io::Result<String> {
+    let dir = glib::user_runtime_dir().join("tlacuache");
+    std::fs::create_dir_all(&dir)?;
+    let path = dir.join("bash-integration.rc");
+    std::fs::write(&path, shell::BASH_INTEGRATION_RC)?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// Shell de la config, si no `$SHELL`, si no `/bin/bash`.

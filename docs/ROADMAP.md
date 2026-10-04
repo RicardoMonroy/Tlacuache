@@ -46,7 +46,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **5.1 `core::shell::quote`** con pruebas (espacios, `'`, `\n`, prefijo `-`, unicode).
 - [x] **5.2 Terminal por panel** (VTE) creada perezosamente, F4 alterna, paleta y fuente desde config.
 - [x] **5.3 Panel → terminal**: `cd` al navegar, solo si el shell está en primer plano; indicador de desincronizado.
-- [ ] **5.4 Terminal → panel** vía OSC 7 sin bucles. CA: `cd ~/dev` en la terminal mueve el panel.
+- [x] **5.4 Terminal → panel** vía OSC 7 sin bucles. CA: `cd ~/dev` en la terminal mueve el panel.
 - [ ] **5.5 Arrastrar archivo a la terminal** pega la ruta escapada.
 - [ ] **5.6 Gestión de foco**: atajos globales no interfieren con la terminal.
 

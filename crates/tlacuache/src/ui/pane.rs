@@ -175,6 +175,11 @@ impl Pane {
                     self,
                     move |_| pane.on_terminal_exited()
                 ));
+                terminal.connect_directory_changed(glib::clone!(
+                    #[weak(rename_to = pane)]
+                    self,
+                    move |_, dir| pane.follow_terminal(dir)
+                ));
                 imp.split.set_end_child(Some(&terminal));
                 imp.terminal.replace(Some(terminal.clone()));
                 terminal
@@ -204,6 +209,20 @@ impl Pane {
         let terminal = imp.terminal.borrow().clone();
         if let (Some(terminal), Some(dir)) = (terminal, self.current_directory()) {
             terminal.change_directory(&dir);
+        }
+    }
+
+    /// Terminal → panel: la pestaña actual navega a donde hizo `cd` el
+    /// shell. Al navegar, `sync_terminal` ve que la terminal ya está ahí y
+    /// no envía otro `cd` (sin bucles).
+    fn follow_terminal(&self, dir: &gio::File) {
+        let enabled = self
+            .imp()
+            .config
+            .get()
+            .is_some_and(|c| c.terminal.sync_terminal_to_panel);
+        if enabled && let Some(page) = self.current_page() {
+            page.navigate_to(dir);
         }
     }
 

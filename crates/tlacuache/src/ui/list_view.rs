@@ -404,7 +404,12 @@ impl FileListView {
             .take()
             .and_then(|f| model.position_of(&f))
             .unwrap_or(0);
-        let flags = gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT;
+        // Sin quitar el foco a otro widget (p. ej. la terminal tras un `cd`).
+        let flags = if crate::ui::has_focus_within(self) {
+            gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT
+        } else {
+            gtk::ListScrollFlags::SELECT
+        };
         column_view.scroll_to(position, None, flags, None);
     }
 

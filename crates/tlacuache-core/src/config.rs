@@ -109,6 +109,9 @@ pub struct Terminal {
     pub font: String,
     pub sync_panel_to_terminal: bool,
     pub sync_terminal_to_panel: bool,
+    /// Integración automática del shell (OSC 7) para seguir los `cd` de la
+    /// terminal. Hoy bash; fish lo hace solo.
+    pub shell_integration: bool,
 }
 
 impl Default for Terminal {
@@ -118,6 +121,7 @@ impl Default for Terminal {
             font: "JetBrains Mono 11".to_owned(),
             sync_panel_to_terminal: true,
             sync_terminal_to_panel: true,
+            shell_integration: true,
         }
     }
 }
@@ -276,6 +280,7 @@ mod tests {
         assert_eq!(c.terminal.font, "JetBrains Mono 11");
         assert!(c.terminal.sync_panel_to_terminal);
         assert!(c.terminal.sync_terminal_to_panel);
+        assert!(c.terminal.shell_integration);
         assert_eq!(c.theme.name, "nord");
         assert_eq!(c.theme.color_scheme, ColorScheme::Dark);
         assert!(c.favorites.is_empty());

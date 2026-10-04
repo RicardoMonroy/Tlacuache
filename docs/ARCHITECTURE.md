@@ -79,8 +79,7 @@ tlacuache/
 - **Panel → terminal**: para cambiar de carpeta se envía `cd -- <ruta escapada>\n` con `feed_child`. El escapado lo hace `tlacuache-core::shell::quote` (comillas simples POSIX: `'` → `'\''`), con pruebas para espacios, comillas, saltos de línea y rutas que empiezan con `-`.
   - Antes de enviar, comprobar que el shell está en primer plano: comparar el PGID de primer plano del PTY (`tcgetpgrp` sobre el fd del `vte::Pty`) con el PID del shell. Si difieren, no enviar y marcar "desincronizado".
 - **Terminal → panel**: escuchar `notify::current-directory-uri`. Requiere integración del shell que emita OSC 7:
-  - bash/zsh en Arch: el paquete de VTE incluye `/etc/profile.d/vte.sh`; documentar en el README que el usuario debe hacer `source /etc/profile.d/vte.sh` en su `.bashrc`/`.zshrc`.
-  - Ofrecer alternativamente inyectar la integración vía variable de entorno o archivo rc temporal (decidir en ADR cuando se implemente).
+  - Integración automática (ADR-008): bash se lanza con `--rcfile` propio que carga la configuración del usuario y antepone un gancho OSC 7 a `PROMPT_COMMAND`; fish lo emite solo; zsh pendiente. Opción `terminal.shell_integration`.
 - Evitar bucles: si el panel navegó por OSC 7, no reenviar `cd`.
 - Paleta y fuente desde la config (`set_colors`, `set_font`).
 
