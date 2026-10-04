@@ -292,6 +292,40 @@ impl TlacuacheWindow {
                 move |_| window.set_active_pane(index)
             ));
             pane.add_controller(focus);
+
+            // Un clic en cualquier parte del panel (también en zonas vacías,
+            // que no toman el foco) lo vuelve activo. En captura y sin
+            // reclamar el evento: el clic sigue funcionando normal.
+            let click = gtk::GestureClick::new();
+            click.set_button(0);
+            click.set_propagation_phase(gtk::PropagationPhase::Capture);
+            click.connect_pressed(glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                #[weak]
+                pane,
+                move |_, _, _, _| {
+                    window.set_active_pane(index);
+                    // Tras procesar el clic: si el foco no quedó dentro del
+                    // panel (zona vacía), dárselo a su vista. Así no se le
+                    // quita a la barra de ruta al editarla.
+                    glib::idle_add_local_once(glib::clone!(
+                        #[weak]
+                        window,
+                        #[weak]
+                        pane,
+                        move || {
+                            let inside = gtk::prelude::RootExt::focus(&window).is_some_and(|w| {
+                                w == *pane.upcast_ref::<gtk::Widget>() || w.is_ancestor(&pane)
+                            });
+                            if !inside {
+                                pane.focus_current();
+                            }
+                        }
+                    ));
+                }
+            ));
+            pane.add_controller(click);
             pane.connect_selection_changed(glib::clone!(
                 #[weak(rename_to = window)]
                 self,
