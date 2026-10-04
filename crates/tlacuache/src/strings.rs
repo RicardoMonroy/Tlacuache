@@ -27,6 +27,14 @@ pub const OP_COPYING: &str = "Copiando";
 pub const OP_MOVING: &str = "Moviendo";
 pub const OP_COPIED: &str = "Copiados";
 pub const OP_MOVED: &str = "Movidos";
+pub const OP_TRASHING: &str = "Enviando a la papelera";
+pub const OP_DELETING: &str = "Eliminando";
+pub const OP_TRASHED: &str = "Enviados a la papelera";
+pub const OP_DELETED: &str = "Eliminados";
+pub const TRASH_TITLE: &str = "¿Mover a la papelera?";
+pub const DELETE_TITLE: &str = "¿Eliminar permanentemente?";
+pub const ACTION_TRASH: &str = "Mover a la papelera";
+pub const ACTION_DELETE: &str = "Eliminar";
 pub const OP_PREPARING: &str = "Preparando…";
 pub const OP_CANCEL: &str = "Cancelar operación";
 pub const OP_CANCELLED: &str = "Operación cancelada";
@@ -190,4 +198,30 @@ pub fn op_done(verb_past: &str, count: u64) -> String {
 
 pub fn op_failed(message: &str) -> String {
     format!("La operación falló: {message}")
+}
+
+/// Nombres para un diálogo: hasta tres y «y N más».
+fn names_summary(names: &[String]) -> String {
+    const SHOWN: usize = 3;
+    let mut text = names
+        .iter()
+        .take(SHOWN)
+        .map(|n| format!("«{n}»"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if names.len() > SHOWN {
+        text.push_str(&format!(" y {} más", names.len() - SHOWN));
+    }
+    text
+}
+
+pub fn trash_confirm(names: &[String]) -> String {
+    format!("Se moverán a la papelera: {}.", names_summary(names))
+}
+
+pub fn delete_confirm(names: &[String]) -> String {
+    format!(
+        "Se eliminarán {}. Esta acción no se puede deshacer.",
+        names_summary(names)
+    )
 }

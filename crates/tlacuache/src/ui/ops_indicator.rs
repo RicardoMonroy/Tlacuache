@@ -112,6 +112,8 @@ impl OpsIndicator {
 
         let verb = match op.kind {
             OpKind::Move => strings::OP_MOVING,
+            OpKind::Trash => strings::OP_TRASHING,
+            OpKind::Delete => strings::OP_DELETING,
             _ => strings::OP_COPYING,
         };
         let progress = &op.progress;

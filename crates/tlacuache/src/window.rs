@@ -50,6 +50,7 @@ mod imp {
         /// Franja central + panel derecho (se ocultan juntos con F3).
         pub right_side: gtk::Box,
         pub pane_actions: PaneActions,
+        pub config: OnceCell<Rc<Config>>,
         /// Cola de operaciones de archivo de la ventana.
         pub ops: OpsManager,
         /// Ya se guardó la sesión: el siguiente cierre es definitivo.
@@ -98,6 +99,18 @@ mod imp {
             let none = gdk::ModifierType::empty();
             klass.add_binding_action(gdk::Key::F5, none, "panes.copy-to-other");
             klass.add_binding_action(gdk::Key::F6, none, "panes.move-to-other");
+
+            // Papelera (Supr) y borrado permanente (Shift+Supr, confirmado).
+            // El entry de la ruta consume Supr al editar.
+            klass.install_action("files.trash", None, |window, _, _| window.trash_selection());
+            klass.install_action("files.delete", None, |window, _, _| {
+                window.delete_selection();
+            });
+            klass.add_binding_action(gdk::Key::Delete, none, "files.trash");
+            klass.add_binding_action(gdk::Key::KP_Delete, none, "files.trash");
+            let shift = gdk::ModifierType::SHIFT_MASK;
+            klass.add_binding_action(gdk::Key::Delete, shift, "files.delete");
+            klass.add_binding_action(gdk::Key::KP_Delete, shift, "files.delete");
             klass.add_binding(gdk::Key::F9, gdk::ModifierType::empty(), |window| {
                 window.set_show_sidebar(!window.show_sidebar());
                 glib::Propagation::Stop
@@ -299,6 +312,7 @@ impl TlacuacheWindow {
         outer.set_position(state.sidebar_width);
         imp.toolbar.set_content(Some(outer));
 
+        let _ = imp.config.set(config.clone());
         let _ = imp.panes.set(panes);
         imp.dual_pane.set(state.dual_pane);
         self.apply_dual_pane();
@@ -334,6 +348,8 @@ impl TlacuacheWindow {
             OpState::Done => {
                 let verb = match op.kind {
                     OpKind::Move => strings::OP_MOVED,
+                    OpKind::Trash => strings::OP_TRASHED,
+                    OpKind::Delete => strings::OP_DELETED,
                     _ => strings::OP_COPIED,
                 };
                 strings::op_done(verb, op.sources.len() as u64)
@@ -481,14 +497,103 @@ impl TlacuacheWindow {
         imp.pane_actions.add_controller(drag);
     }
 
-    /// F5/F6 y la franja central: solo en modo dual y con selección.
+    /// Habilita las acciones sobre la selección: F5/F6 y la franja central
+    /// solo en modo dual; papelera y borrar siempre que haya selección.
     fn update_transfer_actions(&self) {
-        let enabled = self.dual_pane()
-            && self
-                .pane(self.imp().active.get())
-                .is_some_and(|pane| !pane.selected_files().is_empty());
-        self.action_set_enabled("panes.copy-to-other", enabled);
-        self.action_set_enabled("panes.move-to-other", enabled);
+        let has_selection = self
+            .pane(self.imp().active.get())
+            .is_some_and(|pane| !pane.selected_files().is_empty());
+        let transfer = has_selection && self.dual_pane();
+        self.action_set_enabled("panes.copy-to-other", transfer);
+        self.action_set_enabled("panes.move-to-other", transfer);
+        self.action_set_enabled("files.trash", has_selection);
+        self.action_set_enabled("files.delete", has_selection);
+    }
+
+    /// Selección del panel activo y su carpeta.
+    fn active_selection(&self) -> (Vec<gio::File>, Option<gio::File>) {
+        let pane = self.pane(self.imp().active.get());
+        (
+            pane.map(Pane::selected_files).unwrap_or_default(),
+            pane.and_then(Pane::current_directory),
+        )
+    }
+
+    /// Supr: a la papelera (confirmando si `general.confirm_trash`). Dentro
+    /// de la papelera no se puede volver a enviar: se borra con confirmación.
+    fn trash_selection(&self) {
+        let (files, dir) = self.active_selection();
+        if files.is_empty() {
+            return;
+        }
+        if dir.is_some_and(|d| d.has_uri_scheme("trash")) {
+            self.delete_selection();
+            return;
+        }
+        let confirm = self
+            .imp()
+            .config
+            .get()
+            .is_some_and(|c| c.general.confirm_trash);
+        if !confirm {
+            self.imp().ops.enqueue(OpKind::Trash, &files, None);
+            return;
+        }
+        let body = strings::trash_confirm(&display_names(&files));
+        self.confirm_then(
+            strings::TRASH_TITLE,
+            &body,
+            strings::ACTION_TRASH,
+            false,
+            move |window| {
+                window.imp().ops.enqueue(OpKind::Trash, &files, None);
+            },
+        );
+    }
+
+    /// Shift+Supr: borrado permanente, siempre con confirmación.
+    fn delete_selection(&self) {
+        let (files, _) = self.active_selection();
+        if files.is_empty() {
+            return;
+        }
+        let body = strings::delete_confirm(&display_names(&files));
+        self.confirm_then(
+            strings::DELETE_TITLE,
+            &body,
+            strings::ACTION_DELETE,
+            true,
+            move |window| {
+                window.imp().ops.enqueue(OpKind::Delete, &files, None);
+            },
+        );
+    }
+
+    /// Diálogo de confirmación; ejecuta `then` solo si se acepta. Por
+    /// defecto (Enter/Esc) se cancela.
+    fn confirm_then<F>(&self, title: &str, body: &str, accept: &str, destructive: bool, then: F)
+    where
+        F: FnOnce(&Self) + 'static,
+    {
+        let dialog = adw::AlertDialog::new(Some(title), Some(body));
+        dialog.add_responses(&[("cancel", strings::ACTION_CANCEL), ("accept", accept)]);
+        let appearance = if destructive {
+            adw::ResponseAppearance::Destructive
+        } else {
+            adw::ResponseAppearance::Suggested
+        };
+        dialog.set_response_appearance("accept", appearance);
+        dialog.set_default_response(Some("cancel"));
+        dialog.set_close_response("cancel");
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                if dialog.choose_future(Some(&window)).await == "accept" {
+                    then(&window);
+                }
+            }
+        ));
     }
 
     /// Acento en el panel activo, solo en modo dual (con uno no aporta).
@@ -560,4 +665,8 @@ pub fn enqueue_from(
     };
     window.imp().ops.enqueue(kind, sources, Some(dest));
     true
+}
+
+fn display_names(files: &[gio::File]) -> Vec<String> {
+    files.iter().map(crate::fs::display::display_name).collect()
 }

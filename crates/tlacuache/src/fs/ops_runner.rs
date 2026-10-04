@@ -6,6 +6,8 @@
 //! - Mover: `move_async` (instantáneo en el mismo sistema de archivos); si
 //!   gio no puede mover una carpeta directamente (otro disco), se copia y
 //!   después se borra el origen.
+//! - Papelera: `trash_async` por elemento. Borrar (permanente): recorrido y
+//!   borrado de dentro hacia fuera.
 //! - Cancelar: cada operación tiene su `gio::Cancellable`; el archivo a
 //!   medias se borra. Lo ya copiado se conserva.
 //!
@@ -169,6 +171,8 @@ impl OpsManager {
                     (OpKind::Move, Some(dest)) => {
                         move_tree(&sources, &dest, &cancellable, &report).await
                     }
+                    (OpKind::Trash, _) => trash_all(&sources, &cancellable, &report).await,
+                    (OpKind::Delete, _) => delete_all(&sources, &cancellable, &report).await,
                     _ => Err(glib::Error::new(
                         gio::IOErrorEnum::NotSupported,
                         strings::OP_NOT_SUPPORTED,
@@ -457,6 +461,58 @@ async fn delete_tree(root: &gio::File, cancellable: &gio::Cancellable) -> Result
     Ok(())
 }
 
+async fn trash_file(file: &gio::File, cancellable: &gio::Cancellable) -> Result<(), glib::Error> {
+    let (tx, rx) = async_channel::bounded(1);
+    file.trash_async(glib::Priority::DEFAULT, Some(cancellable), move |result| {
+        let _ = tx.try_send(result);
+    });
+    wait(rx).await
+}
+
+/// Envía `sources` a la papelera (gio mueve carpetas enteras).
+async fn trash_all(
+    sources: &[gio::File],
+    cancellable: &gio::Cancellable,
+    report: &Report,
+) -> Result<(), glib::Error> {
+    let mut progress = Progress {
+        files_total: Some(sources.len() as u64),
+        ..Progress::default()
+    };
+    report(&progress);
+    for file in sources {
+        check_cancelled(cancellable)?;
+        progress.current = file.basename().map(|n| n.to_string_lossy().into_owned());
+        report(&progress);
+        trash_file(file, cancellable).await?;
+        progress.files_done += 1;
+        report(&progress);
+    }
+    Ok(())
+}
+
+/// Borra `sources` de forma permanente (carpetas con su contenido).
+async fn delete_all(
+    sources: &[gio::File],
+    cancellable: &gio::Cancellable,
+    report: &Report,
+) -> Result<(), glib::Error> {
+    let mut progress = Progress {
+        files_total: Some(sources.len() as u64),
+        ..Progress::default()
+    };
+    report(&progress);
+    for file in sources {
+        check_cancelled(cancellable)?;
+        progress.current = file.basename().map(|n| n.to_string_lossy().into_owned());
+        report(&progress);
+        delete_tree(file, cancellable).await?;
+        progress.files_done += 1;
+        report(&progress);
+    }
+    Ok(())
+}
+
 /// Mueve `sources` dentro de `dest_dir`.
 async fn move_tree(
     sources: &[gio::File],
@@ -717,6 +773,44 @@ mod tests {
             max_gap < Duration::from_millis(100),
             "el bucle se bloqueó {max_gap:?}"
         );
+    }
+
+    #[test]
+    fn delete_all_removes_files_and_folders_and_reports() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file_a = tmp.path().join("a.txt");
+        let dir_b = tmp.path().join("b");
+        let keep = tmp.path().join("conservar.txt");
+        fs::write(&file_a, "a").unwrap();
+        fs::create_dir_all(dir_b.join("c")).unwrap();
+        fs::write(dir_b.join("c/d.txt"), "d").unwrap();
+        fs::write(&keep, "k").unwrap();
+
+        let last = Rc::new(RefCell::new(Progress::default()));
+        let sink = last.clone();
+        let report: Report = Rc::new(move |p: &Progress| *sink.borrow_mut() = p.clone());
+        block_on(delete_all(
+            &[file(&file_a), file(&dir_b)],
+            &gio::Cancellable::new(),
+            &report,
+        ))
+        .unwrap();
+
+        assert!(!file_a.exists() && !dir_b.exists());
+        assert!(keep.exists());
+        assert_eq!(last.borrow().files_done, 2);
+    }
+
+    #[test]
+    fn cancelled_delete_touches_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let target = tmp.path().join("x.txt");
+        fs::write(&target, "x").unwrap();
+        let cancellable = gio::Cancellable::new();
+        cancellable.cancel();
+        let err = block_on(delete_all(&[file(&target)], &cancellable, &no_report())).unwrap_err();
+        assert!(err.matches(gio::IOErrorEnum::Cancelled));
+        assert!(target.exists());
     }
 
     #[test]
