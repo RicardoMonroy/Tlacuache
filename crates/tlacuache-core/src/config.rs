@@ -200,6 +200,53 @@ impl Config {
     }
 }
 
+/// Reescribe solo `[[favorites]]` en el texto de config.toml, conservando
+/// comentarios y formato del resto. Falla si el texto no es TOML válido
+/// (en ese caso no hay que tocar el archivo).
+pub fn update_favorites_toml(
+    text: &str,
+    groups: &[FavoriteGroup],
+) -> Result<String, toml_edit::TomlError> {
+    let mut doc: toml_edit::DocumentMut = text.parse()?;
+
+    // Los comentarios al final del archivo (p. ej. ejemplos bajo `[keys]`)
+    // son texto final del documento: quedarían debajo de `[[favorites]]` y
+    // descomentarlos los metería en un favorito. Se llevan delante del
+    // primer favorito, junto con lo que ya hubiera ahí.
+    let mut carried = String::new();
+    if let Some(toml_edit::Item::ArrayOfTables(old)) = doc.remove("favorites")
+        && let Some(prefix) = old.get(0).and_then(|t| t.decor().prefix()?.as_str())
+    {
+        carried.push_str(prefix);
+    }
+    carried.push_str(doc.trailing().as_str().unwrap_or(""));
+    doc.set_trailing("");
+
+    if groups.is_empty() {
+        doc.set_trailing(carried.trim_start_matches('\n'));
+        return Ok(doc.to_string());
+    }
+
+    let mut tables = toml_edit::ArrayOfTables::new();
+    for group in groups {
+        let mut table = toml_edit::Table::new();
+        table["group"] = toml_edit::value(group.group.as_str());
+        let paths: toml_edit::Array = group.paths.iter().map(String::as_str).collect();
+        table["paths"] = toml_edit::value(paths);
+        tables.push(table);
+    }
+    let mut prefix = carried.trim_matches('\n').to_owned();
+    prefix.insert(0, '\n');
+    if prefix.len() > 1 {
+        prefix.push_str("\n\n");
+    }
+    if let Some(first) = tables.get_mut(0) {
+        first.decor_mut().set_prefix(prefix);
+    }
+    doc.insert("favorites", toml_edit::Item::ArrayOfTables(tables));
+    Ok(doc.to_string())
+}
+
 fn write_template(path: &Path) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
@@ -328,6 +375,74 @@ mod tests {
     #[test]
     fn wrong_type_is_an_error() {
         assert!(Config::from_toml("[general]\nshow_hidden = \"yes\"\n").is_err());
+    }
+
+    fn group(name: &str, paths: &[&str]) -> FavoriteGroup {
+        FavoriteGroup {
+            group: name.to_owned(),
+            paths: paths.iter().map(|p| (*p).to_owned()).collect(),
+        }
+    }
+
+    #[test]
+    fn update_favorites_keeps_comments_and_other_sections() {
+        let groups = [
+            group("Proyectos", &["~/dev", "/srv/x"]),
+            group("Vacío", &[]),
+        ];
+        let text = update_favorites_toml(DEFAULT_TEMPLATE, &groups).unwrap();
+
+        assert!(text.contains("# Configuración de Tlacuache Browser."));
+        assert!(text.contains("position = \"bottom\"        # bottom | right"));
+        let config = Config::from_toml(&text).unwrap();
+        assert_eq!(config.favorites, groups);
+        assert_eq!(
+            Config {
+                favorites: Vec::new(),
+                ..config
+            },
+            Config::default()
+        );
+    }
+
+    #[test]
+    fn update_favorites_replaces_previous_ones() {
+        let first = update_favorites_toml(DEFAULT_TEMPLATE, &[group("A", &["~/a"])]).unwrap();
+        let second = update_favorites_toml(&first, &[group("B", &["~/b"])]).unwrap();
+        assert_eq!(
+            Config::from_toml(&second).unwrap().favorites,
+            [group("B", &["~/b"])]
+        );
+        assert!(!second.contains("\"A\""));
+    }
+
+    #[test]
+    fn update_favorites_with_none_removes_section() {
+        let first = update_favorites_toml(DEFAULT_TEMPLATE, &[group("A", &["~/a"])]).unwrap();
+        let cleared = update_favorites_toml(&first, &[]).unwrap();
+        assert!(Config::from_toml(&cleared).unwrap().favorites.is_empty());
+        assert!(!cleared.contains("[[favorites]]\ngroup"));
+    }
+
+    #[test]
+    fn trailing_comments_stay_above_favorites_across_rewrites() {
+        let groups = [group("A", &["~/a"])];
+        let first = update_favorites_toml(DEFAULT_TEMPLATE, &groups).unwrap();
+        let second = update_favorites_toml(&first, &groups).unwrap();
+        for text in [&first, &second] {
+            let comment = text.find("# toggle_terminal").unwrap();
+            let favorites = text.find("[[favorites]]\ngroup").unwrap();
+            assert!(comment < favorites, "{text}");
+        }
+        assert_eq!(first, second);
+        // Al quitar los favoritos el comentario vuelve al final.
+        let cleared = update_favorites_toml(&second, &[]).unwrap();
+        assert!(cleared.trim_end().ends_with("# toggle_terminal = \"F4\""));
+    }
+
+    #[test]
+    fn update_favorites_rejects_invalid_toml() {
+        assert!(update_favorites_toml("[general", &[]).is_err());
     }
 
     #[test]

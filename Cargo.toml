@@ -21,6 +21,8 @@ anyhow = "1.0.104"
 thiserror = "2.0.21"
 serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.6"
+# Reescribe [[favorites]] conservando comentarios y formato de config.toml.
+toml_edit = "0.25.15"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 async-channel = "2.5.0"

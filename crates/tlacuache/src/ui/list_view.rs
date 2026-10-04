@@ -20,6 +20,7 @@ use crate::fs::file_item::FileItem;
 use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
+use crate::ui::dnd;
 use crate::ui::filter_indicator::{FilterIndicator, filter_key};
 use crate::window;
 
@@ -413,7 +414,9 @@ fn column(id: ColumnId) -> gtk::ColumnViewColumn {
     let factory = gtk::SignalListItemFactory::new();
     factory.connect_setup(move |_, obj| {
         if let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() {
-            list_item.set_child(Some(&cell_widget(id)));
+            let cell = cell_widget(id);
+            dnd::attach_file_drag(&cell, list_item);
+            list_item.set_child(Some(&cell));
         }
     });
     factory.connect_bind(move |_, obj| {

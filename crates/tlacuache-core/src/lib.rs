@@ -6,6 +6,7 @@
 pub mod age;
 pub mod config;
 pub mod entry;
+pub mod favorites;
 pub mod filter;
 pub mod history;
 pub mod path_input;

@@ -34,6 +34,22 @@ pub const PLACE_VIDEOS: &str = "Vídeos";
 pub const PLACE_TRASH: &str = "Papelera";
 
 pub const SIDEBAR_DRIVES: &str = "Unidades";
+pub const SIDEBAR_FAVORITES: &str = "Favoritos";
+pub const FAVORITES_DEFAULT_GROUP: &str = "Favoritos";
+pub const FAVORITES_EMPTY: &str = "Arrastra carpetas aquí o pulsa Ctrl+D";
+pub const FAVORITES_ONLY_FOLDERS: &str = "Solo se pueden añadir carpetas a favoritos";
+pub const FAVORITE_REMOVE: &str = "Quitar de favoritos";
+pub const GROUP_NEW: &str = "Nuevo grupo…";
+pub const GROUP_RENAME: &str = "Renombrar grupo…";
+pub const GROUP_REMOVE: &str = "Eliminar grupo";
+pub const GROUP_NEW_TITLE: &str = "Nuevo grupo de favoritos";
+pub const GROUP_RENAME_TITLE: &str = "Renombrar grupo";
+pub const GROUP_NAME_PLACEHOLDER: &str = "Nombre del grupo";
+pub const ACTION_OPEN: &str = "Abrir";
+pub const ACTION_CANCEL: &str = "Cancelar";
+pub const ACTION_CREATE: &str = "Crear";
+pub const ACTION_RENAME: &str = "Renombrar";
+pub const ACTION_REMOVE: &str = "Eliminar";
 pub const DRIVE_SYSTEM: &str = "Sistema";
 pub const DRIVE_NOT_MOUNTED: &str = "Sin montar";
 pub const DRIVE_OPEN: &str = "Abrir";
@@ -122,4 +138,13 @@ pub fn drive_mount_failed(name: &str, err: &glib::Error) -> String {
 
 pub fn drive_unmount_failed(name: &str, err: &glib::Error) -> String {
     format!("No se pudo desmontar «{name}»: {}", err.message())
+}
+
+pub fn group_remove_confirm(name: &str, count: usize) -> String {
+    let favorites = if count == 1 { "favorito" } else { "favoritos" };
+    format!("¿Eliminar el grupo «{name}»?\n\nTiene {count} {favorites}. Las carpetas no se borran.")
+}
+
+pub fn favorites_save_failed(detail: &str) -> String {
+    format!("No se guardaron los favoritos: {detail}")
 }

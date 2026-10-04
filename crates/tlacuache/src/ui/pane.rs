@@ -134,6 +134,11 @@ impl Pane {
         }
     }
 
+    /// Carpeta de la pestaña seleccionada.
+    pub fn current_directory(&self) -> Option<gio::File> {
+        self.current_page().and_then(|p| p.directory())
+    }
+
     fn current_page(&self) -> Option<TabPage> {
         self.imp()
             .tab_view

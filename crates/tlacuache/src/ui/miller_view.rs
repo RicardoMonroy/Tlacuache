@@ -22,6 +22,7 @@ use crate::fs::file_item::FileItem;
 use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
+use crate::ui::dnd;
 use crate::ui::filter_indicator::{FilterIndicator, filter_key};
 use crate::window;
 
@@ -635,6 +636,7 @@ fn row_factory() -> gtk::SignalListItemFactory {
         row.append(&icon);
         row.append(&label);
         row.append(&chevron);
+        dnd::attach_file_drag(&row, list_item);
         list_item.set_child(Some(&row));
     });
     factory.connect_bind(|_, obj| {

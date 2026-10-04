@@ -12,7 +12,7 @@ use crate::strings;
 use crate::window::TlacuacheWindow;
 
 /// Ruta de `config.toml` según XDG (`~/.config/tlacuache/config.toml`).
-fn config_path() -> PathBuf {
+pub(crate) fn config_path() -> PathBuf {
     glib::user_config_dir()
         .join("tlacuache")
         .join(config::FILE_NAME)

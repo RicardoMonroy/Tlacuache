@@ -1,18 +1,22 @@
 //! Barra lateral: punto de partida de la navegación. Secciones «Lugares»
-//! (Inicio, carpetas XDG, Papelera) y «Unidades» (sistema, volúmenes y
-//! montajes de `gio::VolumeMonitor`); favoritos llega en la tarea 3.4.
+//! (Inicio, carpetas XDG, Papelera), «Favoritos» (grupos editables, ver
+//! `FavoritesSection`) y «Unidades» (sistema, volúmenes y montajes de
+//! `gio::VolumeMonitor`).
 
 use std::cell::RefCell;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gio, glib, pango};
+use tlacuache_core::config::FavoriteGroup;
 use tlacuache_core::places::{self, PlaceKind, PlaceTarget};
 
 use crate::strings;
 use crate::ui::drive_row::{DriveKind, DriveRow};
+use crate::ui::favorites_section::FavoritesSection;
 
 mod imp {
     use super::*;
@@ -21,6 +25,7 @@ mod imp {
     pub struct Sidebar {
         pub places: gtk::ListBox,
         pub drives: gtk::ListBox,
+        pub favorites: FavoritesSection,
         /// Se conserva para seguir recibiendo sus señales.
         pub volume_monitor: RefCell<Option<gio::VolumeMonitor>>,
         /// Destino de cada fila de `places`, por índice.
@@ -85,6 +90,7 @@ impl Sidebar {
         let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
         content.append(&section_heading(strings::SIDEBAR_PLACES));
         content.append(&imp.places);
+        content.append(&imp.favorites);
         content.append(&section_heading(strings::SIDEBAR_DRIVES));
         content.append(&imp.drives);
 
@@ -104,6 +110,12 @@ impl Sidebar {
         ));
         self.fill_places();
 
+        imp.favorites.connect_favorite_activated(glib::clone!(
+            #[weak(rename_to = sidebar)]
+            self,
+            move |_, file| sidebar.emit_by_name::<()>("place-activated", &[file])
+        ));
+
         imp.drives.add_css_class("navigation-sidebar");
         imp.drives.set_selection_mode(gtk::SelectionMode::None);
         imp.drives.connect_row_activated(|_, row| {
@@ -119,6 +131,16 @@ impl Sidebar {
             .child(&content)
             .build();
         self.set_child(Some(&scrolled));
+    }
+
+    /// Favoritos de la config y ruta donde guardarlos.
+    pub fn set_favorites(&self, groups: Vec<FavoriteGroup>, config_path: PathBuf) {
+        self.imp().favorites.set_favorites(groups, config_path);
+    }
+
+    /// Añade `dir` a favoritos (primer grupo).
+    pub fn add_favorite(&self, dir: &gio::File) {
+        self.imp().favorites.add_favorite(dir);
     }
 
     fn fill_places(&self) {

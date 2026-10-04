@@ -73,6 +73,10 @@ mod imp {
         fn class_init(klass: &mut Self::Class) {
             klass.install_property_action("panes.dual", "dual-pane");
             klass.install_property_action("sidebar.show", "show-sidebar");
+            klass.add_binding(gdk::Key::d, gdk::ModifierType::CONTROL_MASK, |window| {
+                window.add_current_to_favorites();
+                glib::Propagation::Stop
+            });
             klass.add_binding(gdk::Key::F9, gdk::ModifierType::empty(), |window| {
                 window.set_show_sidebar(!window.show_sidebar());
                 glib::Propagation::Stop
@@ -190,6 +194,8 @@ impl TlacuacheWindow {
             move |_, file| window.navigate_active(file)
         ));
         imp.show_sidebar.set(true);
+        imp.sidebar
+            .set_favorites(config.favorites.clone(), crate::app::config_path());
 
         let outer = &imp.outer;
         outer.set_orientation(gtk::Orientation::Horizontal);
@@ -211,6 +217,16 @@ impl TlacuacheWindow {
     fn navigate_active(&self, dir: &gio::File) {
         if let Some(pane) = self.pane(self.imp().active.get()) {
             pane.navigate(dir);
+        }
+    }
+
+    /// Ctrl+D: añade la carpeta actual del panel activo a favoritos.
+    fn add_current_to_favorites(&self) {
+        let dir = self
+            .pane(self.imp().active.get())
+            .and_then(Pane::current_directory);
+        if let Some(dir) = dir {
+            self.imp().sidebar.add_favorite(&dir);
         }
     }
 

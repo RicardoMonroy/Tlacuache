@@ -199,3 +199,14 @@ levelbar.drive-usage.usage-warning block.filled {
 levelbar.drive-usage.usage-critical block.filled {
   background-color: var(--nord11);
 }
+
+/* Favoritos. */
+.tlacuache-sidebar .favorite-group {
+  font-weight: bold;
+}
+
+.tlacuache-sidebar row:drop(active),
+.tlacuache-sidebar .sidebar-heading:drop(active) {
+  box-shadow: inset 0 0 0 2px var(--accent-bg-color);
+  border-radius: 6px;
+}
