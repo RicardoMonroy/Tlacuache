@@ -37,7 +37,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **4.3 F5/F6** hacia el otro panel; arrastrar y soltar entre paneles. Franja central entre paneles (solo modo dual) con botones Copiar → / Mover → cuyas flechas apuntan del panel activo al otro, deshabilitados sin selección. Reemplaza los atajos temporales Ctrl+Shift+F5/F6.
 - [x] **4.4 Papelera** (Supr) y borrado permanente (Shift+Supr, confirmación).
 - [x] **4.5 Renombrar (F2), nueva carpeta (F7), nuevo archivo.**
-- [ ] **4.6 Conflictos**: diálogo Reemplazar/Omitir/Renombrar/Aplicar a todos.
+- [x] **4.6 Conflictos**: diálogo Reemplazar/Omitir/Renombrar/Aplicar a todos.
 - [ ] **4.7 Panel de operaciones**: el indicador de la barra superior despliega un popover con el avance individual de cada operación (cancelar, resultado de las terminadas) y toasts con Deshacer.
 - [ ] **4.8 Portapapeles**: Ctrl+C / Ctrl+X / Ctrl+V entre paneles y con otras apps (`text/uri-list` y `x-special/gnome-copied-files` para cortar).
 - [ ] **4.9 Menú contextual** de archivos y carpetas: Abrir, Abrir con…, Cortar, Copiar, Pegar, Renombrar, Mover a la papelera, Añadir a favoritos, Copiar ruta, Propiedades.

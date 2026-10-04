@@ -11,10 +11,10 @@ use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config::Config;
 use tlacuache_core::names;
-use tlacuache_core::ops::{OpId, OpKind, OpState};
+use tlacuache_core::ops::{ConflictAction, OpId, OpKind, OpState};
 use tlacuache_core::session::{Session, WindowSession};
 
-use crate::fs::ops_runner::OpsManager;
+use crate::fs::ops_runner::{Conflict, ConflictDecision, OpsManager, Resolver};
 use crate::strings;
 use crate::ui::ops_indicator::OpsIndicator;
 use crate::ui::pane::Pane;
@@ -168,6 +168,7 @@ mod imp {
             header.pack_start(&sidebar_toggle);
             header.pack_end(&dual);
             header.pack_end(&OpsIndicator::new(&self.ops));
+            obj.install_conflict_resolver();
             self.ops.connect_finished(glib::clone!(
                 #[weak]
                 obj,
@@ -387,6 +388,76 @@ impl TlacuacheWindow {
             _ => return,
         };
         self.show_toast(&text);
+    }
+
+    /// Las operaciones preguntan por los conflictos con un diálogo.
+    fn install_conflict_resolver(&self) {
+        let window = self.downgrade();
+        let resolver: Resolver = Rc::new(move |conflict| {
+            let window = window.clone();
+            Box::pin(async move {
+                match window.upgrade() {
+                    Some(window) => window.ask_conflict(conflict).await,
+                    None => ConflictDecision {
+                        action: None,
+                        apply_to_all: false,
+                    },
+                }
+            })
+        });
+        self.imp().ops.set_conflict_resolver(resolver);
+    }
+
+    /// Diálogo de conflicto: Cancelar, Omitir, Conservar ambos y
+    /// Reemplazar/Combinar (deshabilitado si no aplica), más «aplicar a
+    /// todos». Por defecto, la opción que no destruye nada.
+    async fn ask_conflict(&self, conflict: Conflict) -> ConflictDecision {
+        let name = crate::fs::display::display_name(&conflict.dest);
+        let folders = conflict.source_is_dir && conflict.dest_is_dir;
+        let body = if conflict.source.equal(&conflict.dest) {
+            strings::CONFLICT_SAME
+        } else if conflict.source_is_dir != conflict.dest_is_dir {
+            strings::CONFLICT_TYPES
+        } else if folders {
+            strings::CONFLICT_FOLDERS
+        } else {
+            strings::CONFLICT_FILES
+        };
+        let replace_label = if folders {
+            strings::ACTION_MERGE
+        } else {
+            strings::ACTION_REPLACE
+        };
+
+        let dialog = adw::AlertDialog::new(Some(&strings::conflict_title(&name)), Some(body));
+        dialog.add_responses(&[
+            ("cancel", strings::ACTION_CANCEL),
+            ("skip", strings::ACTION_SKIP),
+            ("keep", strings::ACTION_KEEP_BOTH),
+            ("replace", replace_label),
+        ]);
+        let appearance = if folders {
+            adw::ResponseAppearance::Suggested
+        } else {
+            adw::ResponseAppearance::Destructive
+        };
+        dialog.set_response_appearance("replace", appearance);
+        dialog.set_response_enabled("replace", conflict.replace_allowed);
+        dialog.set_default_response(Some("keep"));
+        dialog.set_close_response("cancel");
+        let apply_all = gtk::CheckButton::with_label(strings::CONFLICT_APPLY_ALL);
+        dialog.set_extra_child(Some(&apply_all));
+
+        let action = match dialog.choose_future(Some(self)).await.as_str() {
+            "skip" => Some(ConflictAction::Skip),
+            "keep" => Some(ConflictAction::KeepBoth),
+            "replace" => Some(ConflictAction::Replace),
+            _ => None,
+        };
+        ConflictDecision {
+            action,
+            apply_to_all: apply_all.is_active(),
+        }
     }
 
     /// Abre `dir` en una pestaña nueva del panel activo.

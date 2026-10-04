@@ -55,6 +55,18 @@ pub fn numbered_names(base: &str) -> impl Iterator<Item = String> + '_ {
     std::iter::once(base.to_owned()).chain((2..).map(move |n| format!("{base} ({n})")))
 }
 
+/// Variantes numeradas de un nombre existente para «conservar ambos»: el
+/// número va antes de la extensión (`foto (2).jpg`); en carpetas y nombres
+/// sin extensión, al final.
+pub fn numbered_variants(name: &str, is_dir: bool) -> impl Iterator<Item = String> + '_ {
+    let split = name
+        .char_indices()
+        .nth(stem_len(name, is_dir))
+        .map_or(name.len(), |(i, _)| i);
+    let (stem, ext) = name.split_at(split);
+    (2..).map(move |n| format!("{stem} ({n}){ext}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,6 +108,19 @@ mod tests {
         assert_eq!(stem_len(".config.toml", false), 7);
         assert_eq!(stem_len("canción.mp3", false), 7);
         assert_eq!(stem_len("v1.2", true), 4);
+    }
+
+    #[test]
+    fn numbered_variants_keep_extension() {
+        let first = |name: &str, dir: bool| numbered_variants(name, dir).next().unwrap();
+        assert_eq!(first("foto.jpg", false), "foto (2).jpg");
+        assert_eq!(first("a.tar.gz", false), "a.tar (2).gz");
+        assert_eq!(first(".bashrc", false), ".bashrc (2)");
+        assert_eq!(first("Makefile", false), "Makefile (2)");
+        assert_eq!(first("v1.2", true), "v1.2 (2)");
+        assert_eq!(first("canción.mp3", false), "canción (2).mp3");
+        let more: Vec<_> = numbered_variants("x.txt", false).take(2).collect();
+        assert_eq!(more, ["x (2).txt", "x (3).txt"]);
     }
 
     #[test]

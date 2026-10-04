@@ -4,8 +4,10 @@
 //! y va informando a la cola. Las ubicaciones son URIs en texto para cubrir
 //! también rutas no locales (GVfs) sin depender de gio.
 
+mod conflict;
 mod queue;
 
+pub use conflict::{ConflictAction, ConflictPolicy, replace_allowed};
 pub use queue::{OpQueue, OpsError};
 
 pub type OpId = u64;

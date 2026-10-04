@@ -11,11 +11,16 @@
 //! - Cancelar: cada operación tiene su `gio::Cancellable`; el archivo a
 //!   medias se borra. Lo ya copiado se conserva.
 //!
-//! Conflictos (el destino ya existe) fallan con un mensaje; el diálogo de
-//! Reemplazar/Omitir/Renombrar llega en la tarea 4.6.
+//! Conflictos (el destino ya existe): se pregunta a la UI con un
+//! `Resolver` asíncrono (Reemplazar/Combinar, Omitir, Conservar ambos o
+//! Cancelar, con «aplicar a todos»). Al mover combinando carpetas se mueve
+//! archivo por archivo y solo se borran las carpetas de origen vacías, así
+//! lo omitido no se pierde.
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
@@ -24,7 +29,11 @@ use glib::subclass::Signal;
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 use gtk::{gio, glib};
-use tlacuache_core::ops::{OpId, OpKind, OpQueue, OpState, Operation, Progress};
+use tlacuache_core::names::numbered_variants;
+use tlacuache_core::ops::{
+    ConflictAction, ConflictPolicy, OpId, OpKind, OpQueue, OpState, Operation, Progress,
+    replace_allowed,
+};
 
 use crate::strings;
 
@@ -35,6 +44,25 @@ const COPY_FLAGS: gio::FileCopyFlags = gio::FileCopyFlags::NOFOLLOW_SYMLINKS;
 
 type Report = Rc<dyn Fn(&Progress)>;
 
+/// Un elemento ya existe en el destino.
+pub struct Conflict {
+    pub source: gio::File,
+    pub dest: gio::File,
+    pub source_is_dir: bool,
+    pub dest_is_dir: bool,
+    /// `false` si los tipos difieren o es el mismo elemento.
+    pub replace_allowed: bool,
+}
+
+/// Respuesta de la UI a un conflicto. `action: None` cancela la operación.
+pub struct ConflictDecision {
+    pub action: Option<ConflictAction>,
+    pub apply_to_all: bool,
+}
+
+/// Pregunta a la UI qué hacer con un conflicto (normalmente un diálogo).
+pub type Resolver = Rc<dyn Fn(Conflict) -> Pin<Box<dyn Future<Output = ConflictDecision>>>>;
+
 mod imp {
     use super::*;
 
@@ -43,6 +71,7 @@ mod imp {
         pub queue: RefCell<OpQueue>,
         pub cancellables: RefCell<HashMap<OpId, gio::Cancellable>>,
         pub last_emit: Cell<Option<Instant>>,
+        pub resolver: RefCell<Option<Resolver>>,
     }
 
     #[glib::object_subclass]
@@ -93,6 +122,11 @@ impl OpsManager {
             false,
             glib::closure_local!(move |manager: &Self, id: u64| f(manager, id)),
         );
+    }
+
+    /// Quién resuelve los conflictos (la ventana muestra un diálogo).
+    pub fn set_conflict_resolver(&self, resolver: Resolver) {
+        self.imp().resolver.replace(Some(resolver));
     }
 
     /// Encola una operación y la arranca si hay hueco.
@@ -151,6 +185,17 @@ impl OpsManager {
             .insert(id, cancellable.clone());
         self.emit_changed();
 
+        // Sin resolver configurado, cualquier conflicto cancela.
+        let resolver: Resolver = self.imp().resolver.borrow().clone().unwrap_or_else(|| {
+            Rc::new(|_| {
+                Box::pin(async {
+                    ConflictDecision {
+                        action: None,
+                        apply_to_all: false,
+                    }
+                })
+            })
+        });
         let report: Report = Rc::new(glib::clone!(
             #[weak(rename_to = manager)]
             self,
@@ -166,10 +211,10 @@ impl OpsManager {
                 tracing::debug!("operación {id} ({:?}) iniciada", op.kind);
                 let result = match (op.kind, dest) {
                     (OpKind::Copy, Some(dest)) => {
-                        copy_tree(&sources, &dest, &cancellable, &report).await
+                        copy_tree(&sources, &dest, &cancellable, &report, &resolver).await
                     }
                     (OpKind::Move, Some(dest)) => {
-                        move_tree(&sources, &dest, &cancellable, &report).await
+                        move_tree(&sources, &dest, &cancellable, &report, &resolver).await
                     }
                     (OpKind::Trash, _) => trash_all(&sources, &cancellable, &report).await,
                     (OpKind::Delete, _) => delete_all(&sources, &cancellable, &report).await,
@@ -257,13 +302,14 @@ async fn wait(rx: async_channel::Receiver<Result<(), glib::Error>>) -> Result<()
 async fn copy_file(
     src: &gio::File,
     dst: &gio::File,
+    flags: gio::FileCopyFlags,
     cancellable: &gio::Cancellable,
     progress: Box<dyn FnMut(i64, i64)>,
 ) -> Result<(), glib::Error> {
     let (tx, rx) = async_channel::bounded(1);
     src.copy_async(
         dst,
-        COPY_FLAGS,
+        flags,
         glib::Priority::DEFAULT,
         Some(cancellable),
         Some(progress),
@@ -277,13 +323,14 @@ async fn copy_file(
 async fn move_file(
     src: &gio::File,
     dst: &gio::File,
+    flags: gio::FileCopyFlags,
     cancellable: &gio::Cancellable,
     progress: Box<dyn FnMut(i64, i64)>,
 ) -> Result<(), glib::Error> {
     let (tx, rx) = async_channel::bounded(1);
     src.move_async(
         dst,
-        COPY_FLAGS,
+        flags,
         glib::Priority::DEFAULT,
         Some(cancellable),
         Some(progress),
@@ -360,98 +407,327 @@ async fn scan(root: &gio::File, cancellable: &gio::Cancellable) -> Result<Vec<En
     Ok(entries)
 }
 
-/// Destino de `src` dentro de `dest_dir`, comprobando que no se copie una
-/// carpeta dentro de sí misma y que el destino no exista.
-async fn destination_for(src: &gio::File, dest_dir: &gio::File) -> Result<gio::File, glib::Error> {
-    let name = src
-        .basename()
-        .ok_or_else(|| error(gio::IOErrorEnum::InvalidFilename, strings::OP_NO_NAME))?;
-    if dest_dir.equal(src) || dest_dir.has_prefix(src) {
-        return Err(error(
-            gio::IOErrorEnum::WouldRecurse,
-            strings::OP_INTO_ITSELF,
-        ));
-    }
-    let dst = dest_dir.child(&name);
-    let exists = dst
+/// `Some(es_carpeta)` si `file` existe (sin seguir enlaces).
+async fn existing(file: &gio::File) -> Result<Option<bool>, glib::Error> {
+    let info = file
         .query_info_future(
             gio::FILE_ATTRIBUTE_STANDARD_TYPE,
             gio::FileQueryInfoFlags::NOFOLLOW_SYMLINKS,
             glib::Priority::DEFAULT,
         )
         .await;
-    match exists {
-        Ok(_) => Err(error(
-            gio::IOErrorEnum::Exists,
-            &strings::op_exists(&name.to_string_lossy()),
-        )),
-        Err(err) if err.matches(gio::IOErrorEnum::NotFound) => Ok(dst),
+    match info {
+        Ok(info) => Ok(Some(info.file_type() == gio::FileType::Directory)),
+        Err(err) if err.matches(gio::IOErrorEnum::NotFound) => Ok(None),
         Err(err) => Err(err),
     }
 }
 
-/// Copia `sources` (archivos o carpetas) dentro de `dest_dir`.
+/// Primer nombre libre junto a `dst` para «conservar ambos».
+async fn free_variant(dst: &gio::File, is_dir: bool) -> Result<gio::File, glib::Error> {
+    let parent = dst
+        .parent()
+        .ok_or_else(|| error(gio::IOErrorEnum::InvalidFilename, strings::OP_NO_NAME))?;
+    let name = dst
+        .basename()
+        .map(|n| n.to_string_lossy().into_owned())
+        .ok_or_else(|| error(gio::IOErrorEnum::InvalidFilename, strings::OP_NO_NAME))?;
+    for candidate in numbered_variants(&name, is_dir).take(10_000) {
+        let file = parent.child(&candidate);
+        if existing(&file).await?.is_none() {
+            return Ok(file);
+        }
+    }
+    Err(error(gio::IOErrorEnum::Exists, &strings::op_exists(&name)))
+}
+
+/// Resuelve conflictos preguntando a la UI y recordando «aplicar a todos».
+struct Conflicts<'a> {
+    resolver: &'a Resolver,
+    policy: ConflictPolicy,
+}
+
+impl Conflicts<'_> {
+    async fn resolve(
+        &mut self,
+        source: &gio::File,
+        dest: &gio::File,
+        source_is_dir: bool,
+        dest_is_dir: bool,
+    ) -> Result<ConflictAction, glib::Error> {
+        let allowed = replace_allowed(source_is_dir, dest_is_dir, source.equal(dest));
+        if let Some(action) = self.policy.remembered(allowed) {
+            return Ok(action);
+        }
+        let decision = (self.resolver)(Conflict {
+            source: source.clone(),
+            dest: dest.clone(),
+            source_is_dir,
+            dest_is_dir,
+            replace_allowed: allowed,
+        })
+        .await;
+        let action = decision
+            .action
+            .ok_or_else(|| error(gio::IOErrorEnum::Cancelled, strings::OP_CANCELLED))?;
+        // Defensa: la UI no debería ofrecer Reemplazar donde no se permite.
+        let action = if action == ConflictAction::Replace && !allowed {
+            ConflictAction::Skip
+        } else {
+            action
+        };
+        if decision.apply_to_all {
+            self.policy.remember(action);
+        }
+        Ok(action)
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Mode {
+    Copy,
+    Move,
+}
+
+/// Progreso de un archivo en curso sobre el acumulado `base`.
+fn file_progress(report: &Report, progress: &Progress, base: u64) -> Box<dyn FnMut(i64, i64)> {
+    let report = report.clone();
+    let snapshot = progress.clone();
+    Box::new(move |current: i64, _total: i64| {
+        let mut partial = snapshot.clone();
+        partial.bytes_done = base + u64::try_from(current).unwrap_or(0);
+        report(&partial);
+    })
+}
+
+fn display(file: &gio::File) -> Option<String> {
+    file.basename().map(|n| n.to_string_lossy().into_owned())
+}
+
+/// Copia o mueve `sources` dentro de `dest_dir`, resolviendo conflictos.
+async fn transfer(
+    mode: Mode,
+    sources: &[gio::File],
+    dest_dir: &gio::File,
+    cancellable: &gio::Cancellable,
+    report: &Report,
+    resolver: &Resolver,
+) -> Result<(), glib::Error> {
+    // 1. Recorrer los orígenes para los totales.
+    let mut plans = Vec::new();
+    for src in sources {
+        check_cancelled(cancellable)?;
+        let name = src
+            .basename()
+            .ok_or_else(|| error(gio::IOErrorEnum::InvalidFilename, strings::OP_NO_NAME))?;
+        if dest_dir.equal(src) || dest_dir.has_prefix(src) {
+            return Err(error(
+                gio::IOErrorEnum::WouldRecurse,
+                strings::OP_INTO_ITSELF,
+            ));
+        }
+        let entries = scan(src, cancellable).await?;
+        plans.push((src.clone(), dest_dir.child(&name), entries));
+    }
+    let all_files = plans
+        .iter()
+        .flat_map(|(_, _, e)| e)
+        .filter(|e| e.kind == EntryKind::Other);
+    let mut progress = Progress {
+        bytes_total: Some(all_files.clone().map(|e| e.size).sum()),
+        files_total: Some(all_files.count() as u64),
+        ..Progress::default()
+    };
+    report(&progress);
+
+    // 2. Transferir cada origen.
+    let mut conflicts = Conflicts {
+        resolver,
+        policy: ConflictPolicy::default(),
+    };
+    for (src, mut dst, entries) in plans {
+        check_cancelled(cancellable)?;
+        let src_is_dir = entries.first().is_some_and(|e| e.kind == EntryKind::Dir);
+        let files = entries.iter().filter(|e| e.kind == EntryKind::Other);
+        let (bytes, file_count) = (
+            files.clone().map(|e| e.size).sum::<u64>(),
+            files.count() as u64,
+        );
+
+        let mut merge = false;
+        let mut overwrite_root = false;
+        if let Some(dst_is_dir) = existing(&dst).await? {
+            match conflicts
+                .resolve(&src, &dst, src_is_dir, dst_is_dir)
+                .await?
+            {
+                ConflictAction::Skip => {
+                    progress.bytes_done += bytes;
+                    progress.files_done += file_count;
+                    report(&progress);
+                    continue;
+                }
+                ConflictAction::KeepBoth => dst = free_variant(&dst, src_is_dir).await?,
+                ConflictAction::Replace if src_is_dir => merge = true,
+                ConflictAction::Replace => overwrite_root = true,
+            }
+        }
+
+        // Mover sin combinar: intento directo (instantáneo en el mismo
+        // disco). Una carpeta a otro disco se mueve por archivos.
+        if mode == Mode::Move && !merge {
+            let mut flags = COPY_FLAGS;
+            if overwrite_root {
+                flags |= gio::FileCopyFlags::OVERWRITE;
+            }
+            progress.current = display(&src);
+            let base = progress.bytes_done;
+            let on_progress = file_progress(report, &progress, base);
+            match move_file(&src, &dst, flags, cancellable, on_progress).await {
+                Ok(()) => {
+                    progress.bytes_done = base + bytes;
+                    progress.files_done += file_count;
+                    report(&progress);
+                    continue;
+                }
+                Err(err)
+                    if err.matches(gio::IOErrorEnum::WouldRecurse)
+                        || err.matches(gio::IOErrorEnum::NotSupported) => {}
+                Err(err) => return Err(err),
+            }
+        }
+
+        let target = Target {
+            src_root: &src,
+            dst_root: &dst,
+            overwrite_root,
+        };
+        transfer_entries(
+            mode,
+            &target,
+            &entries,
+            &mut conflicts,
+            cancellable,
+            report,
+            &mut progress,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+struct Target<'a> {
+    src_root: &'a gio::File,
+    dst_root: &'a gio::File,
+    /// El usuario ya eligió reemplazar el elemento raíz (un archivo).
+    overwrite_root: bool,
+}
+
+/// Copia o mueve el contenido recorrido de un origen, archivo por archivo.
+async fn transfer_entries(
+    mode: Mode,
+    target: &Target<'_>,
+    entries: &[Entry],
+    conflicts: &mut Conflicts<'_>,
+    cancellable: &gio::Cancellable,
+    report: &Report,
+    progress: &mut Progress,
+) -> Result<(), glib::Error> {
+    for entry in entries {
+        check_cancelled(cancellable)?;
+        let mut dst = match target.src_root.relative_path(&entry.file) {
+            Some(relative) => target.dst_root.resolve_relative_path(relative),
+            None => target.dst_root.clone(),
+        };
+        match entry.kind {
+            EntryKind::Dir => match existing(&dst).await? {
+                // Combinando: la carpeta ya está.
+                Some(true) => {}
+                Some(false) => {
+                    let name = display(&dst).unwrap_or_default();
+                    return Err(error(gio::IOErrorEnum::Exists, &strings::op_exists(&name)));
+                }
+                None => dst.make_directory_future(glib::Priority::DEFAULT).await?,
+            },
+            EntryKind::Other => {
+                let mut flags = COPY_FLAGS;
+                let is_root = entry.file.equal(target.src_root);
+                if is_root && target.overwrite_root {
+                    flags |= gio::FileCopyFlags::OVERWRITE;
+                } else if let Some(dst_is_dir) = existing(&dst).await? {
+                    match conflicts
+                        .resolve(&entry.file, &dst, false, dst_is_dir)
+                        .await?
+                    {
+                        ConflictAction::Skip => {
+                            progress.bytes_done += entry.size;
+                            progress.files_done += 1;
+                            report(progress);
+                            continue;
+                        }
+                        ConflictAction::KeepBoth => dst = free_variant(&dst, false).await?,
+                        ConflictAction::Replace => flags |= gio::FileCopyFlags::OVERWRITE,
+                    }
+                }
+
+                progress.current = display(&entry.file);
+                let base = progress.bytes_done;
+                let on_progress = file_progress(report, progress, base);
+                let result = match mode {
+                    Mode::Copy => {
+                        copy_file(&entry.file, &dst, flags, cancellable, on_progress).await
+                    }
+                    Mode::Move => {
+                        move_file(&entry.file, &dst, flags, cancellable, on_progress).await
+                    }
+                };
+                if let Err(err) = result {
+                    // Sin archivos a medias. Al reemplazar, gio escribe en
+                    // un temporal: el original sigue intacto y no se borra.
+                    if mode == Mode::Copy && !flags.contains(gio::FileCopyFlags::OVERWRITE) {
+                        let _ = dst.delete_future(glib::Priority::DEFAULT).await;
+                    }
+                    return Err(err);
+                }
+                progress.bytes_done = base + entry.size;
+                progress.files_done += 1;
+                report(progress);
+            }
+        }
+    }
+
+    // Movido por archivos: quitar las carpetas de origen que quedaron
+    // vacías; las que conservan algo omitido se dejan.
+    if mode == Mode::Move {
+        for entry in entries.iter().rev().filter(|e| e.kind == EntryKind::Dir) {
+            match entry.file.delete_future(glib::Priority::DEFAULT).await {
+                Ok(()) => {}
+                Err(err) if err.matches(gio::IOErrorEnum::NotEmpty) => {}
+                Err(err) => return Err(err),
+            }
+        }
+    }
+    Ok(())
+}
+
 async fn copy_tree(
     sources: &[gio::File],
     dest_dir: &gio::File,
     cancellable: &gio::Cancellable,
     report: &Report,
+    resolver: &Resolver,
 ) -> Result<(), glib::Error> {
-    // 1. Planificar: destinos válidos y totales.
-    let mut plans = Vec::new();
-    for src in sources {
-        check_cancelled(cancellable)?;
-        let dst = destination_for(src, dest_dir).await?;
-        let entries = scan(src, cancellable).await?;
-        plans.push((src.clone(), dst, entries));
-    }
-    let files = plans
-        .iter()
-        .flat_map(|(_, _, e)| e)
-        .filter(|e| e.kind == EntryKind::Other);
-    let mut progress = Progress {
-        bytes_total: Some(files.clone().map(|e| e.size).sum()),
-        files_total: Some(files.count() as u64),
-        ..Progress::default()
-    };
-    report(&progress);
+    transfer(Mode::Copy, sources, dest_dir, cancellable, report, resolver).await
+}
 
-    // 2. Copiar.
-    for (src_root, dst_root, entries) in plans {
-        for entry in entries {
-            check_cancelled(cancellable)?;
-            let dst = match src_root.relative_path(&entry.file) {
-                Some(relative) => dst_root.resolve_relative_path(relative),
-                None => dst_root.clone(),
-            };
-            match entry.kind {
-                EntryKind::Dir => dst.make_directory_future(glib::Priority::DEFAULT).await?,
-                EntryKind::Other => {
-                    progress.current = entry
-                        .file
-                        .basename()
-                        .map(|n| n.to_string_lossy().into_owned());
-                    let base = progress.bytes_done;
-                    let snapshot = progress.clone();
-                    let report_file = report.clone();
-                    let on_progress = Box::new(move |current: i64, _total: i64| {
-                        let mut partial = snapshot.clone();
-                        partial.bytes_done = base + u64::try_from(current).unwrap_or(0);
-                        report_file(&partial);
-                    });
-                    if let Err(err) = copy_file(&entry.file, &dst, cancellable, on_progress).await {
-                        // Sin archivos a medias en el destino.
-                        let _ = dst.delete_future(glib::Priority::DEFAULT).await;
-                        return Err(err);
-                    }
-                    progress.bytes_done = base + entry.size;
-                    progress.files_done += 1;
-                    report(&progress);
-                }
-            }
-        }
-    }
-    Ok(())
+async fn move_tree(
+    sources: &[gio::File],
+    dest_dir: &gio::File,
+    cancellable: &gio::Cancellable,
+    report: &Report,
+    resolver: &Resolver,
+) -> Result<(), glib::Error> {
+    transfer(Mode::Move, sources, dest_dir, cancellable, report, resolver).await
 }
 
 /// Borra `root` y su contenido (de dentro hacia fuera).
@@ -546,50 +822,6 @@ async fn rename(sources: &[gio::File], dest: &gio::File) -> Result<(), glib::Err
     Ok(())
 }
 
-/// Mueve `sources` dentro de `dest_dir`.
-async fn move_tree(
-    sources: &[gio::File],
-    dest_dir: &gio::File,
-    cancellable: &gio::Cancellable,
-    report: &Report,
-) -> Result<(), glib::Error> {
-    let mut progress = Progress {
-        files_total: Some(sources.len() as u64),
-        ..Progress::default()
-    };
-    report(&progress);
-    for src in sources {
-        check_cancelled(cancellable)?;
-        let dst = destination_for(src, dest_dir).await?;
-        progress.current = src.basename().map(|n| n.to_string_lossy().into_owned());
-        let snapshot = progress.clone();
-        let report_file = report.clone();
-        let on_progress = Box::new(move |current: i64, total: i64| {
-            let mut partial = snapshot.clone();
-            partial.bytes_done = u64::try_from(current).unwrap_or(0);
-            partial.bytes_total = u64::try_from(total).ok().filter(|t| *t > 0);
-            report_file(&partial);
-        });
-        match move_file(src, &dst, cancellable, on_progress).await {
-            Ok(()) => {}
-            // Carpeta a otro sistema de archivos: copiar y borrar el origen.
-            Err(err)
-                if err.matches(gio::IOErrorEnum::WouldRecurse)
-                    || err.matches(gio::IOErrorEnum::NotSupported) =>
-            {
-                copy_tree(std::slice::from_ref(src), dest_dir, cancellable, report).await?;
-                delete_tree(src, cancellable).await?;
-            }
-            Err(err) => return Err(err),
-        }
-        progress.files_done += 1;
-        progress.bytes_total = None;
-        progress.bytes_done = 0;
-        report(&progress);
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -616,6 +848,29 @@ mod tests {
         Rc::new(|_: &Progress| {})
     }
 
+    /// Resolver de prueba: responde en orden con `decisions` y cuenta las
+    /// preguntas. Si se acaban, cancela.
+    fn scripted(decisions: Vec<(Option<ConflictAction>, bool)>) -> (Resolver, Rc<Cell<u32>>) {
+        let asked = Rc::new(Cell::new(0));
+        let queue = Rc::new(RefCell::new(std::collections::VecDeque::from(decisions)));
+        let count = asked.clone();
+        let resolver: Resolver = Rc::new(move |_conflict| {
+            count.set(count.get() + 1);
+            let (action, apply_to_all) = queue.borrow_mut().pop_front().unwrap_or((None, false));
+            Box::pin(async move {
+                ConflictDecision {
+                    action,
+                    apply_to_all,
+                }
+            })
+        });
+        (resolver, asked)
+    }
+
+    fn never() -> Resolver {
+        scripted(Vec::new()).0
+    }
+
     #[test]
     fn copies_a_tree_with_symlinks_and_reports_totals() {
         let tmp = tempfile::tempdir().unwrap();
@@ -635,6 +890,7 @@ mod tests {
             &file(&dest),
             &gio::Cancellable::new(),
             &report,
+            &never(),
         ))
         .unwrap();
 
@@ -654,35 +910,164 @@ mod tests {
         assert_eq!(last.fraction(), Some(1.0));
     }
 
+    fn copy_with(sources: &[&Path], dest: &Path, resolver: &Resolver) -> Result<(), glib::Error> {
+        let sources: Vec<gio::File> = sources.iter().map(|p| file(p)).collect();
+        block_on(copy_tree(
+            &sources,
+            &file(dest),
+            &gio::Cancellable::new(),
+            &no_report(),
+            resolver,
+        ))
+    }
+
     #[test]
-    fn refuses_existing_destination_and_copy_into_itself() {
+    fn copy_into_itself_is_an_error() {
         let tmp = tempfile::tempdir().unwrap();
         let src = tmp.path().join("carpeta");
         fs::create_dir(&src).unwrap();
-        fs::write(tmp.path().join("x.txt"), "1").unwrap();
-        let dest = tmp.path().join("otra");
+        let err = copy_with(&[&src], &src.join("dentro"), &never()).unwrap_err();
+        assert!(err.matches(gio::IOErrorEnum::WouldRecurse));
+    }
+
+    #[test]
+    fn skip_and_cancel_leave_destination_untouched() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("x.txt");
+        fs::write(&src, "nuevo").unwrap();
+        let dest = tmp.path().join("destino");
         fs::create_dir(&dest).unwrap();
         fs::write(dest.join("x.txt"), "ya estaba").unwrap();
-        let c = gio::Cancellable::new();
 
-        let err = block_on(copy_tree(
-            &[file(&tmp.path().join("x.txt"))],
-            &file(&dest),
-            &c,
-            &no_report(),
-        ))
-        .unwrap_err();
-        assert!(err.matches(gio::IOErrorEnum::Exists));
+        let (skip, asked) = scripted(vec![(Some(ConflictAction::Skip), false)]);
+        copy_with(&[&src], &dest, &skip).unwrap();
+        assert_eq!(asked.get(), 1);
         assert_eq!(fs::read_to_string(dest.join("x.txt")).unwrap(), "ya estaba");
 
-        let err = block_on(copy_tree(
+        let err = copy_with(&[&src], &dest, &never()).unwrap_err();
+        assert!(err.matches(gio::IOErrorEnum::Cancelled));
+        assert_eq!(fs::read_to_string(dest.join("x.txt")).unwrap(), "ya estaba");
+    }
+
+    #[test]
+    fn replace_overwrites_and_keep_both_numbers() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("foto.jpg");
+        fs::write(&src, "nueva").unwrap();
+        let dest = tmp.path().join("destino");
+        fs::create_dir(&dest).unwrap();
+        fs::write(dest.join("foto.jpg"), "vieja").unwrap();
+        fs::write(dest.join("foto (2).jpg"), "otra").unwrap();
+
+        let (keep, _) = scripted(vec![(Some(ConflictAction::KeepBoth), false)]);
+        copy_with(&[&src], &dest, &keep).unwrap();
+        assert_eq!(
+            fs::read_to_string(dest.join("foto (3).jpg")).unwrap(),
+            "nueva"
+        );
+        assert_eq!(fs::read_to_string(dest.join("foto.jpg")).unwrap(), "vieja");
+
+        let (replace, _) = scripted(vec![(Some(ConflictAction::Replace), false)]);
+        copy_with(&[&src], &dest, &replace).unwrap();
+        assert_eq!(fs::read_to_string(dest.join("foto.jpg")).unwrap(), "nueva");
+    }
+
+    #[test]
+    fn copying_onto_itself_duplicates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("nota.md");
+        fs::write(&src, "x").unwrap();
+        let (keep, _) = scripted(vec![(Some(ConflictAction::KeepBoth), false)]);
+        copy_with(&[&src], tmp.path(), &keep).unwrap();
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("nota (2).md")).unwrap(),
+            "x"
+        );
+    }
+
+    #[test]
+    fn merge_folders_asks_per_file_and_applies_to_all() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("origen/carpeta");
+        fs::create_dir_all(src.join("sub")).unwrap();
+        fs::write(src.join("a.txt"), "nuevo a").unwrap();
+        fs::write(src.join("b.txt"), "nuevo b").unwrap();
+        fs::write(src.join("sub/c.txt"), "nuevo c").unwrap();
+        let dest = tmp.path().join("destino");
+        fs::create_dir_all(dest.join("carpeta/sub")).unwrap();
+        fs::write(dest.join("carpeta/a.txt"), "viejo a").unwrap();
+        fs::write(dest.join("carpeta/sub/c.txt"), "viejo c").unwrap();
+
+        // Combinar la carpeta y omitir todos los archivos que choquen.
+        let (resolver, asked) = scripted(vec![
+            (Some(ConflictAction::Replace), false),
+            (Some(ConflictAction::Skip), true),
+        ]);
+        copy_with(&[&src], &dest, &resolver).unwrap();
+
+        assert_eq!(asked.get(), 2, "la segunda decisión se aplicó a todos");
+        let merged = dest.join("carpeta");
+        assert_eq!(fs::read_to_string(merged.join("a.txt")).unwrap(), "viejo a");
+        assert_eq!(fs::read_to_string(merged.join("b.txt")).unwrap(), "nuevo b");
+        assert_eq!(
+            fs::read_to_string(merged.join("sub/c.txt")).unwrap(),
+            "viejo c"
+        );
+    }
+
+    #[test]
+    fn move_merge_keeps_skipped_files_in_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("origen/carpeta");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(src.join("a.txt"), "nuevo a").unwrap();
+        fs::write(src.join("b.txt"), "nuevo b").unwrap();
+        let dest = tmp.path().join("destino");
+        fs::create_dir_all(dest.join("carpeta")).unwrap();
+        fs::write(dest.join("carpeta/a.txt"), "viejo a").unwrap();
+
+        let (resolver, _) = scripted(vec![
+            (Some(ConflictAction::Replace), false),
+            (Some(ConflictAction::Skip), false),
+        ]);
+        block_on(move_tree(
             &[file(&src)],
-            &file(&src.join("dentro")),
-            &c,
+            &file(&dest),
+            &gio::Cancellable::new(),
             &no_report(),
+            &resolver,
         ))
-        .unwrap_err();
-        assert!(err.matches(gio::IOErrorEnum::WouldRecurse));
+        .unwrap();
+
+        // b se movió; a se omitió y sigue en el origen junto con su carpeta.
+        assert_eq!(
+            fs::read_to_string(dest.join("carpeta/b.txt")).unwrap(),
+            "nuevo b"
+        );
+        assert_eq!(
+            fs::read_to_string(dest.join("carpeta/a.txt")).unwrap(),
+            "viejo a"
+        );
+        assert!(!src.join("b.txt").exists());
+        assert_eq!(fs::read_to_string(src.join("a.txt")).unwrap(), "nuevo a");
+    }
+
+    #[test]
+    fn replace_is_refused_between_different_types() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("cosa");
+        fs::create_dir(&src).unwrap();
+        let dest = tmp.path().join("destino");
+        fs::create_dir(&dest).unwrap();
+        fs::write(dest.join("cosa"), "soy archivo").unwrap();
+
+        // Aunque la UI respondiera Reemplazar, se trata como Omitir.
+        let (resolver, _) = scripted(vec![(Some(ConflictAction::Replace), false)]);
+        copy_with(&[&src], &dest, &resolver).unwrap();
+        assert_eq!(
+            fs::read_to_string(dest.join("cosa")).unwrap(),
+            "soy archivo"
+        );
     }
 
     #[test]
@@ -700,6 +1085,7 @@ mod tests {
             &file(&dest),
             &cancellable,
             &no_report(),
+            &never(),
         ))
         .unwrap_err();
         assert!(err.matches(gio::IOErrorEnum::Cancelled));
@@ -722,6 +1108,7 @@ mod tests {
             &file(&dest),
             &gio::Cancellable::new(),
             &no_report(),
+            &never(),
         ))
         .unwrap();
 
@@ -787,6 +1174,7 @@ mod tests {
                         &file(&dest),
                         &gio::Cancellable::new(),
                         &report,
+                        &never(),
                     ))
                     .unwrap();
                 tick.destroy();

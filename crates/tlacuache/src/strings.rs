@@ -45,6 +45,17 @@ pub const NEW_FILE_TITLE: &str = "Nuevo archivo";
 pub const RENAME_TITLE: &str = "Renombrar";
 pub const RENAME_SINGLE_ONLY: &str =
     "Selecciona un solo elemento para renombrar (el renombrado masivo llegará en la v0.2)";
+pub const CONFLICT_FILES: &str = "Ya hay un archivo con ese nombre en el destino.";
+pub const CONFLICT_FOLDERS: &str = "Ya hay una carpeta con ese nombre. «Combinar» copia el contenido dentro y pregunta por cada archivo que coincida.";
+pub const CONFLICT_TYPES: &str =
+    "En el destino hay un elemento de otro tipo con ese nombre; no se puede reemplazar.";
+pub const CONFLICT_SAME: &str =
+    "El origen y el destino son el mismo elemento. «Conservar ambos» crea una copia.";
+pub const CONFLICT_APPLY_ALL: &str = "Aplicar a todos los conflictos de esta operación";
+pub const ACTION_SKIP: &str = "Omitir";
+pub const ACTION_KEEP_BOTH: &str = "Conservar ambos";
+pub const ACTION_REPLACE: &str = "Reemplazar";
+pub const ACTION_MERGE: &str = "Combinar";
 pub const OP_PREPARING: &str = "Preparando…";
 pub const OP_CANCEL: &str = "Cancelar operación";
 pub const OP_CANCELLED: &str = "Operación cancelada";
@@ -234,4 +245,8 @@ pub fn delete_confirm(names: &[String]) -> String {
         "Se eliminarán {}. Esta acción no se puede deshacer.",
         names_summary(names)
     )
+}
+
+pub fn conflict_title(name: &str) -> String {
+    format!("«{name}» ya existe")
 }
