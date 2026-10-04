@@ -109,6 +109,8 @@ impl FileListView {
         let column_view = gtk::ColumnView::new(Some(selection.clone()));
         column_view.add_css_class("file-list");
         column_view.add_css_class("data-table");
+        // Selección por rectángulo arrastrando con el ratón.
+        column_view.set_enable_rubberband(true);
 
         // Solo la última columna se expande: si se expandiera "Nombre", GTK
         // le seguiría dando el espacio sobrante al redimensionarla y los
