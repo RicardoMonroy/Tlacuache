@@ -14,7 +14,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **1.2 Lista detallada**: `ColumnView` con `DirectoryList` → filtro → orden. CA: abre `~` y una carpeta con 10 000 archivos sin congelar la UI.
 - [x] **1.3 Navegación**: Enter/doble clic entra, Backspace sube, Alt+←/→ con `core::history`. CA: pruebas de history + prueba manual.
 - [x] **1.4 Barra de ruta**: breadcrumb clicable y modo editable (Ctrl+L) con autocompletado. CA: navegar escribiendo una ruta.
-- [ ] **1.5 Columna edad**: `core::age` con buckets y chip de color. CA: pruebas de buckets.
+- [x] **1.5 Columna edad**: `core::age` con buckets y chip de color. CA: pruebas de buckets.
 - [ ] **1.6 Abrir archivos**: con la app predeterminada (`gio::AppInfo::launch_default_for_uri_async`). CA: abre PDF/imagen en su app.
 - [ ] **1.7 Filtro rápido y ocultos** (escribir para filtrar, Esc limpia, Ctrl+H).
 

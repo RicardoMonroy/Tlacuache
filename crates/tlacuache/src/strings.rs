@@ -5,6 +5,7 @@
 use std::path::Path;
 
 use gtk::glib;
+use tlacuache_core::age::{Age, AgeUnit};
 
 pub const APP_NAME: &str = "Tlacuache";
 
@@ -12,6 +13,7 @@ pub const COLUMN_NAME: &str = "Nombre";
 pub const COLUMN_EXTENSION: &str = "Ext";
 pub const COLUMN_SIZE: &str = "Tamaño";
 pub const COLUMN_MODIFIED: &str = "Modificado";
+pub const COLUMN_AGE: &str = "Edad";
 
 pub const NAV_BACK: &str = "Atrás (Alt+←)";
 pub const NAV_FORWARD: &str = "Adelante (Alt+→)";
@@ -30,4 +32,19 @@ pub fn listing_failed(err: &glib::Error) -> String {
 
 pub fn path_not_found(text: &str) -> String {
     format!("No existe la ruta: {text}")
+}
+
+/// Edad relativa compacta: "ahora", "5 min", "3 h", "2 d", "1 mes", "4 años".
+pub fn age(age: &Age) -> String {
+    let n = age.amount;
+    match age.unit {
+        AgeUnit::Now => "ahora".to_owned(),
+        AgeUnit::Minutes => format!("{n} min"),
+        AgeUnit::Hours => format!("{n} h"),
+        AgeUnit::Days => format!("{n} d"),
+        AgeUnit::Months if n == 1 => "1 mes".to_owned(),
+        AgeUnit::Months => format!("{n} meses"),
+        AgeUnit::Years if n == 1 => "1 año".to_owned(),
+        AgeUnit::Years => format!("{n} años"),
+    }
 }

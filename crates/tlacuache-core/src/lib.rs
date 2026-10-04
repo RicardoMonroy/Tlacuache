@@ -3,6 +3,7 @@
 //! Todo lo testeable (orden, filtros, historial, configuración, keymap,
 //! cola de operaciones) vive aquí.
 
+pub mod age;
 pub mod config;
 pub mod entry;
 pub mod filter;

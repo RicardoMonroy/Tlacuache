@@ -10,6 +10,9 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gio, glib, pango};
+use std::time::SystemTime;
+
+use tlacuache_core::age::{Age, AgeBucket};
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 
 use crate::fs::file_item::FileItem;
@@ -99,9 +102,10 @@ impl FileListView {
         column_view.append_column(&name);
         column_view.append_column(&column(ColumnId::Extension));
         column_view.append_column(&column(ColumnId::Size));
-        let modified = column(ColumnId::Modified);
-        modified.set_expand(true);
-        column_view.append_column(&modified);
+        column_view.append_column(&column(ColumnId::Modified));
+        let age = column(ColumnId::Age);
+        age.set_expand(true);
+        column_view.append_column(&age);
 
         // Los encabezados solo indican qué columna/dirección eligió el
         // usuario; el orden real lo aplica core::sort (carpetas primero).
@@ -215,14 +219,19 @@ impl FileListView {
     }
 
     fn apply_header_sort(&self, sorter: &gtk::ColumnViewSorter) {
-        let key = sorter
+        let column = sorter
             .primary_sort_column()
             .and_then(|c| c.id())
             .and_then(|id| ColumnId::from_id(&id))
-            .map_or(SortKey::Name, ColumnId::sort_key);
-        let direction = match sorter.primary_sort_order() {
-            gtk::SortType::Descending => SortDirection::Descending,
-            _ => SortDirection::Ascending,
+            .unwrap_or(ColumnId::Name);
+        let ascending = sorter.primary_sort_order() != gtk::SortType::Descending;
+        // Edad ascendente = lo más reciente primero = fecha descendente.
+        let ascending = ascending != matches!(column, ColumnId::Age);
+        let key = column.sort_key();
+        let direction = if ascending {
+            SortDirection::Ascending
+        } else {
+            SortDirection::Descending
         };
         if let Some(model) = self.imp().model.get() {
             model.set_sort(SortSpec { key, direction });
@@ -236,10 +245,17 @@ enum ColumnId {
     Extension,
     Size,
     Modified,
+    Age,
 }
 
 impl ColumnId {
-    const ALL: [Self; 4] = [Self::Name, Self::Extension, Self::Size, Self::Modified];
+    const ALL: [Self; 5] = [
+        Self::Name,
+        Self::Extension,
+        Self::Size,
+        Self::Modified,
+        Self::Age,
+    ];
 
     fn id(self) -> &'static str {
         match self {
@@ -247,6 +263,7 @@ impl ColumnId {
             Self::Extension => "extension",
             Self::Size => "size",
             Self::Modified => "modified",
+            Self::Age => "age",
         }
     }
 
@@ -260,6 +277,7 @@ impl ColumnId {
             Self::Extension => strings::COLUMN_EXTENSION,
             Self::Size => strings::COLUMN_SIZE,
             Self::Modified => strings::COLUMN_MODIFIED,
+            Self::Age => strings::COLUMN_AGE,
         }
     }
 
@@ -268,7 +286,7 @@ impl ColumnId {
             Self::Name => SortKey::Name,
             Self::Extension => SortKey::Extension,
             Self::Size => SortKey::Size,
-            Self::Modified => SortKey::Modified,
+            Self::Modified | Self::Age => SortKey::Modified,
         }
     }
 }
@@ -319,6 +337,12 @@ fn cell_widget(id: ColumnId) -> gtk::Widget {
             label.add_css_class("numeric");
             label.upcast()
         }
+        ColumnId::Age => {
+            let chip = gtk::Label::builder().halign(gtk::Align::Start).build();
+            chip.add_css_class("age-chip");
+            chip.add_css_class("numeric");
+            chip.upcast()
+        }
         ColumnId::Extension | ColumnId::Modified => {
             let label = gtk::Label::builder().xalign(0.0).build();
             if matches!(id, ColumnId::Modified) {
@@ -363,7 +387,34 @@ fn bind_cell(id: ColumnId, item: &FileItem, child: &gtk::Widget) {
                 .unwrap_or_default();
             set_label(child, &text);
         }
+        ColumnId::Age => {
+            if let Some(chip) = child.downcast_ref::<gtk::Label>() {
+                bind_age_chip(chip, entry.modified);
+            }
+        }
     }
+}
+
+const AGE_CLASSES: [&str; 5] = ["age-day", "age-week", "age-month", "age-year", "age-older"];
+
+fn bind_age_chip(chip: &gtk::Label, modified: Option<SystemTime>) {
+    for class in AGE_CLASSES {
+        chip.remove_css_class(class);
+    }
+    let Some(modified) = modified else {
+        chip.set_visible(false);
+        return;
+    };
+    let age = Age::between(modified, SystemTime::now());
+    chip.add_css_class(match age.bucket {
+        AgeBucket::Day => "age-day",
+        AgeBucket::Week => "age-week",
+        AgeBucket::Month => "age-month",
+        AgeBucket::Year => "age-year",
+        AgeBucket::Older => "age-older",
+    });
+    chip.set_text(&strings::age(&age));
+    chip.set_visible(true);
 }
 
 fn set_label(child: &gtk::Widget, text: &str) {
