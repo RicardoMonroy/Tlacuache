@@ -52,6 +52,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 - **Panel → terminal**: al cambiar de carpeta en el panel, si la terminal está inactiva (sin proceso en primer plano distinto al shell) se envía `cd` con la ruta escapada. Si hay un proceso corriendo, no se envía nada y se muestra un indicador "carpeta desincronizada" con botón para sincronizar.
 - **Terminal → panel**: si el shell emite OSC 7 (`current-directory-uri`), el panel navega a esa carpeta. Opción configurable.
 - Copiar/pegar: Ctrl+Shift+C / Ctrl+Shift+V. Fuente monoespaciada configurable.
+- Se oculta con F4 (recuerda su altura) y se descarta si el shell termina (`exit`); el siguiente F4 lanza uno nuevo en la carpeta actual. Dentro de la terminal, Tab es del shell (autocompletar).
 - Arrastrar un archivo del panel a la terminal pega su ruta escapada.
 
 ## 5. Sidebar

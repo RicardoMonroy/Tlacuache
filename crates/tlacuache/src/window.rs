@@ -1152,10 +1152,14 @@ impl TlacuacheWindow {
         if key != gdk::Key::Tab || mods.intersects(modifiers) || !self.dual_pane() {
             return glib::Propagation::Proceed;
         }
-        // Escribiendo texto (p. ej. la ruta), Tab autocompleta.
-        if gtk::prelude::RootExt::focus(self)
-            .is_some_and(|w| w.is::<gtk::Text>() || w.ancestor(gtk::Entry::static_type()).is_some())
-        {
+        // Escribiendo texto (la ruta) o en la terminal, Tab es del widget:
+        // autocompletar ruta o del shell.
+        if gtk::prelude::RootExt::focus(self).is_some_and(|w| {
+            w.is::<gtk::Text>()
+                || w.ancestor(gtk::Entry::static_type()).is_some()
+                || w.is::<vte::Terminal>()
+                || w.ancestor(vte::Terminal::static_type()).is_some()
+        }) {
             return glib::Propagation::Proceed;
         }
         self.switch_active_pane();

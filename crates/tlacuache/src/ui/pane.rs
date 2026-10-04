@@ -17,6 +17,7 @@ use tlacuache_core::session::{PaneSession, TabSession};
 use crate::fs::display::{display_name, display_path};
 use crate::strings;
 use crate::ui::tab_page::TabPage;
+use crate::ui::terminal::TerminalView;
 
 mod imp {
     use super::*;
@@ -26,6 +27,12 @@ mod imp {
         pub tab_view: adw::TabView,
         pub tab_bar: adw::TabBar,
         pub config: OnceCell<Rc<Config>>,
+        /// Pestañas | terminal.
+        pub split: gtk::Paned,
+        /// Terminal del panel: se crea en el primer F4.
+        pub terminal: std::cell::RefCell<Option<TerminalView>>,
+        /// Altura de la zona de pestañas recordada al ocultar la terminal.
+        pub split_position: std::cell::Cell<Option<i32>>,
     }
 
     #[glib::object_subclass]
@@ -109,8 +116,105 @@ impl Pane {
             }
         ));
 
+        // Pestañas arriba, terminal abajo (oculta hasta el primer F4).
+        imp.split.set_orientation(gtk::Orientation::Vertical);
+        imp.split.set_start_child(Some(&imp.tab_view));
+        imp.split.set_resize_end_child(false);
+        imp.split.set_shrink_start_child(false);
+        imp.split.set_shrink_end_child(false);
+        imp.split.set_vexpand(true);
+
+        // F4 en captura: llega antes que a VTE, así funciona también con
+        // el foco dentro de la terminal.
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        keys.connect_key_pressed(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, mods| {
+                let modifiers = gdk::ModifierType::CONTROL_MASK
+                    | gdk::ModifierType::ALT_MASK
+                    | gdk::ModifierType::SHIFT_MASK
+                    | gdk::ModifierType::SUPER_MASK;
+                if key == gdk::Key::F4 && !mods.intersects(modifiers) {
+                    pane.toggle_terminal();
+                    glib::Propagation::Stop
+                } else {
+                    glib::Propagation::Proceed
+                }
+            }
+        ));
+        self.add_controller(keys);
+
         self.append(&imp.tab_bar);
-        self.append(&imp.tab_view);
+        self.append(&imp.split);
+    }
+
+    /// F4: muestra la terminal (creándola la primera vez, en la carpeta
+    /// actual) u oculta la que hay, devolviendo el foco a la vista.
+    pub fn toggle_terminal(&self) {
+        let imp = self.imp();
+        let visible = imp.split.end_child().is_some_and(|c| c.is_visible());
+        if visible {
+            self.hide_terminal();
+            return;
+        }
+        let existing = imp.terminal.borrow().clone();
+        let terminal = match existing {
+            Some(terminal) => terminal,
+            None => {
+                let Some(config) = imp.config.get() else {
+                    return;
+                };
+                let terminal = TerminalView::new(config, self.current_directory().as_ref());
+                terminal.connect_exited(glib::clone!(
+                    #[weak(rename_to = pane)]
+                    self,
+                    move |_| pane.on_terminal_exited()
+                ));
+                imp.split.set_end_child(Some(&terminal));
+                imp.terminal.replace(Some(terminal.clone()));
+                terminal
+            }
+        };
+        terminal.set_visible(true);
+        // Posición recordada o dos tercios para las pestañas.
+        let position = imp
+            .split_position
+            .get()
+            .unwrap_or(imp.split.height() * 2 / 3);
+        imp.split.set_position(position.max(1));
+        terminal.grab_focus();
+    }
+
+    fn hide_terminal(&self) {
+        let imp = self.imp();
+        imp.split_position.set(Some(imp.split.position()));
+        if let Some(terminal) = imp.split.end_child() {
+            terminal.set_visible(false);
+        }
+        self.focus_current();
+    }
+
+    /// El shell terminó (`exit`): se oculta y se descarta; el próximo F4
+    /// lanza uno nuevo.
+    fn on_terminal_exited(&self) {
+        let imp = self.imp();
+        let had_focus = imp
+            .terminal
+            .borrow()
+            .as_ref()
+            .is_some_and(|t| t.has_focus() || t.focus_child().is_some());
+        if imp.split.end_child().is_some_and(|c| c.is_visible()) {
+            imp.split_position.set(Some(imp.split.position()));
+        }
+        imp.split.set_end_child(None::<&gtk::Widget>);
+        imp.terminal.replace(None);
+        if had_focus {
+            self.focus_current();
+        }
     }
 
     /// Abre una pestaña en `dir` con la vista y ocultos de la config, y la

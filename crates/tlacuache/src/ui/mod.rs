@@ -15,3 +15,4 @@ pub mod properties_dialog;
 pub mod sidebar;
 pub mod status_bar;
 pub mod tab_page;
+pub mod terminal;

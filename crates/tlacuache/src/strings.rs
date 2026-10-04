@@ -362,3 +362,7 @@ pub fn prop_measured(bytes: u64, files: u64, dirs: u64) -> String {
         prop_size(bytes)
     )
 }
+
+pub fn terminal_spawn_failed(detail: &str) -> String {
+    format!("No se pudo iniciar la terminal: {detail}")
+}

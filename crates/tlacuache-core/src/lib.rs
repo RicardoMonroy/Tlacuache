@@ -20,6 +20,7 @@ pub mod shell;
 pub mod sort;
 pub mod summary;
 pub mod text;
+pub mod theme;
 pub mod usage;
 
 /// Identificador de la aplicación (D-Bus / desktop file).
