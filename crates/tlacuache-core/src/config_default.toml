@@ -1,0 +1,30 @@
+# Configuración de Tlacuache Browser.
+# Todas las claves son opcionales: lo que borres vuelve a su valor por defecto.
+
+[general]
+show_hidden = false
+dual_pane = true
+confirm_trash = false
+
+[preview]
+position = "bottom"        # bottom | right
+max_text_bytes = 1048576
+
+[terminal]
+shell = ""                 # vacío = $SHELL
+font = "JetBrains Mono 11"
+sync_panel_to_terminal = true
+sync_terminal_to_panel = true
+
+[theme]
+name = "nord"
+color_scheme = "dark"      # dark | light | system
+
+# Favoritos agrupados (uno o más bloques):
+# [[favorites]]
+# group = "Proyectos"
+# paths = ["~/dev", "~/Documentos/clases"]
+
+# Atajos remapeados: acción = "acelerador"
+[keys]
+# toggle_terminal = "F4"

@@ -3,6 +3,8 @@
 //! Todo lo testeable (orden, filtros, historial, configuración, keymap,
 //! cola de operaciones) vive aquí.
 
+pub mod config;
+
 /// Identificador de la aplicación (D-Bus / desktop file).
 pub const APP_ID: &str = "io.github.rmonroy.Tlacuache";
 

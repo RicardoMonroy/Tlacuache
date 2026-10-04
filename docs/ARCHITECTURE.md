@@ -113,6 +113,7 @@ sync_terminal_to_panel = true
 
 [theme]
 name = "nord"
+color_scheme = "dark"   # dark | light | system
 
 [[favorites]]
 group = "Proyectos"
@@ -121,6 +122,8 @@ paths = ["~/dev", "~/Documentos/clases"]
 [keys]
 toggle_terminal = "F4"
 ```
+
+Todas las claves son opcionales (`#[serde(default)]`): un archivo parcial se combina con los defaults y las claves desconocidas se ignoran. Si no existe, se escribe la plantilla comentada `tlacuache-core/src/config_default.toml`. Si el TOML es inválido no se sobrescribe: se usan defaults y se avisa con un toast.
 
 Estado de sesión (pestañas abiertas, tamaños de paneles) en `~/.local/state/tlacuache/session.toml`.
 
