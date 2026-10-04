@@ -97,6 +97,7 @@ pub const PROP_PERMISSIONS: &str = "Permisos";
 pub const PROP_OWNER: &str = "Propietario:grupo";
 pub const PROP_ERROR: &str = "Error";
 pub const PROP_CALCULATING: &str = "Calculando…";
+pub const TOGGLE_TERMINAL: &str = "Terminal (F4)";
 pub const TERMINAL_DESYNC: &str = "Carpeta desincronizada";
 pub const TERMINAL_SYNC: &str = "Sincronizar";
 pub const TERMINAL_BUSY: &str = "La terminal está ocupada con otro programa";

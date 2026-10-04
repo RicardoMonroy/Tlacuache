@@ -22,8 +22,13 @@ use crate::ui::terminal::TerminalView;
 mod imp {
     use super::*;
 
-    #[derive(Default)]
+    #[derive(Default, glib::Properties)]
+    #[properties(wrapper_type = super::Pane)]
     pub struct Pane {
+        /// Terminal visible. Propiedad para exponerla como acción
+        /// conmutable (`pane.terminal`) al botón de la barra.
+        #[property(get, set = Self::set_terminal_visible)]
+        pub terminal_visible: std::cell::Cell<bool>,
         pub tab_view: adw::TabView,
         pub tab_bar: adw::TabBar,
         pub config: OnceCell<Rc<Config>>,
@@ -44,6 +49,7 @@ mod imp {
         fn class_init(klass: &mut Self::Class) {
             klass.install_action("pane.new-tab", None, |pane, _, _| pane.new_tab());
             klass.install_action("pane.close-tab", None, |pane, _, _| pane.close_tab());
+            klass.install_property_action("pane.terminal", "terminal-visible");
 
             let ctrl = gdk::ModifierType::CONTROL_MASK;
             klass.add_binding_action(gdk::Key::t, ctrl, "pane.new-tab");
@@ -51,6 +57,15 @@ mod imp {
         }
     }
 
+    impl Pane {
+        fn set_terminal_visible(&self, visible: bool) {
+            if self.terminal_visible.get() != visible {
+                self.obj().toggle_terminal();
+            }
+        }
+    }
+
+    #[glib::derived_properties]
     impl ObjectImpl for Pane {
         fn signals() -> &'static [glib::subclass::Signal] {
             static SIGNALS: std::sync::OnceLock<Vec<glib::subclass::Signal>> =
@@ -186,6 +201,7 @@ impl Pane {
             }
         };
         terminal.set_visible(true);
+        self.set_terminal_state(true);
         // Posición recordada o dos tercios para las pestañas.
         let position = imp
             .split_position
@@ -232,7 +248,15 @@ impl Pane {
         if let Some(terminal) = imp.split.end_child() {
             terminal.set_visible(false);
         }
+        self.set_terminal_state(false);
         self.focus_current();
+    }
+
+    /// Actualiza la propiedad (y el botón) sin volver a alternar.
+    fn set_terminal_state(&self, visible: bool) {
+        if self.imp().terminal_visible.replace(visible) != visible {
+            self.notify_terminal_visible();
+        }
     }
 
     /// El shell terminó (`exit`): se oculta y se descarta; el próximo F4
@@ -249,6 +273,7 @@ impl Pane {
         }
         imp.split.set_end_child(None::<&gtk::Widget>);
         imp.terminal.replace(None);
+        self.set_terminal_state(false);
         if had_focus {
             self.focus_current();
         }

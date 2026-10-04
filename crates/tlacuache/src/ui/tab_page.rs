@@ -262,6 +262,15 @@ impl TabPage {
         imp.path_bar.set_hexpand(true);
         nav.append(&imp.path_bar);
         nav.append(&view_switcher());
+        // Alterna la terminal del panel (acción del `Pane`, como F4).
+        let terminal = gtk::ToggleButton::builder()
+            .icon_name("utilities-terminal-symbolic")
+            .tooltip_text(strings::TOGGLE_TERMINAL)
+            .action_name("pane.terminal")
+            .focusable(false)
+            .build();
+        terminal.add_css_class("flat");
+        nav.append(&terminal);
 
         imp.path_bar.connect_navigate(glib::clone!(
             #[weak(rename_to = page)]
