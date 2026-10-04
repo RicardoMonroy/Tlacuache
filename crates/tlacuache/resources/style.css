@@ -170,3 +170,15 @@ listview.miller-column > row {
 .pane.active-pane {
   border-top-color: var(--accent-bg-color);
 }
+
+/* Barra lateral. */
+.tlacuache-sidebar {
+  background-color: var(--sidebar-bg-color);
+  color: var(--sidebar-fg-color);
+}
+
+.tlacuache-sidebar .sidebar-heading {
+  margin: 12px 12px 4px;
+  font-size: 0.85em;
+  opacity: 0.7;
+}

@@ -21,6 +21,18 @@ pub const NAV_FORWARD: &str = "Adelante (Alt+→)";
 pub const NAV_UP: &str = "Subir (Alt+↑)";
 
 pub const DUAL_PANE: &str = "Doble panel (F3)";
+pub const SHOW_SIDEBAR: &str = "Barra lateral (F9)";
+
+pub const SIDEBAR_PLACES: &str = "Lugares";
+pub const PLACE_HOME: &str = "Inicio";
+pub const PLACE_DESKTOP: &str = "Escritorio";
+pub const PLACE_DOCUMENTS: &str = "Documentos";
+pub const PLACE_DOWNLOADS: &str = "Descargas";
+pub const PLACE_MUSIC: &str = "Música";
+pub const PLACE_PICTURES: &str = "Imágenes";
+pub const PLACE_VIDEOS: &str = "Vídeos";
+pub const PLACE_ROOT: &str = "Raíz";
+pub const PLACE_TRASH: &str = "Papelera";
 pub const TAB_NEW: &str = "Nueva pestaña (Ctrl+T)";
 
 pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";

@@ -1,4 +1,5 @@
-//! Ventana principal: header bar y área de paneles (uno o dos, F3). Lleva
+//! Ventana principal: header bar, barra lateral (F9) y área de paneles
+//! (uno o dos, F3). Lleva
 //! la cuenta del panel activo, que Tab alterna y que las operaciones entre
 //! paneles (F5/F6) usarán como origen.
 
@@ -12,6 +13,11 @@ use tlacuache_core::config::Config;
 
 use crate::strings;
 use crate::ui::pane::Pane;
+use crate::ui::sidebar::Sidebar;
+
+/// Ancho inicial y mínimo de la barra lateral (px).
+const SIDEBAR_WIDTH: i32 = 200;
+const SIDEBAR_MIN_WIDTH: i32 = 140;
 
 mod imp {
     use super::*;
@@ -21,6 +27,10 @@ mod imp {
     pub struct TlacuacheWindow {
         pub toast_overlay: adw::ToastOverlay,
         pub toolbar: adw::ToolbarView,
+        /// Barra lateral | paneles.
+        pub outer: gtk::Paned,
+        pub sidebar: Sidebar,
+        /// Panel izquierdo | panel derecho.
         pub paned: gtk::Paned,
         /// Izquierdo y derecho.
         pub panes: OnceCell<[Pane; 2]>,
@@ -30,6 +40,9 @@ mod imp {
         /// conmutable (`panes.dual`) al botón de la barra.
         #[property(get, set = Self::set_dual_pane)]
         pub dual_pane: Cell<bool>,
+        /// Barra lateral visible (F9).
+        #[property(get, set = Self::set_show_sidebar)]
+        pub show_sidebar: Cell<bool>,
     }
 
     impl TlacuacheWindow {
@@ -41,6 +54,14 @@ mod imp {
             obj.apply_dual_pane();
             obj.notify_dual_pane();
         }
+
+        fn set_show_sidebar(&self, show: bool) {
+            if self.show_sidebar.replace(show) == show {
+                return;
+            }
+            self.sidebar.set_visible(show);
+            self.obj().notify_show_sidebar();
+        }
     }
 
     #[glib::object_subclass]
@@ -51,6 +72,11 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             klass.install_property_action("panes.dual", "dual-pane");
+            klass.install_property_action("sidebar.show", "show-sidebar");
+            klass.add_binding(gdk::Key::F9, gdk::ModifierType::empty(), |window| {
+                window.set_show_sidebar(!window.show_sidebar());
+                glib::Propagation::Stop
+            });
             klass.add_binding(gdk::Key::F3, gdk::ModifierType::empty(), |window| {
                 window.set_dual_pane(!window.dual_pane());
                 glib::Propagation::Stop
@@ -73,7 +99,14 @@ mod imp {
                 .action_name("panes.dual")
                 .focusable(false)
                 .build();
+            let sidebar_toggle = gtk::ToggleButton::builder()
+                .icon_name("sidebar-show-symbolic")
+                .tooltip_text(strings::SHOW_SIDEBAR)
+                .action_name("sidebar.show")
+                .focusable(false)
+                .build();
             let header = adw::HeaderBar::new();
+            header.pack_start(&sidebar_toggle);
             header.pack_end(&dual);
 
             self.toolbar.add_top_bar(&header);
@@ -149,12 +182,36 @@ impl TlacuacheWindow {
                 }
             ));
         });
-        imp.toolbar.set_content(Some(paned));
+
+        imp.sidebar.set_width_request(SIDEBAR_MIN_WIDTH);
+        imp.sidebar.connect_place_activated(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_, file| window.navigate_active(file)
+        ));
+        imp.show_sidebar.set(true);
+
+        let outer = &imp.outer;
+        outer.set_orientation(gtk::Orientation::Horizontal);
+        outer.set_start_child(Some(&imp.sidebar));
+        outer.set_end_child(Some(paned));
+        outer.set_resize_start_child(false);
+        outer.set_shrink_start_child(false);
+        outer.set_shrink_end_child(false);
+        outer.set_position(SIDEBAR_WIDTH);
+        imp.toolbar.set_content(Some(outer));
 
         let _ = imp.panes.set(panes);
         imp.dual_pane.set(config.general.dual_pane);
         self.apply_dual_pane();
         self.set_active_pane(0);
+    }
+
+    /// Navega el panel activo a `dir` (barra lateral, favoritos…).
+    fn navigate_active(&self, dir: &gio::File) {
+        if let Some(pane) = self.pane(self.imp().active.get()) {
+            pane.navigate(dir);
+        }
     }
 
     fn pane(&self, index: usize) -> Option<&Pane> {

@@ -119,6 +119,14 @@ impl Pane {
         imp.tab_view.set_selected_page(&tab);
     }
 
+    /// Navega la pestaña seleccionada a `dir` y le da el foco.
+    pub fn navigate(&self, dir: &gio::File) {
+        if let Some(page) = self.current_page() {
+            page.navigate_to(dir);
+            page.focus_view();
+        }
+    }
+
     /// Lleva el foco a la vista de la pestaña seleccionada.
     pub fn focus_current(&self) {
         if let Some(page) = self.current_page() {
