@@ -1,0 +1,66 @@
+# Roadmap — Tlacuache Browser
+
+Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio de aceptación (CA).
+
+## Hito 0 — Esqueleto
+- [ ] **0.1 Workspace**: crear workspace con `tlacuache-core` y `tlacuache`. CA: `cargo build` y `cargo test` pasan.
+- [ ] **0.2 Ventana vacía**: `adw::Application` con app-id `io.github.rmonroy.Tlacuache`, `adw::ApplicationWindow` con HeaderBar. CA: `cargo run` abre ventana.
+- [ ] **0.3 CSS y tema Nord**: cargar `style.css` desde recursos. CA: fondo y acentos Nord visibles.
+- [ ] **0.4 Config**: `core::config` con defaults y lectura de `config.toml`; crear archivo si no existe. CA: pruebas de parseo y defaults.
+- [ ] **0.5 CI local**: script `scripts/check.sh` que corre fmt, clippy y tests. CA: script en verde.
+
+## Hito 1 — Un panel que navega
+- [ ] **1.1 FileEntry + sort + filter** en core con pruebas (orden natural, carpetas primero, ocultos).
+- [ ] **1.2 Lista detallada**: `ColumnView` con `DirectoryList` → filtro → orden. CA: abre `~` y una carpeta con 10 000 archivos sin congelar la UI.
+- [ ] **1.3 Navegación**: Enter/doble clic entra, Backspace sube, Alt+←/→ con `core::history`. CA: pruebas de history + prueba manual.
+- [ ] **1.4 Barra de ruta**: breadcrumb clicable y modo editable (Ctrl+L) con autocompletado. CA: navegar escribiendo una ruta.
+- [ ] **1.5 Columna edad**: `core::age` con buckets y chip de color. CA: pruebas de buckets.
+- [ ] **1.6 Abrir archivos**: con la app predeterminada (`gio::AppInfo::launch_default_for_uri_async`). CA: abre PDF/imagen en su app.
+- [ ] **1.7 Filtro rápido y ocultos** (escribir para filtrar, Esc limpia, Ctrl+H).
+
+## Hito 2 — Columnas Miller y pestañas
+- [ ] **2.1 Vista Miller** con scroll automático a la columna activa. CA: navegar 6 niveles solo con flechas.
+- [ ] **2.2 Alternar vista** Miller/lista por pestaña.
+- [ ] **2.3 Pestañas** con `adw::TabView` (Ctrl+T, Ctrl+W, Ctrl+Tab).
+- [ ] **2.4 Barra de estado** del panel (elementos, selección, espacio libre).
+
+## Hito 3 — Doble panel y sidebar
+- [ ] **3.1 Dos paneles** en `gtk::Paned`, F3 alterna, Tab cambia el panel activo con acento visual.
+- [ ] **3.2 Sidebar: lugares XDG** + Inicio + Raíz.
+- [ ] **3.3 Sidebar: unidades** con `gio::VolumeMonitor`, uso de disco y montar/desmontar.
+- [ ] **3.4 Sidebar: favoritos** agrupados, persistidos en config, arrastrar para añadir.
+- [ ] **3.5 Sesión**: restaurar pestañas y tamaños al reabrir.
+
+## Hito 4 — Operaciones de archivo
+- [ ] **4.1 Cola de ops en core** (estados, progreso, cancelación) con pruebas.
+- [ ] **4.2 Runner gio**: copiar/mover archivos y directorios (recursivo) con progreso. CA: copiar 2 GB sin congelar la UI y cancelar a mitad.
+- [ ] **4.3 F5/F6** hacia el otro panel; arrastrar y soltar entre paneles.
+- [ ] **4.4 Papelera** (Supr) y borrado permanente (Shift+Supr, confirmación).
+- [ ] **4.5 Renombrar (F2), nueva carpeta (F7), nuevo archivo.**
+- [ ] **4.6 Conflictos**: diálogo Reemplazar/Omitir/Renombrar/Aplicar a todos.
+- [ ] **4.7 Panel de operaciones** con progreso y toasts con Deshacer.
+
+## Hito 5 — Terminal integrada
+- [ ] **5.1 `core::shell::quote`** con pruebas (espacios, `'`, `\n`, prefijo `-`, unicode).
+- [ ] **5.2 Terminal por panel** (VTE) creada perezosamente, F4 alterna, paleta y fuente desde config.
+- [ ] **5.3 Panel → terminal**: `cd` al navegar, solo si el shell está en primer plano; indicador de desincronizado.
+- [ ] **5.4 Terminal → panel** vía OSC 7 sin bucles. CA: `cd ~/dev` en la terminal mueve el panel.
+- [ ] **5.5 Arrastrar archivo a la terminal** pega la ruta escapada.
+- [ ] **5.6 Gestión de foco**: atajos globales no interfieren con la terminal.
+
+## Hito 6 — Vista previa
+- [ ] **6.1 Contenedor de preview + detalles** por panel (Espacio alterna), debounce y cancelación.
+- [ ] **6.2 Imágenes** con escalado en segundo plano y zoom.
+- [ ] **6.3 Texto/código** con sourceview5, límite de tamaño.
+- [ ] **6.4 Carpetas**: conteo y tamaño en segundo plano.
+- [ ] **6.5 Posición configurable** (abajo/derecha).
+
+**→ Release v0.1 (MVP).** Checklist: usar 3 días seguidos como gestor principal y registrar fallos en `docs/BUGS.md`.
+
+## Hito 7 — v0.2
+- [ ] PDF (poppler), video/audio (`gtk::Video`), Markdown renderizado.
+- [ ] Miniaturas freedesktop.
+- [ ] Búsqueda recursiva en segundo plano.
+- [ ] Renombrado masivo con regex y vista previa.
+- [ ] Notas por carpeta.
+- [ ] PKGBUILD, archivo `.desktop` e icono; publicar en AUR.
