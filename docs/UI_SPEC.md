@@ -33,7 +33,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 - **Vistas**:
   - Columnas Miller: cada nivel es una columna; seleccionar carpeta abre la siguiente columna a la derecha y hace scroll automático. La última columna puede mostrarse como lista detallada (como OneCommander).
   - Lista detallada (`gtk::ColumnView`): columnas visibles según ancho del panel.
-- **Panel activo**: borde/acento de color. Tab cambia de panel activo. Las operaciones F5/F6 usan el otro panel como destino.
+- **Panel activo**: el que tiene el foco; en modo dual se marca con una línea de acento arriba. Tab cambia de panel activo (salvo escribiendo en un campo de texto, donde autocompleta). Las operaciones F5/F6 usan el otro panel como destino. F3 o el botón de la barra ocultan el panel derecho, que conserva sus pestañas.
 - **Edad relativa**: chip de color en la columna "Edad": < 1 día verde, < 7 días cian, < 30 días azul, < 1 año gris, ≥ 1 año gris tenue.
 - **Barra de estado** del panel: elementos, seleccionados, tamaño seleccionado, espacio libre de la unidad.
 

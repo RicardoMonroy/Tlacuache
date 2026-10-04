@@ -161,3 +161,12 @@ listview.miller-column > row {
   color: alpha(var(--window-fg-color), 0.75);
   border-top: 1px solid alpha(var(--nord3), 0.6);
 }
+
+/* Panel activo en modo dual: línea de acento arriba. */
+.pane {
+  border-top: 2px solid transparent;
+}
+
+.pane.active-pane {
+  border-top-color: var(--accent-bg-color);
+}

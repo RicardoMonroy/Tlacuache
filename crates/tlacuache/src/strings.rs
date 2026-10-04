@@ -20,6 +20,7 @@ pub const NAV_BACK: &str = "Atrás (Alt+←)";
 pub const NAV_FORWARD: &str = "Adelante (Alt+→)";
 pub const NAV_UP: &str = "Subir (Alt+↑)";
 
+pub const DUAL_PANE: &str = "Doble panel (F3)";
 pub const TAB_NEW: &str = "Nueva pestaña (Ctrl+T)";
 
 pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";

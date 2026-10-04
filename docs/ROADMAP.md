@@ -25,7 +25,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **2.4 Barra de estado** del panel (elementos, selección, espacio libre).
 
 ## Hito 3 — Doble panel y sidebar
-- [ ] **3.1 Dos paneles** en `gtk::Paned`, F3 alterna, Tab cambia el panel activo con acento visual.
+- [x] **3.1 Dos paneles** en `gtk::Paned`, F3 alterna, Tab cambia el panel activo con acento visual.
 - [ ] **3.2 Sidebar: lugares XDG** + Inicio + Raíz.
 - [ ] **3.3 Sidebar: unidades** con `gio::VolumeMonitor`, uso de disco y montar/desmontar.
 - [ ] **3.4 Sidebar: favoritos** agrupados, persistidos en config, arrastrar para añadir.

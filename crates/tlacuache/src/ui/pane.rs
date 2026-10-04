@@ -66,6 +66,7 @@ impl Pane {
     fn build(&self) {
         let imp = self.imp();
         self.set_orientation(gtk::Orientation::Vertical);
+        self.add_css_class("pane");
 
         let new_tab = gtk::Button::from_icon_name("tab-new-symbolic");
         new_tab.add_css_class("flat");
@@ -116,6 +117,13 @@ impl Pane {
             }
         ));
         imp.tab_view.set_selected_page(&tab);
+    }
+
+    /// Lleva el foco a la vista de la pestaña seleccionada.
+    pub fn focus_current(&self) {
+        if let Some(page) = self.current_page() {
+            page.focus_view();
+        }
     }
 
     fn current_page(&self) -> Option<TabPage> {
