@@ -35,6 +35,7 @@ cargo run -p tlacuache         # ejecutar la app
 cargo test --workspace          # pruebas (la lógica vive en tlacuache-core)
 cargo fmt --all                 # formato
 cargo clippy --workspace --all-targets -- -D warnings
+scripts/check.sh                # fmt --check + clippy + tests (--fix aplica fmt)
 ```
 
 Definición de "terminado" para cualquier tarea: compila, `cargo fmt` limpio, `clippy` sin warnings, pruebas en verde y criterio de aceptación de la tarea en `ROADMAP.md` cumplido. Marca la casilla `[x]` en el roadmap al terminar.
