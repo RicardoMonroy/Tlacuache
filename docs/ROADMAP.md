@@ -34,11 +34,13 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 ## Hito 4 — Operaciones de archivo
 - [x] **4.1 Cola de ops en core** (estados, progreso, cancelación) con pruebas.
 - [x] **4.2 Runner gio**: copiar/mover archivos y directorios (recursivo) con progreso. CA: copiar 2 GB sin congelar la UI y cancelar a mitad.
-- [ ] **4.3 F5/F6** hacia el otro panel; arrastrar y soltar entre paneles.
+- [ ] **4.3 F5/F6** hacia el otro panel; arrastrar y soltar entre paneles. Franja central entre paneles (solo modo dual) con botones Copiar → / Mover → cuyas flechas apuntan del panel activo al otro, deshabilitados sin selección. Reemplaza los atajos temporales Ctrl+Shift+F5/F6.
 - [ ] **4.4 Papelera** (Supr) y borrado permanente (Shift+Supr, confirmación).
 - [ ] **4.5 Renombrar (F2), nueva carpeta (F7), nuevo archivo.**
 - [ ] **4.6 Conflictos**: diálogo Reemplazar/Omitir/Renombrar/Aplicar a todos.
-- [ ] **4.7 Panel de operaciones** con progreso y toasts con Deshacer.
+- [ ] **4.7 Panel de operaciones**: el indicador de la barra superior despliega un popover con el avance individual de cada operación (cancelar, resultado de las terminadas) y toasts con Deshacer.
+- [ ] **4.8 Portapapeles**: Ctrl+C / Ctrl+X / Ctrl+V entre paneles y con otras apps (`text/uri-list` y `x-special/gnome-copied-files` para cortar).
+- [ ] **4.9 Menú contextual** de archivos y carpetas: Abrir, Abrir con…, Cortar, Copiar, Pegar, Renombrar, Mover a la papelera, Añadir a favoritos, Copiar ruta, Propiedades.
 
 ## Hito 5 — Terminal integrada
 - [ ] **5.1 `core::shell::quote`** con pruebas (espacios, `'`, `\n`, prefijo `-`, unicode).
