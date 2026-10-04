@@ -16,7 +16,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **1.4 Barra de ruta**: breadcrumb clicable y modo editable (Ctrl+L) con autocompletado. CA: navegar escribiendo una ruta.
 - [x] **1.5 Columna edad**: `core::age` con buckets y chip de color. CA: pruebas de buckets.
 - [x] **1.6 Abrir archivos**: con la app predeterminada (`gio::AppInfo::launch_default_for_uri_async`). CA: abre PDF/imagen en su app.
-- [ ] **1.7 Filtro rápido y ocultos** (escribir para filtrar, Esc limpia, Ctrl+H).
+- [x] **1.7 Filtro rápido y ocultos** (escribir para filtrar, Esc limpia, Ctrl+H).
 
 ## Hito 2 — Columnas Miller y pestañas
 - [ ] **2.1 Vista Miller** con scroll automático a la columna activa. CA: navegar 6 niveles solo con flechas.

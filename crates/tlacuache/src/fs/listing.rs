@@ -18,6 +18,8 @@ pub const ATTRIBUTES: &str = "standard::*,time::modified,time::created,unix::mod
 
 pub struct DirectoryModel {
     dir_list: gtk::DirectoryList,
+    filter_state: Rc<RefCell<Filter>>,
+    filter: gtk::CustomFilter,
     sort_spec: Rc<Cell<SortSpec>>,
     sorter: gtk::CustomSorter,
     selection: gtk::MultiSelection,
@@ -44,7 +46,7 @@ impl DirectoryModel {
                     .is_some_and(|item| filter_state.borrow().matches(&item.entry()))
             }
         ));
-        let filtered = gtk::FilterListModel::new(Some(items), Some(filter));
+        let filtered = gtk::FilterListModel::new(Some(items), Some(filter.clone()));
         // No incremental: con filtrado/orden incremental la vista conserva la
         // fila visible mientras se reacomodan los lotes y termina desplazada
         // (p. ej. en `archivo_6050`). Ordenar 10 000 entradas de una vez
@@ -67,6 +69,8 @@ impl DirectoryModel {
 
         Self {
             dir_list,
+            filter_state,
+            filter,
             sort_spec,
             sorter,
             selection,
@@ -95,6 +99,31 @@ impl DirectoryModel {
                 .and_then(|item| item.file())
                 .is_some_and(|f| f.equal(file))
         })
+    }
+
+    /// Cambia el texto del filtro rápido.
+    pub fn set_query(&self, query: &str) {
+        let old_len = self.filter_state.borrow().query().chars().count();
+        let new_len = query.chars().count();
+        self.filter_state.borrow_mut().set_query(query);
+        // Pistas para que GTK no recalcule todo cuando solo se añade texto.
+        let change = if new_len > old_len && old_len > 0 {
+            gtk::FilterChange::MoreStrict
+        } else if new_len < old_len && new_len > 0 {
+            gtk::FilterChange::LessStrict
+        } else {
+            gtk::FilterChange::Different
+        };
+        self.filter.changed(change);
+    }
+
+    pub fn show_hidden(&self) -> bool {
+        self.filter_state.borrow().show_hidden()
+    }
+
+    pub fn set_show_hidden(&self, show: bool) {
+        self.filter_state.borrow_mut().set_show_hidden(show);
+        self.filter.changed(gtk::FilterChange::Different);
     }
 
     pub fn set_sort(&self, spec: SortSpec) {

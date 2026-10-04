@@ -84,6 +84,8 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Nueva pestaña / cerrar | Ctrl+T / Ctrl+W |
 | Abrir terminal externa aquí | Ctrl+Alt+T |
 
+**Filtro rápido**: subcadena sin distinguir mayúsculas ni acentos (`cancion` encuentra `Canción`; la `ñ` cuenta como `n`), así funciona sin teclas muertas. Se muestra en un indicador flotante con el número de coincidencias y se limpia al cambiar de carpeta. Ctrl+H alterna los ocultos de la pestaña (inicial: `general.show_hidden`).
+
 **Filtro rápido activo**: mientras el filtro tiene texto, Backspace borra un carácter del filtro y Espacio inserta un espacio; Esc limpia el filtro. Sin filtro activo, Backspace sube de nivel y Espacio alterna la vista previa.
 
 Los atajos de la ventana no deben capturarse cuando la terminal tiene el foco (excepto F4 y Tab con modificador configurable para salir de la terminal: Ctrl+Shift+Tab).

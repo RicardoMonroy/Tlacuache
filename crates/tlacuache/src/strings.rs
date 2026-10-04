@@ -52,3 +52,9 @@ pub fn age(age: &Age) -> String {
         AgeUnit::Years => format!("{n} años"),
     }
 }
+
+/// Indicador del filtro rápido: «texto» · N elementos.
+pub fn filter_indicator(query: &str, count: u32) -> String {
+    let items = if count == 1 { "elemento" } else { "elementos" };
+    format!("«{query}» · {count} {items}")
+}

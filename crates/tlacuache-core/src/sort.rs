@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::time::SystemTime;
 
 use crate::entry::FileEntry;
+use crate::text::strip_accent;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SortKey {
@@ -108,19 +109,6 @@ fn collation_weights(c: char) -> impl Iterator<Item = u32> {
         'ñ' => u32::from('n') * 2 + 1,
         other => u32::from(strip_accent(other)) * 2,
     })
-}
-
-fn strip_accent(c: char) -> char {
-    match c {
-        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => 'a',
-        'ç' => 'c',
-        'è' | 'é' | 'ê' | 'ë' => 'e',
-        'ì' | 'í' | 'î' | 'ï' => 'i',
-        'ò' | 'ó' | 'ô' | 'õ' | 'ö' => 'o',
-        'ù' | 'ú' | 'û' | 'ü' => 'u',
-        'ý' | 'ÿ' => 'y',
-        other => other,
-    }
 }
 
 fn take_digits(it: &mut std::iter::Peekable<std::str::Chars<'_>>) -> String {

@@ -40,6 +40,11 @@ mod imp {
             klass.install_action("nav.edit-path", None, |page, _, _| {
                 page.imp().path_bar.start_editing();
             });
+            klass.install_action("view.toggle-hidden", None, |page, _, _| {
+                if let Some(view) = page.imp().view.get() {
+                    view.toggle_show_hidden();
+                }
+            });
 
             // Solo actúan con el foco dentro de la pestaña (no en la
             // terminal). El entry de la ruta consume Backspace al editar.
@@ -48,11 +53,9 @@ mod imp {
             klass.add_binding_action(gdk::Key::Up, alt, "nav.up");
             klass.add_binding_action(gdk::Key::Left, alt, "nav.back");
             klass.add_binding_action(gdk::Key::Right, alt, "nav.forward");
-            klass.add_binding_action(
-                gdk::Key::l,
-                gdk::ModifierType::CONTROL_MASK,
-                "nav.edit-path",
-            );
+            let ctrl = gdk::ModifierType::CONTROL_MASK;
+            klass.add_binding_action(gdk::Key::l, ctrl, "nav.edit-path");
+            klass.add_binding_action(gdk::Key::h, ctrl, "view.toggle-hidden");
         }
     }
 

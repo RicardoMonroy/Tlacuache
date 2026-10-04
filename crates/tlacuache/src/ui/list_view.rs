@@ -9,10 +9,11 @@ use std::sync::OnceLock;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
-use gtk::{gio, glib, pango};
+use gtk::{gdk, gio, glib, pango};
 use std::time::SystemTime;
 
 use tlacuache_core::age::{Age, AgeBucket};
+use tlacuache_core::filter::{self, FilterKey};
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 
 use crate::fs::file_item::FileItem;
@@ -38,6 +39,10 @@ mod imp {
         /// Al terminar de cargar, enfocar esta entrada (la carpeta de la que
         /// venimos al subir o retroceder).
         pub pending_focus: RefCell<Option<gio::File>>,
+        /// Texto del filtro rápido (vacío = inactivo).
+        pub query: RefCell<String>,
+        pub filter_revealer: gtk::Revealer,
+        pub filter_label: gtk::Label,
     }
 
     #[glib::object_subclass]
@@ -157,7 +162,42 @@ impl FileListView {
             .vexpand(true)
             .child(&column_view)
             .build();
-        self.set_child(Some(&scrolled));
+
+        // Indicador flotante del filtro rápido.
+        let indicator = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        indicator.add_css_class("filter-indicator");
+        indicator.append(&gtk::Image::from_icon_name("edit-find-symbolic"));
+        indicator.append(&imp.filter_label);
+        imp.filter_revealer.set_child(Some(&indicator));
+        imp.filter_revealer
+            .set_transition_type(gtk::RevealerTransitionType::Crossfade);
+        imp.filter_revealer.set_halign(gtk::Align::End);
+        imp.filter_revealer.set_valign(gtk::Align::End);
+        imp.filter_revealer.set_can_target(false);
+
+        let overlay = gtk::Overlay::new();
+        overlay.set_child(Some(&scrolled));
+        overlay.add_overlay(&imp.filter_revealer);
+        self.set_child(Some(&overlay));
+
+        // Captura: las teclas de texto llegan aquí antes que a las filas, así
+        // el foco se queda en la lista y las flechas/Enter siguen funcionando.
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        keys.connect_key_pressed(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            #[upgrade_or]
+            glib::Propagation::Proceed,
+            move |_, key, _, mods| view.on_key(key, mods)
+        ));
+        self.add_controller(keys);
+
+        model.selection().connect_items_changed(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            move |_, _, _, _| view.update_filter_indicator()
+        ));
 
         imp.directory.replace(Some(dir.clone()));
         let _ = imp.model.set(model);
@@ -174,8 +214,86 @@ impl FileListView {
         tracing::debug!("carpeta: {}", dir.uri());
         let previous = imp.directory.replace(Some(dir.clone()));
         imp.pending_focus.replace(previous);
+        // El filtro es por carpeta: al cambiar se limpia.
+        if !imp.query.borrow().is_empty() {
+            imp.query.replace(String::new());
+            model.set_query("");
+            self.update_filter_indicator();
+        }
         model.set_directory(dir);
         self.notify_directory();
+    }
+
+    /// Alterna los archivos ocultos (Ctrl+H) y devuelve el estado nuevo.
+    pub fn toggle_show_hidden(&self) -> bool {
+        let Some(model) = self.imp().model.get() else {
+            return false;
+        };
+        let show = !model.show_hidden();
+        model.set_show_hidden(show);
+        show
+    }
+
+    fn on_key(&self, key: gdk::Key, mods: gdk::ModifierType) -> glib::Propagation {
+        let shortcut_mods = gdk::ModifierType::CONTROL_MASK
+            | gdk::ModifierType::ALT_MASK
+            | gdk::ModifierType::SUPER_MASK;
+        if mods.intersects(shortcut_mods) {
+            return glib::Propagation::Proceed;
+        }
+        let filter_key = match key {
+            gdk::Key::Escape => FilterKey::Escape,
+            gdk::Key::BackSpace => FilterKey::Backspace,
+            _ => match key.to_unicode() {
+                Some(c) => FilterKey::Char(c),
+                None => return glib::Propagation::Proceed,
+            },
+        };
+        let current = self.imp().query.borrow().clone();
+        match filter::apply_key(&current, filter_key) {
+            Some(query) => {
+                self.set_query(query);
+                glib::Propagation::Stop
+            }
+            None => glib::Propagation::Proceed,
+        }
+    }
+
+    fn set_query(&self, query: String) {
+        let imp = self.imp();
+        let Some(model) = imp.model.get() else {
+            return;
+        };
+        model.set_query(&query);
+        imp.query.replace(query);
+        self.update_filter_indicator();
+        // Seleccionar la primera coincidencia para poder abrirla con Enter.
+        if let Some(column_view) = imp.column_view.get()
+            && model.selection().n_items() > 0
+        {
+            let flags = gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT;
+            column_view.scroll_to(0, None, flags, None);
+        }
+    }
+
+    fn update_filter_indicator(&self) {
+        let imp = self.imp();
+        let query = imp.query.borrow();
+        let active = !query.is_empty();
+        imp.filter_revealer.set_reveal_child(active);
+        if !active {
+            return;
+        }
+        let count = imp.model.get().map_or(0, |m| m.selection().n_items());
+        imp.filter_label
+            .set_text(&strings::filter_indicator(&query, count));
+        if let Some(indicator) = imp.filter_revealer.child() {
+            if count == 0 {
+                indicator.add_css_class("no-match");
+            } else {
+                indicator.remove_css_class("no-match");
+            }
+        }
     }
 
     /// Lleva el foco del teclado a la fila actual de la lista.

@@ -10,6 +10,7 @@ pub mod filter;
 pub mod history;
 pub mod path_input;
 pub mod sort;
+pub mod text;
 
 /// Identificador de la aplicación (D-Bus / desktop file).
 pub const APP_ID: &str = "io.github.rmonroy.Tlacuache";

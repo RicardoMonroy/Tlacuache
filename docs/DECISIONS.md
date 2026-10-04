@@ -30,7 +30,7 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
 ## ADR-006 — Backspace y Espacio editan el filtro rápido cuando está activo
 - **Contexto**: el filtro rápido se activa al escribir directamente, pero Backspace (subir nivel) y Espacio (vista previa) también son atajos del panel.
 - **Decisión**: si el filtro tiene texto, Backspace y Espacio editan el filtro; si está vacío, ejecutan su acción normal. Esc siempre limpia el filtro.
-- **Consecuencias**: el filtro admite espacios y se puede corregir sin salir de él. El despacho de teclas del panel debe consultar primero el estado del filtro (lógica testeable en `core::keymap`).
+- **Consecuencias**: el filtro admite espacios y se puede corregir sin salir de él. El despacho de teclas del panel consulta primero el estado del filtro; la regla vive en `core::filter::apply_key`, con pruebas.
 
 ## ADR-007 — Orden natural propio con plegado de acentos
 - **Contexto**: los nombres deben ordenarse de forma natural (`img2` < `img10`), y el autor usa nombres en español con acentos y `ñ`. Comparar por código Unicode deja `Árbol` después de `zeta`.

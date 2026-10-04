@@ -129,3 +129,17 @@ columnview.file-list > listview > row > cell {
   background-color: alpha(var(--nord3), 0.45);
   color: alpha(var(--nord4), 0.6);
 }
+
+/* Indicador flotante del filtro rápido. */
+.filter-indicator {
+  margin: 10px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  background-color: var(--nord2);
+  color: var(--nord6);
+  box-shadow: 0 2px 6px alpha(black, 0.35);
+}
+
+.filter-indicator.no-match {
+  background-color: var(--nord11);
+}
