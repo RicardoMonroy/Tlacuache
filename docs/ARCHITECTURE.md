@@ -69,7 +69,8 @@ tlacuache/
 - `fs/ops_runner.rs` ejecuta con `gio::File::copy_future` / `move_future` / `trash_future`, reporta progreso por callback y admite `gio::Cancellable`.
 - Copia de directorios: recorrido recursivo asíncrono (gio no copia directorios de forma recursiva).
 - Conflictos (archivo existente): diálogo con Reemplazar / Omitir / Renombrar / Aplicar a todos.
-- Al terminar: `adw::Toast` con opción "Deshacer" para mover/renombrar/papelera cuando sea posible.
+- Conflictos: el runner se pausa y pregunta a la UI con un `Resolver` asíncrono (Reemplazar/Combinar, Omitir, Conservar ambos, Cancelar; «aplicar a todos» en `core::ops::ConflictPolicy`).
+- Deshacer: cada operación devuelve un `core::ops::Journal` (pares origen→destino final, papelera, creados, si hubo combinación) y `core::ops::undo_request` lo traduce a la operación inversa (copiar→papelera, mover→`Restore` a rutas exactas, renombrar→renombrar, papelera→`Untrash` por `trash::orig-path`, crear→papelera). Borrar permanente y combinar carpetas no se deshacen. Se ofrece en el toast, en el panel de operaciones y con Ctrl+Z.
 
 ## 5. Terminal embebida (VTE)
 

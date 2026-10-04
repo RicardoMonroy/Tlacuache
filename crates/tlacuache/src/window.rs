@@ -125,6 +125,12 @@ mod imp {
                 window.create_item(false)
             });
             klass.add_binding_action(gdk::Key::F2, none, "files.rename");
+            // Ctrl+Z: deshacer la última operación (el entry de la ruta
+            // usa su propio Ctrl+Z al editar).
+            klass.add_binding(gdk::Key::z, gdk::ModifierType::CONTROL_MASK, |window| {
+                window.undo_last();
+                glib::Propagation::Stop
+            });
             klass.add_binding_action(gdk::Key::F7, none, "files.new-folder");
             let ctrl = gdk::ModifierType::CONTROL_MASK;
             klass.add_binding_action(gdk::Key::N, ctrl | shift, "files.new-folder");
@@ -367,27 +373,41 @@ impl TlacuacheWindow {
         let Some(op) = self.imp().ops.operation(id) else {
             return;
         };
+        let undoable = op.undo.is_some();
         let text = match &op.state {
-            // Crear y renombrar son inmediatos y ya se ven en la lista.
-            OpState::Done
-                if matches!(op.kind, OpKind::Mkdir | OpKind::CreateFile | OpKind::Rename) =>
-            {
-                return;
-            }
-            OpState::Done => {
-                let verb = match op.kind {
-                    OpKind::Move => strings::OP_MOVED,
-                    OpKind::Trash => strings::OP_TRASHED,
-                    OpKind::Delete => strings::OP_DELETED,
-                    _ => strings::OP_COPIED,
-                };
-                strings::op_done(verb, op.sources.len() as u64)
-            }
+            OpState::Done => strings::op_done(done_verb(op.kind), op.sources.len() as u64),
             OpState::Failed(message) => strings::op_failed(message),
             OpState::Cancelled => strings::OP_CANCELLED.to_owned(),
             _ => return,
         };
-        self.show_toast(&text);
+        if undoable {
+            self.show_undo_toast(&text, id);
+        } else if !(op.state == OpState::Done && is_quick(op.kind)) {
+            // Crear/renombrar sin deshacer ya se ven en la lista.
+            self.show_toast(&text);
+        }
+    }
+
+    /// Toast con «Deshacer» para una operación reversible.
+    fn show_undo_toast(&self, text: &str, id: OpId) {
+        let toast = adw::Toast::new(text);
+        toast.set_timeout(10);
+        toast.set_button_label(Some(strings::ACTION_UNDO));
+        toast.connect_button_clicked(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |_| {
+                window.imp().ops.undo(id);
+            }
+        ));
+        self.imp().toast_overlay.add_toast(toast);
+    }
+
+    /// Ctrl+Z: deshace la última operación reversible.
+    fn undo_last(&self) {
+        if self.imp().ops.undo_last().is_none() {
+            self.show_toast(strings::UNDO_NOTHING);
+        }
     }
 
     /// Las operaciones preguntan por los conflictos con un diálogo.
@@ -936,4 +956,21 @@ async fn free_name(dir: &gio::File, base: &str) -> String {
         }
     }
     base.to_owned()
+}
+
+/// Operaciones inmediatas cuyo resultado ya se ve en la lista.
+fn is_quick(kind: OpKind) -> bool {
+    matches!(kind, OpKind::Mkdir | OpKind::CreateFile | OpKind::Rename)
+}
+
+fn done_verb(kind: OpKind) -> &'static str {
+    match kind {
+        OpKind::Copy => strings::OP_COPIED,
+        OpKind::Move => strings::OP_MOVED,
+        OpKind::Trash => strings::OP_TRASHED,
+        OpKind::Delete => strings::OP_DELETED,
+        OpKind::Mkdir | OpKind::CreateFile => strings::OP_CREATED,
+        OpKind::Rename => strings::OP_RENAMED,
+        OpKind::Restore | OpKind::Untrash => strings::OP_RESTORED,
+    }
 }

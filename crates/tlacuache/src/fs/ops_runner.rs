@@ -31,8 +31,8 @@ use gtk::subclass::prelude::*;
 use gtk::{gio, glib};
 use tlacuache_core::names::numbered_variants;
 use tlacuache_core::ops::{
-    ConflictAction, ConflictPolicy, OpId, OpKind, OpQueue, OpState, Operation, Progress,
-    replace_allowed,
+    ConflictAction, ConflictPolicy, Journal, OpId, OpKind, OpQueue, OpRequest, OpState, Operation,
+    Progress, replace_allowed, undo_request,
 };
 
 use crate::strings;
@@ -133,10 +133,39 @@ impl OpsManager {
     pub fn enqueue(&self, kind: OpKind, sources: &[gio::File], dest: Option<&gio::File>) -> OpId {
         let uris = sources.iter().map(|f| f.uri().to_string()).collect();
         let dest = dest.map(|d| d.uri().to_string());
-        let id = self.imp().queue.borrow_mut().enqueue(kind, uris, dest);
+        self.enqueue_request(OpRequest::new(kind, uris, dest))
+    }
+
+    pub fn enqueue_request(&self, request: OpRequest) -> OpId {
+        let id = self.imp().queue.borrow_mut().enqueue_request(request);
         self.emit_changed();
         self.pump();
         id
+    }
+
+    /// Encola la operación que deshace `id` (una sola vez).
+    pub fn undo(&self, id: OpId) -> Option<OpId> {
+        let request = self.imp().queue.borrow_mut().take_undo(id)?;
+        Some(self.enqueue_request(request))
+    }
+
+    /// Deshace la operación reversible más reciente.
+    pub fn undo_last(&self) -> Option<OpId> {
+        let id = self
+            .imp()
+            .queue
+            .borrow()
+            .iter()
+            .filter(|op| op.undo.is_some())
+            .map(|op| op.id)
+            .max()?;
+        self.undo(id)
+    }
+
+    /// Quita del panel las operaciones terminadas.
+    pub fn clear_finished(&self) {
+        self.imp().queue.borrow_mut().clear_finished();
+        self.emit_changed();
     }
 
     pub fn cancel(&self, id: OpId) {
@@ -221,6 +250,12 @@ impl OpsManager {
                     (OpKind::Mkdir, _) => create_items(&sources, true).await,
                     (OpKind::CreateFile, _) => create_items(&sources, false).await,
                     (OpKind::Rename, Some(dest)) => rename(&sources, &dest).await,
+                    (OpKind::Restore, _) => {
+                        let targets: Vec<gio::File> =
+                            op.targets.iter().map(|u| gio::File::for_uri(u)).collect();
+                        restore(&sources, &targets, &cancellable, &report).await
+                    }
+                    (OpKind::Untrash, _) => untrash(&sources, &cancellable, &report).await,
                     _ => Err(glib::Error::new(
                         gio::IOErrorEnum::NotSupported,
                         strings::OP_NOT_SUPPORTED,
@@ -251,12 +286,15 @@ impl OpsManager {
         }
     }
 
-    fn finish(&self, id: OpId, result: Result<(), glib::Error>) {
+    fn finish(&self, id: OpId, result: Result<Journal, glib::Error>) {
         self.imp().cancellables.borrow_mut().remove(&id);
         {
             let mut queue = self.imp().queue.borrow_mut();
             let outcome = match result {
-                Ok(()) => queue.complete(id),
+                Ok(journal) => {
+                    let undo = queue.get(id).and_then(|op| undo_request(op.kind, &journal));
+                    queue.complete_with_undo(id, undo)
+                }
                 Err(err) if err.matches(gio::IOErrorEnum::Cancelled) => {
                     // Si se canceló sin pasar por `cancel` (no debería), se
                     // registra igual como cancelada.
@@ -512,7 +550,8 @@ async fn transfer(
     cancellable: &gio::Cancellable,
     report: &Report,
     resolver: &Resolver,
-) -> Result<(), glib::Error> {
+) -> Result<Journal, glib::Error> {
+    let mut journal = Journal::default();
     // 1. Recorrer los orígenes para los totales.
     let mut plans = Vec::new();
     for src in sources {
@@ -568,7 +607,10 @@ async fn transfer(
                     continue;
                 }
                 ConflictAction::KeepBoth => dst = free_variant(&dst, src_is_dir).await?,
-                ConflictAction::Replace if src_is_dir => merge = true,
+                ConflictAction::Replace if src_is_dir => {
+                    merge = true;
+                    journal.merged = true;
+                }
                 ConflictAction::Replace => overwrite_root = true,
             }
         }
@@ -588,6 +630,9 @@ async fn transfer(
                     progress.bytes_done = base + bytes;
                     progress.files_done += file_count;
                     report(&progress);
+                    journal
+                        .pairs
+                        .push((src.uri().to_string(), dst.uri().to_string()));
                     continue;
                 }
                 Err(err)
@@ -612,8 +657,11 @@ async fn transfer(
             &mut progress,
         )
         .await?;
+        journal
+            .pairs
+            .push((src.uri().to_string(), dst.uri().to_string()));
     }
-    Ok(())
+    Ok(journal)
 }
 
 struct Target<'a> {
@@ -716,7 +764,7 @@ async fn copy_tree(
     cancellable: &gio::Cancellable,
     report: &Report,
     resolver: &Resolver,
-) -> Result<(), glib::Error> {
+) -> Result<Journal, glib::Error> {
     transfer(Mode::Copy, sources, dest_dir, cancellable, report, resolver).await
 }
 
@@ -726,7 +774,7 @@ async fn move_tree(
     cancellable: &gio::Cancellable,
     report: &Report,
     resolver: &Resolver,
-) -> Result<(), glib::Error> {
+) -> Result<Journal, glib::Error> {
     transfer(Mode::Move, sources, dest_dir, cancellable, report, resolver).await
 }
 
@@ -753,7 +801,8 @@ async fn trash_all(
     sources: &[gio::File],
     cancellable: &gio::Cancellable,
     report: &Report,
-) -> Result<(), glib::Error> {
+) -> Result<Journal, glib::Error> {
+    let mut trashed = Vec::new();
     let mut progress = Progress {
         files_total: Some(sources.len() as u64),
         ..Progress::default()
@@ -764,10 +813,14 @@ async fn trash_all(
         progress.current = file.basename().map(|n| n.to_string_lossy().into_owned());
         report(&progress);
         trash_file(file, cancellable).await?;
+        trashed.push(file.uri().to_string());
         progress.files_done += 1;
         report(&progress);
     }
-    Ok(())
+    Ok(Journal {
+        trashed,
+        ..Journal::default()
+    })
 }
 
 /// Borra `sources` de forma permanente (carpetas con su contenido).
@@ -775,7 +828,7 @@ async fn delete_all(
     sources: &[gio::File],
     cancellable: &gio::Cancellable,
     report: &Report,
-) -> Result<(), glib::Error> {
+) -> Result<Journal, glib::Error> {
     let mut progress = Progress {
         files_total: Some(sources.len() as u64),
         ..Progress::default()
@@ -789,11 +842,11 @@ async fn delete_all(
         progress.files_done += 1;
         report(&progress);
     }
-    Ok(())
+    Ok(Journal::default())
 }
 
 /// Crea carpetas (`dirs`) o archivos vacíos. Falla si ya existen.
-async fn create_items(items: &[gio::File], dirs: bool) -> Result<(), glib::Error> {
+async fn create_items(items: &[gio::File], dirs: bool) -> Result<Journal, glib::Error> {
     for item in items {
         if dirs {
             item.make_directory_future(glib::Priority::DEFAULT).await?;
@@ -804,22 +857,161 @@ async fn create_items(items: &[gio::File], dirs: bool) -> Result<(), glib::Error
             stream.close_future(glib::Priority::DEFAULT).await?;
         }
     }
-    Ok(())
+    Ok(Journal {
+        created: items.iter().map(|f| f.uri().to_string()).collect(),
+        ..Journal::default()
+    })
 }
 
 /// Renombra el primer origen al nombre de `dest`. `set_display_name`
 /// falla si ya existe un elemento con ese nombre (no lo pisa).
-async fn rename(sources: &[gio::File], dest: &gio::File) -> Result<(), glib::Error> {
+async fn rename(sources: &[gio::File], dest: &gio::File) -> Result<Journal, glib::Error> {
     let source = sources
         .first()
         .ok_or_else(|| error(gio::IOErrorEnum::InvalidArgument, strings::OP_NO_NAME))?;
     let name = dest
         .basename()
         .ok_or_else(|| error(gio::IOErrorEnum::InvalidFilename, strings::OP_NO_NAME))?;
-    source
+    let renamed = source
         .set_display_name_future(&name.to_string_lossy(), glib::Priority::DEFAULT)
         .await?;
-    Ok(())
+    Ok(Journal {
+        pairs: vec![(source.uri().to_string(), renamed.uri().to_string())],
+        ..Journal::default()
+    })
+}
+
+/// Devuelve cada origen a su ruta exacta (deshacer mover). No pisa nada:
+/// si el destino ya existe, falla.
+async fn restore(
+    sources: &[gio::File],
+    targets: &[gio::File],
+    cancellable: &gio::Cancellable,
+    report: &Report,
+) -> Result<Journal, glib::Error> {
+    let mut progress = Progress {
+        files_total: Some(sources.len() as u64),
+        ..Progress::default()
+    };
+    report(&progress);
+    for (src, target) in sources.iter().zip(targets) {
+        check_cancelled(cancellable)?;
+        if existing(target).await?.is_some() {
+            let name = display(target).unwrap_or_default();
+            return Err(error(gio::IOErrorEnum::Exists, &strings::op_exists(&name)));
+        }
+        progress.current = display(src);
+        report(&progress);
+        let on_progress = file_progress(report, &progress, 0);
+        match move_file(src, target, COPY_FLAGS, cancellable, on_progress).await {
+            Ok(()) => {}
+            // Carpeta a otro disco: por archivos (el destino no existe, así
+            // que no hay conflictos).
+            Err(err)
+                if err.matches(gio::IOErrorEnum::WouldRecurse)
+                    || err.matches(gio::IOErrorEnum::NotSupported) =>
+            {
+                let entries = scan(src, cancellable).await?;
+                let target = Target {
+                    src_root: src,
+                    dst_root: target,
+                    overwrite_root: false,
+                };
+                let never: Resolver = Rc::new(|_| {
+                    Box::pin(async {
+                        ConflictDecision {
+                            action: None,
+                            apply_to_all: false,
+                        }
+                    })
+                });
+                let mut conflicts = Conflicts {
+                    resolver: &never,
+                    policy: ConflictPolicy::default(),
+                };
+                let mut inner = Progress::default();
+                transfer_entries(
+                    Mode::Move,
+                    &target,
+                    &entries,
+                    &mut conflicts,
+                    cancellable,
+                    report,
+                    &mut inner,
+                )
+                .await?;
+            }
+            Err(err) => return Err(err),
+        }
+        progress.files_done += 1;
+        report(&progress);
+    }
+    Ok(Journal::default())
+}
+
+/// Saca de la papelera los elementos cuya ruta original está en
+/// `originals` (deshacer papelera). Si un original se envió varias veces,
+/// restaura el borrado más reciente.
+async fn untrash(
+    originals: &[gio::File],
+    cancellable: &gio::Cancellable,
+    report: &Report,
+) -> Result<Journal, glib::Error> {
+    let trash = gio::File::for_uri("trash:///");
+    let attrs = "standard::name,trash::orig-path,trash::deletion-date";
+    let enumerator = trash
+        .enumerate_children_future(
+            attrs,
+            gio::FileQueryInfoFlags::NONE,
+            glib::Priority::DEFAULT,
+        )
+        .await?;
+    // (ruta original, fecha de borrado ISO, elemento en la papelera)
+    let mut items = Vec::new();
+    loop {
+        let batch = enumerator
+            .next_files_future(256, glib::Priority::DEFAULT)
+            .await?;
+        if batch.is_empty() {
+            break;
+        }
+        for info in batch {
+            let Some(orig) = info.attribute_byte_string("trash::orig-path") else {
+                continue;
+            };
+            let date = info
+                .attribute_string("trash::deletion-date")
+                .unwrap_or_default();
+            items.push((orig.to_string(), date.to_string(), trash.child(info.name())));
+        }
+    }
+
+    let mut sources = Vec::new();
+    let mut targets = Vec::new();
+    for original in originals {
+        let Some(path) = original.path() else {
+            continue;
+        };
+        let wanted = path.to_string_lossy();
+        let newest = items
+            .iter()
+            .filter(|(orig, _, _)| *orig == wanted)
+            .max_by(|a, b| a.1.cmp(&b.1));
+        match newest {
+            Some((_, _, item)) => {
+                sources.push(item.clone());
+                targets.push(original.clone());
+            }
+            None => {
+                let name = display(original).unwrap_or_default();
+                return Err(error(
+                    gio::IOErrorEnum::NotFound,
+                    &strings::untrash_missing(&name),
+                ));
+            }
+        }
+    }
+    restore(&sources, &targets, cancellable, report).await
 }
 
 #[cfg(test)]
@@ -910,7 +1102,11 @@ mod tests {
         assert_eq!(last.fraction(), Some(1.0));
     }
 
-    fn copy_with(sources: &[&Path], dest: &Path, resolver: &Resolver) -> Result<(), glib::Error> {
+    fn copy_with(
+        sources: &[&Path],
+        dest: &Path,
+        resolver: &Resolver,
+    ) -> Result<Journal, glib::Error> {
         let sources: Vec<gio::File> = sources.iter().map(|p| file(p)).collect();
         block_on(copy_tree(
             &sources,
@@ -1263,6 +1459,85 @@ mod tests {
             fs::read_to_string(tmp.path().join("otro.txt")).unwrap(),
             "contenido"
         );
+    }
+
+    #[test]
+    fn journal_records_final_names_and_move_can_be_restored() {
+        let tmp = tempfile::tempdir().unwrap();
+        let origin = tmp.path().join("origen");
+        let dest = tmp.path().join("destino");
+        fs::create_dir_all(origin.join("carpeta")).unwrap();
+        fs::write(origin.join("x.txt"), "x").unwrap();
+        fs::write(origin.join("carpeta/y.txt"), "y").unwrap();
+        fs::create_dir(&dest).unwrap();
+        fs::write(dest.join("x.txt"), "ya estaba").unwrap();
+
+        // Mover con «conservar ambos» para x.txt.
+        let (keep, _) = scripted(vec![(Some(ConflictAction::KeepBoth), false)]);
+        let journal = block_on(move_tree(
+            &[file(&origin.join("x.txt")), file(&origin.join("carpeta"))],
+            &file(&dest),
+            &gio::Cancellable::new(),
+            &no_report(),
+            &keep,
+        ))
+        .unwrap();
+        assert!(!journal.merged);
+        assert_eq!(journal.pairs.len(), 2);
+        assert!(journal.pairs[0].1.ends_with("x%20(2).txt"));
+
+        // Deshacer: cada elemento vuelve a su ruta exacta.
+        let undo = undo_request(OpKind::Move, &journal).unwrap();
+        assert_eq!(undo.kind, OpKind::Restore);
+        let sources: Vec<gio::File> = undo.sources.iter().map(|u| gio::File::for_uri(u)).collect();
+        let targets: Vec<gio::File> = undo.targets.iter().map(|u| gio::File::for_uri(u)).collect();
+        block_on(restore(
+            &sources,
+            &targets,
+            &gio::Cancellable::new(),
+            &no_report(),
+        ))
+        .unwrap();
+
+        assert_eq!(fs::read_to_string(origin.join("x.txt")).unwrap(), "x");
+        assert_eq!(
+            fs::read_to_string(origin.join("carpeta/y.txt")).unwrap(),
+            "y"
+        );
+        assert_eq!(fs::read_to_string(dest.join("x.txt")).unwrap(), "ya estaba");
+        assert!(!dest.join("x (2).txt").exists() && !dest.join("carpeta").exists());
+    }
+
+    #[test]
+    fn restore_never_overwrites() {
+        let tmp = tempfile::tempdir().unwrap();
+        let a = tmp.path().join("a.txt");
+        let b = tmp.path().join("b.txt");
+        fs::write(&a, "a").unwrap();
+        fs::write(&b, "b").unwrap();
+        let err = block_on(restore(
+            &[file(&a)],
+            &[file(&b)],
+            &gio::Cancellable::new(),
+            &no_report(),
+        ))
+        .unwrap_err();
+        assert!(err.matches(gio::IOErrorEnum::Exists));
+        assert_eq!(fs::read_to_string(&b).unwrap(), "b");
+    }
+
+    #[test]
+    fn rename_journal_allows_renaming_back() {
+        let tmp = tempfile::tempdir().unwrap();
+        let old = tmp.path().join("viejo.txt");
+        fs::write(&old, "contenido").unwrap();
+        let journal =
+            block_on(rename(&[file(&old)], &file(&tmp.path().join("nuevo.txt")))).unwrap();
+        let undo = undo_request(OpKind::Rename, &journal).unwrap();
+        let source = gio::File::for_uri(&undo.sources[0]);
+        let dest = gio::File::for_uri(undo.dest.as_deref().unwrap());
+        block_on(rename(&[source], &dest)).unwrap();
+        assert_eq!(fs::read_to_string(&old).unwrap(), "contenido");
     }
 
     #[test]

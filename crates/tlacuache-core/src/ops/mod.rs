@@ -6,9 +6,11 @@
 
 mod conflict;
 mod queue;
+mod undo;
 
 pub use conflict::{ConflictAction, ConflictPolicy, replace_allowed};
 pub use queue::{OpQueue, OpsError};
+pub use undo::{Journal, undo_request};
 
 pub type OpId = u64;
 
@@ -23,6 +25,32 @@ pub enum OpKind {
     /// Crear un archivo vacío.
     CreateFile,
     Rename,
+    /// Devolver cada origen a su ruta exacta en `targets` (deshacer mover).
+    Restore,
+    /// Sacar de la papelera los elementos cuyas rutas originales son
+    /// `sources` (deshacer enviar a la papelera).
+    Untrash,
+}
+
+/// Lo necesario para encolar una operación.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OpRequest {
+    pub kind: OpKind,
+    pub sources: Vec<String>,
+    pub dest: Option<String>,
+    /// Destino exacto de cada origen (solo `Restore`).
+    pub targets: Vec<String>,
+}
+
+impl OpRequest {
+    pub fn new(kind: OpKind, sources: Vec<String>, dest: Option<String>) -> Self {
+        Self {
+            kind,
+            sources,
+            dest,
+            targets: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,8 +116,12 @@ pub struct Operation {
     /// URI de destino: carpeta para Copy/Move; para Rename, el elemento ya
     /// renombrado (misma carpeta, nombre nuevo).
     pub dest: Option<String>,
+    /// Destino exacto de cada origen (solo `Restore`).
+    pub targets: Vec<String>,
     pub state: OpState,
     pub progress: Progress,
+    /// Cómo deshacerla, si terminó y es reversible. Se consume al usarla.
+    pub undo: Option<OpRequest>,
 }
 
 #[cfg(test)]

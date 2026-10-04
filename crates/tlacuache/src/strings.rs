@@ -6,6 +6,7 @@ use std::path::Path;
 
 use gtk::glib;
 use tlacuache_core::age::{Age, AgeUnit};
+use tlacuache_core::ops::OpKind;
 use tlacuache_core::summary::ViewStatus;
 
 pub const APP_NAME: &str = "Tlacuache";
@@ -56,6 +57,17 @@ pub const ACTION_SKIP: &str = "Omitir";
 pub const ACTION_KEEP_BOTH: &str = "Conservar ambos";
 pub const ACTION_REPLACE: &str = "Reemplazar";
 pub const ACTION_MERGE: &str = "Combinar";
+pub const OP_RESTORING: &str = "Restaurando";
+pub const OP_RESTORED: &str = "Restaurados";
+pub const OP_CREATED: &str = "Creados";
+pub const OP_RENAMED: &str = "Renombrados";
+pub const OP_QUEUED: &str = "En cola";
+pub const OP_CANCELLING: &str = "Cancelando…";
+pub const OP_DONE: &str = "Terminado";
+pub const OPS_PANEL: &str = "Operaciones";
+pub const OPS_CLEAR: &str = "Limpiar";
+pub const ACTION_UNDO: &str = "Deshacer";
+pub const UNDO_NOTHING: &str = "No hay nada que deshacer";
 pub const OP_PREPARING: &str = "Preparando…";
 pub const OP_CANCEL: &str = "Cancelar operación";
 pub const OP_CANCELLED: &str = "Operación cancelada";
@@ -249,4 +261,43 @@ pub fn delete_confirm(names: &[String]) -> String {
 
 pub fn conflict_title(name: &str) -> String {
     format!("«{name}» ya existe")
+}
+
+pub fn untrash_missing(name: &str) -> String {
+    format!("«{name}» ya no está en la papelera")
+}
+
+pub fn items_count(count: usize) -> String {
+    let items = if count == 1 { "elemento" } else { "elementos" };
+    format!("{count} {items}")
+}
+
+/// Título de una operación en el panel: `what` es «nombre» o «N elementos».
+pub fn op_title(kind: OpKind, what: &str, dest: Option<&str>) -> String {
+    let arrow = |verb: &str| match dest {
+        Some(dest) => format!("{verb} {what} → {dest}"),
+        None => format!("{verb} {what}"),
+    };
+    match kind {
+        OpKind::Copy => arrow("Copiar"),
+        OpKind::Move => arrow("Mover"),
+        OpKind::Rename => match dest {
+            Some(dest) => format!("Renombrar {what} → «{dest}»"),
+            None => format!("Renombrar {what}"),
+        },
+        OpKind::Trash => format!("Papelera: {what}"),
+        OpKind::Delete => format!("Eliminar {what}"),
+        OpKind::Mkdir => format!("Crear carpeta {what}"),
+        OpKind::CreateFile => format!("Crear archivo {what}"),
+        OpKind::Restore => format!("Restaurar {what}"),
+        OpKind::Untrash => format!("Sacar de la papelera {what}"),
+    }
+}
+
+pub fn ops_finished(count: usize) -> String {
+    if count == 1 {
+        "1 terminada".to_owned()
+    } else {
+        format!("{count} terminadas")
+    }
 }

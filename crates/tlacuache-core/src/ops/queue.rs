@@ -12,7 +12,7 @@
 //!   └────cancel──────────────────────────▶ Cancelled
 //! ```
 
-use super::{OpId, OpKind, OpState, Operation, Progress};
+use super::{OpId, OpKind, OpRequest, OpState, Operation, Progress};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum OpsError {
@@ -50,15 +50,21 @@ impl OpQueue {
     }
 
     pub fn enqueue(&mut self, kind: OpKind, sources: Vec<String>, dest: Option<String>) -> OpId {
+        self.enqueue_request(OpRequest::new(kind, sources, dest))
+    }
+
+    pub fn enqueue_request(&mut self, request: OpRequest) -> OpId {
         let id = self.next_id;
         self.next_id += 1;
         self.ops.push(Operation {
             id,
-            kind,
-            sources,
-            dest,
+            kind: request.kind,
+            sources: request.sources,
+            dest: request.dest,
+            targets: request.targets,
             state: OpState::Queued,
             progress: Progress::default(),
+            undo: None,
         });
         id
     }
@@ -104,12 +110,27 @@ impl OpQueue {
 
     /// El runner terminó con éxito (también si se pidió cancelar tarde).
     pub fn complete(&mut self, id: OpId) -> Result<(), OpsError> {
+        self.complete_with_undo(id, None)
+    }
+
+    /// Termina con éxito guardando cómo deshacerla.
+    pub fn complete_with_undo(
+        &mut self,
+        id: OpId,
+        undo: Option<OpRequest>,
+    ) -> Result<(), OpsError> {
         let op = self.find_mut(id)?;
         if !op.state.is_active() {
             return Err(invalid(op, "complete"));
         }
         op.state = OpState::Done;
+        op.undo = undo;
         Ok(())
+    }
+
+    /// Entrega (una sola vez) la operación que deshace `id`.
+    pub fn take_undo(&mut self, id: OpId) -> Option<OpRequest> {
+        self.find_mut(id).ok()?.undo.take()
     }
 
     pub fn fail(&mut self, id: OpId, message: impl Into<String>) -> Result<(), OpsError> {
@@ -301,6 +322,32 @@ mod tests {
         assert!(q.cancel(a).is_err(), "ya terminó");
         assert!(q.fail(a, "x").is_err());
         assert_eq!(q.complete(99), Err(OpsError::NotFound(99)));
+    }
+
+    #[test]
+    fn undo_is_stored_and_taken_once() {
+        let mut q = OpQueue::new(1);
+        let a = copy(&mut q, "a");
+        q.start_next();
+        let undo = OpRequest::new(OpKind::Trash, vec!["file:///b/a".into()], None);
+        q.complete_with_undo(a, Some(undo.clone())).unwrap();
+        assert_eq!(q.get(a).unwrap().undo, Some(undo.clone()));
+        assert_eq!(q.take_undo(a), Some(undo));
+        assert_eq!(q.take_undo(a), None);
+        assert_eq!(q.take_undo(99), None);
+    }
+
+    #[test]
+    fn enqueue_request_keeps_targets() {
+        let mut q = OpQueue::new(1);
+        let request = OpRequest {
+            kind: OpKind::Restore,
+            sources: vec!["file:///b/x".into()],
+            dest: None,
+            targets: vec!["file:///a/x".into()],
+        };
+        let id = q.enqueue_request(request);
+        assert_eq!(q.get(id).unwrap().targets, ["file:///a/x"]);
     }
 
     #[test]
