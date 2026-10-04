@@ -32,7 +32,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **3.5 Sesión**: restaurar pestañas y tamaños al reabrir.
 
 ## Hito 4 — Operaciones de archivo
-- [ ] **4.1 Cola de ops en core** (estados, progreso, cancelación) con pruebas.
+- [x] **4.1 Cola de ops en core** (estados, progreso, cancelación) con pruebas.
 - [ ] **4.2 Runner gio**: copiar/mover archivos y directorios (recursivo) con progreso. CA: copiar 2 GB sin congelar la UI y cancelar a mitad.
 - [ ] **4.3 F5/F6** hacia el otro panel; arrastrar y soltar entre paneles.
 - [ ] **4.4 Papelera** (Supr) y borrado permanente (Shift+Supr, confirmación).
