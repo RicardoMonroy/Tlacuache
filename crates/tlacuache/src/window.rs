@@ -10,7 +10,7 @@ use gtk::{gio, glib};
 use tlacuache_core::config::Config;
 
 use crate::strings;
-use crate::ui::list_view::FileListView;
+use crate::ui::tab_page::TabPage;
 
 mod imp {
     use super::*;
@@ -19,7 +19,6 @@ mod imp {
     pub struct TlacuacheWindow {
         pub toast_overlay: OnceCell<adw::ToastOverlay>,
         pub toolbar: OnceCell<adw::ToolbarView>,
-        pub title: adw::WindowTitle,
     }
 
     #[glib::object_subclass]
@@ -35,11 +34,9 @@ mod imp {
             let obj = self.obj();
 
             obj.set_title(Some(strings::APP_NAME));
-            self.title.set_title(strings::APP_NAME);
             obj.set_default_size(1200, 800);
 
             let header = adw::HeaderBar::new();
-            header.set_title_widget(Some(&self.title));
             let toolbar = adw::ToolbarView::new();
             toolbar.add_top_bar(&header);
 
@@ -67,27 +64,12 @@ glib::wrapper! {
 impl TlacuacheWindow {
     pub fn new(app: &adw::Application, config: Rc<Config>, start_dir: &gio::File) -> Self {
         let window: Self = glib::Object::builder().property("application", app).build();
-        // Por ahora una sola lista; paneles y pestañas llegan en hitos 2 y 3.
-        let list = FileListView::new(start_dir, config.general.show_hidden);
-        // Subtítulo con la ruta actual hasta que exista la barra de ruta (1.4).
-        list.connect_directory_notify(glib::clone!(
-            #[weak]
-            window,
-            move |list| window.update_subtitle(list.directory().as_ref())
-        ));
-        window.update_subtitle(Some(start_dir));
+        // Por ahora una sola pestaña; panel con pestañas en hitos 2 y 3.
+        let page = TabPage::new(start_dir, config.general.show_hidden);
         if let Some(toolbar) = window.imp().toolbar.get() {
-            toolbar.set_content(Some(&list));
+            toolbar.set_content(Some(&page));
         }
         window
-    }
-
-    fn update_subtitle(&self, dir: Option<&gio::File>) {
-        let text = dir.map_or_else(String::new, |d| match d.path() {
-            Some(path) => path.display().to_string(),
-            None => d.uri().to_string(),
-        });
-        self.imp().title.set_subtitle(&text);
     }
 
     /// Muestra un aviso no bloqueante en la parte inferior de la ventana.

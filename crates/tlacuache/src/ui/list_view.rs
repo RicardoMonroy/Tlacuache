@@ -1,12 +1,15 @@
-//! Vista de lista detallada (`gtk::ColumnView`) de una carpeta, con
-//! navegación por teclado/ratón e historial atrás/adelante.
+//! Vista de lista detallada (`gtk::ColumnView`) de una carpeta.
+//!
+//! Solo muestra; la navegación (historial, atajos) la decide `TabPage`, que
+//! escucha `directory-activated`.
 
 use std::cell::{OnceCell, RefCell};
+use std::sync::OnceLock;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use gtk::{gdk, gio, glib, pango};
-use tlacuache_core::history::History;
+use glib::subclass::Signal;
+use gtk::{gio, glib, pango};
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 
 use crate::fs::file_item::FileItem;
@@ -14,9 +17,8 @@ use crate::fs::listing::DirectoryModel;
 use crate::strings;
 use crate::window::TlacuacheWindow;
 
-/// Botones laterales del ratón (atrás/adelante) según X11/Wayland.
-const MOUSE_BUTTON_BACK: u32 = 8;
-const MOUSE_BUTTON_FORWARD: u32 = 9;
+/// Ancho inicial de la columna "Nombre" (px); el usuario puede cambiarlo.
+const NAME_COLUMN_WIDTH: i32 = 360;
 
 mod imp {
     use super::*;
@@ -29,8 +31,6 @@ mod imp {
         pub directory: RefCell<Option<gio::File>>,
         pub model: OnceCell<DirectoryModel>,
         pub column_view: OnceCell<gtk::ColumnView>,
-        /// URIs visitadas (gio admite rutas no locales vía GVfs).
-        pub history: RefCell<Option<History<String>>>,
         /// Al terminar de cargar, enfocar esta entrada (la carpeta de la que
         /// venimos al subir o retroceder).
         pub pending_focus: RefCell<Option<gio::File>>,
@@ -41,23 +41,23 @@ mod imp {
         const NAME: &'static str = "TlacuacheFileListView";
         type Type = super::FileListView;
         type ParentType = adw::Bin;
-
-        fn class_init(klass: &mut Self::Class) {
-            klass.install_action("nav.up", None, |view, _, _| view.go_up());
-            klass.install_action("nav.back", None, |view, _, _| view.go_back());
-            klass.install_action("nav.forward", None, |view, _, _| view.go_forward());
-
-            // Solo actúan con el foco dentro de la lista (no en la terminal).
-            let alt = gdk::ModifierType::ALT_MASK;
-            klass.add_binding_action(gdk::Key::BackSpace, gdk::ModifierType::empty(), "nav.up");
-            klass.add_binding_action(gdk::Key::Up, alt, "nav.up");
-            klass.add_binding_action(gdk::Key::Left, alt, "nav.back");
-            klass.add_binding_action(gdk::Key::Right, alt, "nav.forward");
-        }
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for FileListView {}
+    impl ObjectImpl for FileListView {
+        fn signals() -> &'static [Signal] {
+            static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
+            SIGNALS.get_or_init(|| {
+                vec![
+                    // Enter o doble clic sobre una carpeta.
+                    Signal::builder("directory-activated")
+                        .param_types([gio::File::static_type()])
+                        .build(),
+                ]
+            })
+        }
+    }
+
     impl WidgetImpl for FileListView {}
     impl BinImpl for FileListView {}
 }
@@ -75,6 +75,14 @@ impl FileListView {
         view
     }
 
+    pub fn connect_directory_activated<F: Fn(&Self, &gio::File) + 'static>(&self, f: F) {
+        self.connect_closure(
+            "directory-activated",
+            false,
+            glib::closure_local!(move |view: &Self, dir: &gio::File| f(view, dir)),
+        );
+    }
+
     fn build(&self, dir: &gio::File, show_hidden: bool) {
         let imp = self.imp();
         let model = DirectoryModel::new(dir, show_hidden);
@@ -83,12 +91,17 @@ impl FileListView {
         column_view.add_css_class("file-list");
         column_view.add_css_class("data-table");
 
+        // Solo la última columna se expande: si se expandiera "Nombre", GTK
+        // le seguiría dando el espacio sobrante al redimensionarla y los
+        // bordes intermedios se moverían al revés de lo que se arrastra.
         let name = column(ColumnId::Name);
-        name.set_expand(true);
+        name.set_fixed_width(NAME_COLUMN_WIDTH);
         column_view.append_column(&name);
         column_view.append_column(&column(ColumnId::Extension));
         column_view.append_column(&column(ColumnId::Size));
-        column_view.append_column(&column(ColumnId::Modified));
+        let modified = column(ColumnId::Modified);
+        modified.set_expand(true);
+        column_view.append_column(&modified);
 
         // Los encabezados solo indican qué columna/dirección eligió el
         // usuario; el orden real lo aplica core::sort (carpetas primero).
@@ -107,19 +120,6 @@ impl FileListView {
             self,
             move |_, position| view.activate_position(position)
         ));
-
-        let mouse_nav = gtk::GestureClick::new();
-        mouse_nav.set_button(0);
-        mouse_nav.connect_pressed(glib::clone!(
-            #[weak(rename_to = view)]
-            self,
-            move |gesture, _, _, _| match gesture.current_button() {
-                MOUSE_BUTTON_BACK => view.go_back(),
-                MOUSE_BUTTON_FORWARD => view.go_forward(),
-                _ => {}
-            }
-        ));
-        column_view.add_controller(mouse_nav);
 
         let dir_list = model.directory_list();
         dir_list.connect_error_notify(glib::clone!(
@@ -144,65 +144,23 @@ impl FileListView {
             }
         ));
 
+        // Scroll horizontal automático: columnas anchas no deben impedir
+        // achicar la ventana.
         let scrolled = gtk::ScrolledWindow::builder()
-            .hscrollbar_policy(gtk::PolicyType::Never)
+            .hscrollbar_policy(gtk::PolicyType::Automatic)
+            .vexpand(true)
             .child(&column_view)
             .build();
         self.set_child(Some(&scrolled));
 
-        imp.history
-            .replace(Some(History::new(dir.uri().to_string())));
         imp.directory.replace(Some(dir.clone()));
         let _ = imp.model.set(model);
         let _ = imp.column_view.set(column_view);
-        self.update_nav_actions();
     }
 
-    /// Navega a `dir` registrándolo en el historial.
-    pub fn navigate_to(&self, dir: &gio::File) {
-        let moved = self
-            .imp()
-            .history
-            .borrow_mut()
-            .as_mut()
-            .is_some_and(|h| h.navigate(dir.uri().to_string()));
-        if moved {
-            self.show_directory(dir);
-        }
-    }
-
-    fn go_up(&self) {
-        if let Some(parent) = self.directory().and_then(|d| d.parent()) {
-            self.navigate_to(&parent);
-        }
-    }
-
-    fn go_back(&self) {
-        let target = self
-            .imp()
-            .history
-            .borrow_mut()
-            .as_mut()
-            .and_then(|h| h.back().cloned());
-        if let Some(uri) = target {
-            self.show_directory(&gio::File::for_uri(&uri));
-        }
-    }
-
-    fn go_forward(&self) {
-        let target = self
-            .imp()
-            .history
-            .borrow_mut()
-            .as_mut()
-            .and_then(|h| h.forward().cloned());
-        if let Some(uri) = target {
-            self.show_directory(&gio::File::for_uri(&uri));
-        }
-    }
-
-    /// Cambia la carpeta mostrada sin tocar el historial.
-    fn show_directory(&self, dir: &gio::File) {
+    /// Cambia la carpeta mostrada. Al terminar de cargar se enfoca la
+    /// carpeta anterior si está en la nueva (al subir o retroceder).
+    pub fn show_directory(&self, dir: &gio::File) {
         let imp = self.imp();
         let Some(model) = imp.model.get() else {
             return;
@@ -212,7 +170,13 @@ impl FileListView {
         imp.pending_focus.replace(previous);
         model.set_directory(dir);
         self.notify_directory();
-        self.update_nav_actions();
+    }
+
+    /// Lleva el foco del teclado a la fila actual de la lista.
+    pub fn focus_list(&self) {
+        if let Some(column_view) = self.imp().column_view.get() {
+            column_view.grab_focus();
+        }
     }
 
     fn activate_position(&self, position: u32) {
@@ -227,7 +191,7 @@ impl FileListView {
         };
         let is_dir = item.entry().is_dir;
         if is_dir && let Some(dir) = item.file() {
-            self.navigate_to(&dir);
+            self.emit_by_name::<()>("directory-activated", &[&dir]);
         }
         // Abrir archivos con su app predeterminada: tarea 1.6.
     }
@@ -248,19 +212,6 @@ impl FileListView {
             .unwrap_or(0);
         let flags = gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT;
         column_view.scroll_to(position, None, flags, None);
-    }
-
-    fn update_nav_actions(&self) {
-        let (back, forward) = self
-            .imp()
-            .history
-            .borrow()
-            .as_ref()
-            .map_or((false, false), |h| (h.can_go_back(), h.can_go_forward()));
-        let has_parent = self.directory().and_then(|d| d.parent()).is_some();
-        self.action_set_enabled("nav.back", back);
-        self.action_set_enabled("nav.forward", forward);
-        self.action_set_enabled("nav.up", has_parent);
     }
 
     fn apply_header_sort(&self, sorter: &gtk::ColumnViewSorter) {

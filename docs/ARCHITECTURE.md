@@ -28,8 +28,8 @@ tlacuache/
 │           ├── ui/
 │           │   ├── sidebar.rs
 │           │   ├── pane.rs         # Pane: pestañas + preview + terminal (Paned)
-│           │   ├── tab_page.rs     # contenido de una pestaña: ruta + vista
-│           │   ├── path_bar.rs     # breadcrumb/Entry
+│           │   ├── tab_page.rs     # contenido de una pestaña: ‹ › ↑ + ruta + vista; dueña del historial y atajos de navegación
+│           │   ├── path_bar.rs     # breadcrumb/Entry con autocompletado propio (EntryCompletion está obsoleto)
 │           │   ├── miller_view.rs
 │           │   ├── list_view.rs    # ColumnView detallado
 │           │   ├── preview.rs      # despachador de previews por tipo MIME
