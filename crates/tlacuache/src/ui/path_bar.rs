@@ -16,7 +16,7 @@ use gtk::{gdk, gio, glib};
 use tlacuache_core::path_input;
 
 use crate::strings;
-use crate::window::TlacuacheWindow;
+use crate::window;
 
 const PAGE_CRUMBS: &str = "crumbs";
 const PAGE_EDIT: &str = "edit";
@@ -480,9 +480,7 @@ impl PathBar {
                     }
                     None => {
                         bar.imp().entry.add_css_class("error");
-                        if let Some(window) = bar.root().and_downcast::<TlacuacheWindow>() {
-                            window.show_toast(&strings::path_not_found(&text));
-                        }
+                        window::show_toast_from(&bar, &strings::path_not_found(&text));
                     }
                 }
             }

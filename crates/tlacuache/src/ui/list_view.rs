@@ -5,22 +5,22 @@
 
 use std::cell::{OnceCell, RefCell};
 use std::sync::OnceLock;
+use std::time::SystemTime;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
-use std::time::SystemTime;
-
 use tlacuache_core::age::{Age, AgeBucket};
-use tlacuache_core::filter::{self, FilterKey};
+use tlacuache_core::filter;
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 
 use crate::fs::file_item::FileItem;
 use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
-use crate::window::TlacuacheWindow;
+use crate::ui::filter_indicator::{FilterIndicator, filter_key};
+use crate::window;
 
 /// Ancho inicial de la columna "Nombre" (px); el usuario puede cambiarlo.
 const NAME_COLUMN_WIDTH: i32 = 360;
@@ -41,8 +41,7 @@ mod imp {
         pub pending_focus: RefCell<Option<gio::File>>,
         /// Texto del filtro rápido (vacío = inactivo).
         pub query: RefCell<String>,
-        pub filter_revealer: gtk::Revealer,
-        pub filter_label: gtk::Label,
+        pub indicator: FilterIndicator,
     }
 
     #[glib::object_subclass]
@@ -97,7 +96,8 @@ impl FileListView {
         let imp = self.imp();
         let model = DirectoryModel::new(dir, show_hidden);
 
-        let column_view = gtk::ColumnView::new(Some(model.selection().clone()));
+        let selection = gtk::MultiSelection::new(Some(model.model().clone()));
+        let column_view = gtk::ColumnView::new(Some(selection));
         column_view.add_css_class("file-list");
         column_view.add_css_class("data-table");
 
@@ -139,9 +139,7 @@ impl FileListView {
             move |list| {
                 if let Some(err) = list.error() {
                     tracing::warn!("error al listar: {err}");
-                    if let Some(window) = view.root().and_downcast::<TlacuacheWindow>() {
-                        window.show_toast(&strings::listing_failed(&err));
-                    }
+                    window::show_toast_from(&view, &strings::listing_failed(&err));
                 }
             }
         ));
@@ -163,21 +161,9 @@ impl FileListView {
             .child(&column_view)
             .build();
 
-        // Indicador flotante del filtro rápido.
-        let indicator = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        indicator.add_css_class("filter-indicator");
-        indicator.append(&gtk::Image::from_icon_name("edit-find-symbolic"));
-        indicator.append(&imp.filter_label);
-        imp.filter_revealer.set_child(Some(&indicator));
-        imp.filter_revealer
-            .set_transition_type(gtk::RevealerTransitionType::Crossfade);
-        imp.filter_revealer.set_halign(gtk::Align::End);
-        imp.filter_revealer.set_valign(gtk::Align::End);
-        imp.filter_revealer.set_can_target(false);
-
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&scrolled));
-        overlay.add_overlay(&imp.filter_revealer);
+        overlay.add_overlay(&imp.indicator);
         self.set_child(Some(&overlay));
 
         // Captura: las teclas de texto llegan aquí antes que a las filas, así
@@ -193,7 +179,7 @@ impl FileListView {
         ));
         self.add_controller(keys);
 
-        model.selection().connect_items_changed(glib::clone!(
+        model.model().connect_items_changed(glib::clone!(
             #[weak(rename_to = view)]
             self,
             move |_, _, _, _| view.update_filter_indicator()
@@ -235,19 +221,8 @@ impl FileListView {
     }
 
     fn on_key(&self, key: gdk::Key, mods: gdk::ModifierType) -> glib::Propagation {
-        let shortcut_mods = gdk::ModifierType::CONTROL_MASK
-            | gdk::ModifierType::ALT_MASK
-            | gdk::ModifierType::SUPER_MASK;
-        if mods.intersects(shortcut_mods) {
+        let Some(filter_key) = filter_key(key, mods) else {
             return glib::Propagation::Proceed;
-        }
-        let filter_key = match key {
-            gdk::Key::Escape => FilterKey::Escape,
-            gdk::Key::BackSpace => FilterKey::Backspace,
-            _ => match key.to_unicode() {
-                Some(c) => FilterKey::Char(c),
-                None => return glib::Propagation::Proceed,
-            },
         };
         let current = self.imp().query.borrow().clone();
         match filter::apply_key(&current, filter_key) {
@@ -269,7 +244,7 @@ impl FileListView {
         self.update_filter_indicator();
         // Seleccionar la primera coincidencia para poder abrirla con Enter.
         if let Some(column_view) = imp.column_view.get()
-            && model.selection().n_items() > 0
+            && model.model().n_items() > 0
         {
             let flags = gtk::ListScrollFlags::FOCUS | gtk::ListScrollFlags::SELECT;
             column_view.scroll_to(0, None, flags, None);
@@ -278,22 +253,8 @@ impl FileListView {
 
     fn update_filter_indicator(&self) {
         let imp = self.imp();
-        let query = imp.query.borrow();
-        let active = !query.is_empty();
-        imp.filter_revealer.set_reveal_child(active);
-        if !active {
-            return;
-        }
-        let count = imp.model.get().map_or(0, |m| m.selection().n_items());
-        imp.filter_label
-            .set_text(&strings::filter_indicator(&query, count));
-        if let Some(indicator) = imp.filter_revealer.child() {
-            if count == 0 {
-                indicator.add_css_class("no-match");
-            } else {
-                indicator.remove_css_class("no-match");
-            }
-        }
+        let count = imp.model.get().map_or(0, |m| m.model().n_items());
+        imp.indicator.update(&imp.query.borrow(), count);
     }
 
     /// Lleva el foco del teclado a la fila actual de la lista.
@@ -304,13 +265,7 @@ impl FileListView {
     }
 
     fn activate_position(&self, position: u32) {
-        let Some(item) = self
-            .imp()
-            .model
-            .get()
-            .and_then(|m| m.selection().item(position))
-            .and_downcast::<FileItem>()
-        else {
+        let Some(item) = self.imp().model.get().and_then(|m| m.item(position)) else {
             return;
         };
         let Some(file) = item.file() else {
@@ -319,23 +274,8 @@ impl FileListView {
         if item.entry().is_dir {
             self.emit_by_name::<()>("directory-activated", &[&file]);
         } else {
-            self.open_file(file, item.entry().name.clone());
+            launch::open_file(self, file, item.entry().name.clone());
         }
-    }
-
-    fn open_file(&self, file: gio::File, name: String) {
-        glib::spawn_future_local(glib::clone!(
-            #[weak(rename_to = view)]
-            self,
-            async move {
-                if let Err(err) = launch::open_default(&file, &view).await {
-                    tracing::warn!("no se pudo abrir {}: {err}", file.uri());
-                    if let Some(window) = view.root().and_downcast::<TlacuacheWindow>() {
-                        window.show_toast(&strings::open_failed(&name, &err));
-                    }
-                }
-            }
-        ));
     }
 
     /// Selecciona la carpeta de la que venimos o, si no está, la primera fila.
@@ -344,7 +284,7 @@ impl FileListView {
         let (Some(model), Some(column_view)) = (imp.model.get(), imp.column_view.get()) else {
             return;
         };
-        if model.selection().n_items() == 0 {
+        if model.model().n_items() == 0 {
             return;
         }
         let position = imp

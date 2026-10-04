@@ -19,8 +19,8 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **1.7 Filtro rápido y ocultos** (escribir para filtrar, Esc limpia, Ctrl+H).
 
 ## Hito 2 — Columnas Miller y pestañas
-- [ ] **2.1 Vista Miller** con scroll automático a la columna activa. CA: navegar 6 niveles solo con flechas.
-- [ ] **2.2 Alternar vista** Miller/lista por pestaña.
+- [x] **2.1 Vista Miller** con scroll automático a la columna activa. CA: navegar 6 niveles solo con flechas.
+- [ ] **2.2 Alternar vista** Miller/lista por pestaña. Diseñar el selector para admitir más vistas (iconos en v0.2); cada pestaña, y por tanto cada panel del modo dual, tiene su propia vista.
 - [ ] **2.3 Pestañas** con `adw::TabView` (Ctrl+T, Ctrl+W, Ctrl+Tab).
 - [ ] **2.4 Barra de estado** del panel (elementos, selección, espacio libre).
 
@@ -59,6 +59,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 
 ## Hito 7 — v0.2
 - [ ] PDF (poppler), video/audio (`gtk::Video`), Markdown renderizado.
+- [ ] Vista de iconos (cuadrícula con `gtk::GridView`) como tercera opción del selector de vista.
 - [ ] Miniaturas freedesktop.
 - [ ] Búsqueda recursiva en segundo plano.
 - [ ] Renombrado masivo con regex y vista previa.

@@ -81,3 +81,10 @@ impl TlacuacheWindow {
         }
     }
 }
+
+/// Muestra un toast en la ventana que contiene `widget`, si la hay.
+pub fn show_toast_from(widget: &impl IsA<gtk::Widget>, text: &str) {
+    if let Some(window) = widget.root().and_downcast::<TlacuacheWindow>() {
+        window.show_toast(text);
+    }
+}

@@ -1,7 +1,8 @@
 //! Modelo de una carpeta: `DirectoryList` → `MapListModel` (FileItem) →
-//! `FilterListModel` (core::filter) → `SortListModel` (core::sort) →
-//! `MultiSelection`. `DirectoryList` lee de forma asíncrona e incremental, así
-//! que la UI no se bloquea mientras llegan las entradas.
+//! `FilterListModel` (core::filter) → `SortListModel` (core::sort). Cada
+//! vista envuelve el resultado en su propio modelo de selección.
+//! `DirectoryList` lee de forma asíncrona e incremental, así que la UI no se
+//! bloquea mientras llegan las entradas.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -16,13 +17,14 @@ use super::file_item::FileItem;
 /// Atributos que se piden a gio por cada entrada.
 pub const ATTRIBUTES: &str = "standard::*,time::modified,time::created,unix::mode,owner::user";
 
+#[derive(Clone)]
 pub struct DirectoryModel {
     dir_list: gtk::DirectoryList,
     filter_state: Rc<RefCell<Filter>>,
     filter: gtk::CustomFilter,
     sort_spec: Rc<Cell<SortSpec>>,
     sorter: gtk::CustomSorter,
-    selection: gtk::MultiSelection,
+    sorted: gtk::SortListModel,
 }
 
 impl DirectoryModel {
@@ -65,20 +67,23 @@ impl DirectoryModel {
         let sorted = gtk::SortListModel::new(Some(filtered), Some(sorter.clone()));
         sorted.set_incremental(false);
 
-        let selection = gtk::MultiSelection::new(Some(sorted));
-
         Self {
             dir_list,
             filter_state,
             filter,
             sort_spec,
             sorter,
-            selection,
+            sorted,
         }
     }
 
-    pub fn selection(&self) -> &gtk::MultiSelection {
-        &self.selection
+    /// Entradas visibles, filtradas y ordenadas.
+    pub fn model(&self) -> &gtk::SortListModel {
+        &self.sorted
+    }
+
+    pub fn item(&self, position: u32) -> Option<FileItem> {
+        self.sorted.item(position).and_downcast()
     }
 
     pub fn directory_list(&self) -> &gtk::DirectoryList {
@@ -92,10 +97,8 @@ impl DirectoryModel {
     /// Posición (en el modelo ordenado y filtrado) de la entrada cuyo archivo
     /// es `file`.
     pub fn position_of(&self, file: &gio::File) -> Option<u32> {
-        (0..self.selection.n_items()).find(|&i| {
-            self.selection
-                .item(i)
-                .and_downcast::<FileItem>()
+        (0..self.sorted.n_items()).find(|&i| {
+            self.item(i)
                 .and_then(|item| item.file())
                 .is_some_and(|f| f.equal(file))
         })

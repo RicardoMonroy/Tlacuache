@@ -9,7 +9,7 @@ use gtk::{gdk, gio, glib};
 use tlacuache_core::history::History;
 
 use crate::strings;
-use crate::ui::list_view::FileListView;
+use crate::ui::miller_view::MillerView;
 use crate::ui::path_bar::PathBar;
 
 /// Botones laterales del ratón (atrás/adelante).
@@ -21,7 +21,7 @@ mod imp {
 
     #[derive(Default)]
     pub struct TabPage {
-        pub view: OnceCell<FileListView>,
+        pub view: OnceCell<MillerView>,
         pub path_bar: PathBar,
         /// URIs visitadas (gio admite rutas no locales vía GVfs).
         pub history: RefCell<Option<History<String>>>,
@@ -98,7 +98,7 @@ impl TabPage {
         imp.path_bar.set_hexpand(true);
         nav.append(&imp.path_bar);
 
-        let view = FileListView::new(dir, show_hidden);
+        let view = MillerView::new(dir, show_hidden);
         view.connect_directory_activated(glib::clone!(
             #[weak(rename_to = page)]
             self,
