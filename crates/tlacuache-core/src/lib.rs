@@ -16,6 +16,7 @@ pub mod path_input;
 pub mod perms;
 pub mod places;
 pub mod session;
+pub mod shell;
 pub mod sort;
 pub mod summary;
 pub mod text;
