@@ -183,7 +183,16 @@ mod imp {
     }
 
     #[glib::derived_properties]
-    impl ObjectImpl for TabPage {}
+    impl ObjectImpl for TabPage {
+        fn signals() -> &'static [glib::subclass::Signal] {
+            static SIGNALS: std::sync::OnceLock<Vec<glib::subclass::Signal>> =
+                std::sync::OnceLock::new();
+            SIGNALS.get_or_init(|| {
+                // Cambiaron los elementos o la selección de la vista.
+                vec![glib::subclass::Signal::builder("status-changed").build()]
+            })
+        }
+    }
     impl WidgetImpl for TabPage {}
     impl BoxImpl for TabPage {}
 }
@@ -286,6 +295,15 @@ impl TabPage {
     fn update_status(&self) {
         let status = self.view().map(|v| v.status()).unwrap_or_default();
         self.imp().status_bar.set_status(&status);
+        self.emit_by_name::<()>("status-changed", &[]);
+    }
+
+    pub fn connect_status_changed<F: Fn(&Self) + 'static>(&self, f: F) {
+        self.connect_closure(
+            "status-changed",
+            false,
+            glib::closure_local!(move |page: &Self| f(page)),
+        );
     }
 
     /// Consulta en segundo plano el espacio libre de la unidad de `dir`.

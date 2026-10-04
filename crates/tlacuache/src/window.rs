@@ -17,6 +17,7 @@ use crate::fs::ops_runner::OpsManager;
 use crate::strings;
 use crate::ui::ops_indicator::OpsIndicator;
 use crate::ui::pane::Pane;
+use crate::ui::pane_actions::PaneActions;
 use crate::ui::sidebar::Sidebar;
 
 /// Ancho mínimo de la barra lateral (px); el inicial viene de la sesión.
@@ -46,6 +47,9 @@ mod imp {
         /// Barra lateral visible (F9).
         #[property(get, set = Self::set_show_sidebar)]
         pub show_sidebar: Cell<bool>,
+        /// Franja central + panel derecho (se ocultan juntos con F3).
+        pub right_side: gtk::Box,
+        pub pane_actions: PaneActions,
         /// Cola de operaciones de archivo de la ventana.
         pub ops: OpsManager,
         /// Ya se guardó la sesión: el siguiente cierre es definitivo.
@@ -84,17 +88,16 @@ mod imp {
                 window.add_current_to_favorites();
                 glib::Propagation::Stop
             });
-            // Temporal (4.2): copiar/mover la selección al otro panel. F5/F6
-            // definitivos, con arrastrar y soltar, llegan en la tarea 4.3.
-            let ctrl_shift = gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::SHIFT_MASK;
-            klass.add_binding(gdk::Key::F5, ctrl_shift, |window| {
+            // Copiar/mover la selección del panel activo al otro.
+            klass.install_action("panes.copy-to-other", None, |window, _, _| {
                 window.transfer_selection(OpKind::Copy);
-                glib::Propagation::Stop
             });
-            klass.add_binding(gdk::Key::F6, ctrl_shift, |window| {
+            klass.install_action("panes.move-to-other", None, |window, _, _| {
                 window.transfer_selection(OpKind::Move);
-                glib::Propagation::Stop
             });
+            let none = gdk::ModifierType::empty();
+            klass.add_binding_action(gdk::Key::F5, none, "panes.copy-to-other");
+            klass.add_binding_action(gdk::Key::F6, none, "panes.move-to-other");
             klass.add_binding(gdk::Key::F9, gdk::ModifierType::empty(), |window| {
                 window.set_show_sidebar(!window.show_sidebar());
                 glib::Propagation::Stop
@@ -233,12 +236,23 @@ impl TlacuacheWindow {
                 move |_| window.set_active_pane(index)
             ));
             pane.add_controller(focus);
+            pane.connect_selection_changed(glib::clone!(
+                #[weak(rename_to = window)]
+                self,
+                move |_| window.update_transfer_actions()
+            ));
         }
 
         let paned = &imp.paned;
         paned.set_orientation(gtk::Orientation::Horizontal);
         paned.set_start_child(Some(&panes[0]));
-        paned.set_end_child(Some(&panes[1]));
+        imp.right_side.append(&imp.pane_actions);
+        imp.right_side
+            .append(&gtk::Separator::new(gtk::Orientation::Vertical));
+        imp.right_side.append(&panes[1]);
+        self.make_strip_resize_panes();
+        panes[1].set_hexpand(true);
+        paned.set_end_child(Some(&imp.right_side));
         paned.set_shrink_start_child(false);
         paned.set_shrink_end_child(false);
         // Al mostrarse: posición guardada o mitad y mitad; y foco al panel
@@ -293,6 +307,10 @@ impl TlacuacheWindow {
 
     /// Copia o mueve la selección del panel activo a la carpeta del otro.
     fn transfer_selection(&self, kind: OpKind) {
+        if !self.dual_pane() {
+            self.show_toast(strings::DUAL_PANE_REQUIRED);
+            return;
+        }
         let active = self.imp().active.get();
         let sources = self
             .pane(active)
@@ -402,9 +420,7 @@ impl TlacuacheWindow {
     /// Muestra u oculta el panel derecho (conserva sus pestañas).
     fn apply_dual_pane(&self) {
         let dual = self.dual_pane();
-        if let Some(right) = self.pane(1) {
-            right.set_visible(dual);
-        }
+        self.imp().right_side.set_visible(dual);
         if !dual && self.imp().active.get() == 1 {
             if let Some(left) = self.pane(0) {
                 left.focus_current();
@@ -412,11 +428,67 @@ impl TlacuacheWindow {
             self.set_active_pane(0);
         }
         self.update_active_style();
+        self.update_transfer_actions();
     }
 
     fn set_active_pane(&self, index: usize) {
         self.imp().active.set(index);
+        self.imp().pane_actions.set_left_active(index == 0);
         self.update_active_style();
+        self.update_transfer_actions();
+    }
+
+    /// Arrastrar en la franja central mueve el divisor entre paneles. Se
+    /// calcula con la posición del puntero en el `Paned` (no con el
+    /// desplazamiento del gesto) porque la franja se mueve al arrastrar.
+    fn make_strip_resize_panes(&self) {
+        let imp = self.imp();
+        // (x del puntero dentro de la franja, distancia divisor→franja).
+        let grab = Rc::new(Cell::new((0.0_f64, 0.0_f64)));
+        let drag = gtk::GestureDrag::new();
+        drag.connect_drag_begin(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            #[strong]
+            grab,
+            move |_, x, _| {
+                let imp = window.imp();
+                let strip_x = imp
+                    .pane_actions
+                    .compute_point(&imp.paned, &gtk::graphene::Point::new(0.0, 0.0))
+                    .map_or(0.0, |p| f64::from(p.x()));
+                grab.set((x, strip_x - f64::from(imp.paned.position())));
+            }
+        ));
+        drag.connect_drag_update(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |gesture, dx, _| {
+                let imp = window.imp();
+                let Some((start_x, start_y)) = gesture.start_point() else {
+                    return;
+                };
+                let pointer = gtk::graphene::Point::new((start_x + dx) as f32, start_y as f32);
+                let Some(in_paned) = imp.pane_actions.compute_point(&imp.paned, &pointer) else {
+                    return;
+                };
+                let (grab_x, handle) = grab.get();
+                // Píxeles enteros para la posición del divisor.
+                let position = (f64::from(in_paned.x()) - grab_x - handle).round() as i32;
+                imp.paned.set_position(position.max(0));
+            }
+        ));
+        imp.pane_actions.add_controller(drag);
+    }
+
+    /// F5/F6 y la franja central: solo en modo dual y con selección.
+    fn update_transfer_actions(&self) {
+        let enabled = self.dual_pane()
+            && self
+                .pane(self.imp().active.get())
+                .is_some_and(|pane| !pane.selected_files().is_empty());
+        self.action_set_enabled("panes.copy-to-other", enabled);
+        self.action_set_enabled("panes.move-to-other", enabled);
     }
 
     /// Acento en el panel activo, solo en modo dual (con uno no aporta).
@@ -473,4 +545,19 @@ pub fn show_toast_from(widget: &impl IsA<gtk::Widget>, text: &str) {
     if let Some(window) = widget.root().and_downcast::<TlacuacheWindow>() {
         window.show_toast(text);
     }
+}
+
+/// Encola una operación en la ventana que contiene `widget` (arrastrar y
+/// soltar). Devuelve `false` si no hay ventana.
+pub fn enqueue_from(
+    widget: &impl IsA<gtk::Widget>,
+    kind: OpKind,
+    sources: &[gio::File],
+    dest: &gio::File,
+) -> bool {
+    let Some(window) = widget.root().and_downcast::<TlacuacheWindow>() else {
+        return false;
+    };
+    window.imp().ops.enqueue(kind, sources, Some(dest));
+    true
 }

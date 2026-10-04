@@ -116,13 +116,13 @@ impl FileListView {
         // Solo la última columna se expande: si se expandiera "Nombre", GTK
         // le seguiría dando el espacio sobrante al redimensionarla y los
         // bordes intermedios se moverían al revés de lo que se arrastra.
-        let name = column(ColumnId::Name);
+        let name = column(ColumnId::Name, selection.upcast_ref());
         name.set_fixed_width(NAME_COLUMN_WIDTH);
         column_view.append_column(&name);
-        column_view.append_column(&column(ColumnId::Extension));
-        column_view.append_column(&column(ColumnId::Size));
-        column_view.append_column(&column(ColumnId::Modified));
-        let age = column(ColumnId::Age);
+        column_view.append_column(&column(ColumnId::Extension, selection.upcast_ref()));
+        column_view.append_column(&column(ColumnId::Size, selection.upcast_ref()));
+        column_view.append_column(&column(ColumnId::Modified, selection.upcast_ref()));
+        let age = column(ColumnId::Age, selection.upcast_ref());
         age.set_expand(true);
         column_view.append_column(&age);
 
@@ -172,6 +172,18 @@ impl FileListView {
             .vexpand(true)
             .child(&column_view)
             .build();
+
+        // Soltar en la zona vacía: a la carpeta mostrada.
+        dnd::attach_dir_drop(
+            &scrolled,
+            glib::clone!(
+                #[weak(rename_to = view)]
+                self,
+                #[upgrade_or]
+                None,
+                move || view.directory()
+            ),
+        );
 
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&scrolled));
@@ -422,12 +434,14 @@ impl ColumnId {
     }
 }
 
-fn column(id: ColumnId) -> gtk::ColumnViewColumn {
+fn column(id: ColumnId, selection: &gtk::SelectionModel) -> gtk::ColumnViewColumn {
     let factory = gtk::SignalListItemFactory::new();
+    let selection = selection.clone();
     factory.connect_setup(move |_, obj| {
         if let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() {
             let cell = cell_widget(id);
-            dnd::attach_file_drag(&cell, list_item);
+            dnd::attach_file_drag(&cell, list_item, &selection);
+            dnd::attach_row_drop(&cell, list_item);
             list_item.set_child(Some(&cell));
         }
     });

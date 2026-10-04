@@ -210,3 +210,12 @@ levelbar.drive-usage.usage-critical block.filled {
   box-shadow: inset 0 0 0 2px var(--accent-bg-color);
   border-radius: 6px;
 }
+
+/* Franja central de acciones entre paneles. */
+.pane-actions {
+  padding: 0 2px;
+}
+
+.pane-actions button {
+  padding: 6px 4px;
+}

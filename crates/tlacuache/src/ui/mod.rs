@@ -8,6 +8,7 @@ pub mod list_view;
 pub mod miller_view;
 pub mod ops_indicator;
 pub mod pane;
+pub mod pane_actions;
 pub mod path_bar;
 pub mod sidebar;
 pub mod status_bar;

@@ -34,6 +34,9 @@ pub const OP_INTERRUPTED: &str = "La operación se interrumpió";
 pub const OP_NOT_SUPPORTED: &str = "Operación no disponible todavía";
 pub const OP_NO_NAME: &str = "El origen no tiene nombre de archivo";
 pub const OP_INTO_ITSELF: &str = "No se puede copiar ni mover una carpeta dentro de sí misma";
+pub const COPY_TO_OTHER: &str = "Copiar al otro panel (F5)";
+pub const MOVE_TO_OTHER: &str = "Mover al otro panel (F6)";
+pub const DUAL_PANE_REQUIRED: &str = "Activa el doble panel (F3) para copiar o mover entre paneles";
 pub const OP_NOTHING_SELECTED: &str = "No hay nada seleccionado";
 
 pub const SESSION_RESTORE_FAILED: &str = "No se pudo restaurar la sesión anterior";

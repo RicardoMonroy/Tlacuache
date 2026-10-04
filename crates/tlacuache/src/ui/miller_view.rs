@@ -307,7 +307,10 @@ impl MillerView {
         selection.set_autoselect(false);
         selection.set_can_unselect(true);
 
-        let list = gtk::ListView::new(Some(selection.clone()), Some(row_factory()));
+        let list = gtk::ListView::new(
+            Some(selection.clone()),
+            Some(row_factory(selection.upcast_ref())),
+        );
         list.add_css_class("miller-column");
 
         let scrolled = gtk::ScrolledWindow::builder()
@@ -315,6 +318,9 @@ impl MillerView {
             .width_request(COLUMN_WIDTH)
             .child(&list)
             .build();
+        // Soltar en la zona vacía de la columna: a su carpeta.
+        let column_dir = dir.clone();
+        dnd::attach_dir_drop(&scrolled, move || Some(column_dir.clone()));
         let widget = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         widget.append(&scrolled);
         widget.append(&gtk::Separator::new(gtk::Orientation::Vertical));
@@ -625,9 +631,10 @@ fn ancestors(dir: &gio::File) -> Vec<gio::File> {
     chain
 }
 
-fn row_factory() -> gtk::SignalListItemFactory {
+fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
     let factory = gtk::SignalListItemFactory::new();
-    factory.connect_setup(|_, obj| {
+    let selection = selection.clone();
+    factory.connect_setup(move |_, obj| {
         let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() else {
             return;
         };
@@ -645,7 +652,8 @@ fn row_factory() -> gtk::SignalListItemFactory {
         row.append(&icon);
         row.append(&label);
         row.append(&chevron);
-        dnd::attach_file_drag(&row, list_item);
+        dnd::attach_file_drag(&row, list_item, &selection);
+        dnd::attach_row_drop(&row, list_item);
         list_item.set_child(Some(&row));
     });
     factory.connect_bind(|_, obj| {

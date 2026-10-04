@@ -44,7 +44,16 @@ mod imp {
         }
     }
 
-    impl ObjectImpl for Pane {}
+    impl ObjectImpl for Pane {
+        fn signals() -> &'static [glib::subclass::Signal] {
+            static SIGNALS: std::sync::OnceLock<Vec<glib::subclass::Signal>> =
+                std::sync::OnceLock::new();
+            SIGNALS.get_or_init(|| {
+                // Cambió la selección de la pestaña actual (o la pestaña).
+                vec![glib::subclass::Signal::builder("selection-changed").build()]
+            })
+        }
+    }
     impl WidgetImpl for Pane {}
     impl BoxImpl for Pane {}
 }
@@ -85,15 +94,20 @@ impl Pane {
             view.close_page_finish(page, view.n_pages() > 1);
             glib::Propagation::Stop
         });
-        imp.tab_view.connect_selected_page_notify(|view| {
-            if let Some(page) = view
-                .selected_page()
-                .map(|p| p.child())
-                .and_downcast::<TabPage>()
-            {
-                page.focus_view();
+        imp.tab_view.connect_selected_page_notify(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            move |view| {
+                if let Some(page) = view
+                    .selected_page()
+                    .map(|p| p.child())
+                    .and_downcast::<TabPage>()
+                {
+                    page.focus_view();
+                }
+                pane.emit_by_name::<()>("selection-changed", &[]);
             }
-        });
+        ));
 
         self.append(&imp.tab_bar);
         self.append(&imp.tab_view);
@@ -112,6 +126,15 @@ impl Pane {
     fn add_tab_with(&self, dir: &gio::File, mode: ViewMode, show_hidden: bool) {
         let imp = self.imp();
         let page = TabPage::new(dir, show_hidden, mode);
+        page.connect_status_changed(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            move |page| {
+                if pane.current_page().as_ref() == Some(page) {
+                    pane.emit_by_name::<()>("selection-changed", &[]);
+                }
+            }
+        ));
         let tab = imp.tab_view.append(&page);
         update_tab_title(&tab, dir);
         page.connect_directory_notify(glib::clone!(
@@ -174,6 +197,14 @@ impl Pane {
         if let Some(page) = self.current_page() {
             page.focus_view();
         }
+    }
+
+    pub fn connect_selection_changed<F: Fn(&Self) + 'static>(&self, f: F) {
+        self.connect_closure(
+            "selection-changed",
+            false,
+            glib::closure_local!(move |pane: &Self| f(pane)),
+        );
     }
 
     /// Archivos seleccionados en la pestaña actual.
