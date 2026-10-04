@@ -18,12 +18,12 @@ use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::filter;
 use tlacuache_core::summary::{SelectionSummary, ViewStatus};
 
-use crate::fs::file_item::FileItem;
+use crate::fs::file_item::{FileItem, SelectedInfo};
 use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
-use crate::ui::dnd;
 use crate::ui::filter_indicator::{FilterIndicator, filter_key};
+use crate::ui::{context_menu, dnd};
 use crate::window;
 
 const COLUMN_WIDTH: i32 = 240;
@@ -251,6 +251,15 @@ impl MillerView {
         }
     }
 
+    /// Seleccionado en la columna activa, con su tipo.
+    pub fn selected_infos(&self) -> Vec<SelectedInfo> {
+        self.active_column()
+            .and_then(|c| c.selected_item())
+            .and_then(|item| SelectedInfo::from_item(&item))
+            .into_iter()
+            .collect()
+    }
+
     /// Archivo seleccionado en la columna activa.
     pub fn selected_files(&self) -> Vec<gio::File> {
         self.active_column()
@@ -343,6 +352,10 @@ impl MillerView {
             .width_request(COLUMN_WIDTH)
             .child(&list)
             .build();
+        // Clic derecho en la zona vacía: menú de la carpeta de la columna
+        // (al tomar el foco, esa columna pasa a ser la actual).
+        context_menu::attach_background_menu(&scrolled, || {});
+
         // Soltar en la zona vacía de la columna: a su carpeta.
         let column_dir = dir.clone();
         dnd::attach_dir_drop(&scrolled, move || Some(column_dir.clone()));
@@ -680,6 +693,7 @@ fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
         row.append(&chevron);
         dnd::attach_file_drag(&row, list_item, &selection);
         dnd::attach_row_drop(&row, list_item);
+        context_menu::attach_row_menu(&row, list_item, &selection);
         list_item.set_child(Some(&row));
     });
     factory.connect_bind(|_, obj| {

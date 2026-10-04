@@ -139,6 +139,33 @@ mod imp {
             klass.add_binding_action(gdk::Key::x, ctrl, "clipboard.cut");
             klass.add_binding_action(gdk::Key::v, ctrl, "clipboard.paste");
 
+            // Menú contextual: abrir, abrir con, favoritos, ruta, propiedades.
+            klass.install_action("files.open", None, |window, _, _| window.open_selection());
+            klass.install_action(
+                "files.open-with",
+                Some(&String::static_variant_type()),
+                |window, _, param| {
+                    if let Some(app_id) = param.and_then(|p| p.get::<String>()) {
+                        window.open_selection_with(&app_id);
+                    }
+                },
+            );
+            klass.install_action("files.open-with-other", None, |window, _, _| {
+                window.open_with_other();
+            });
+            klass.install_action("files.add-favorite", None, |window, _, _| {
+                window.add_selection_to_favorites();
+            });
+            klass.install_action("files.copy-path", None, |window, _, _| {
+                window.copy_selection_paths();
+            });
+            klass.install_action("files.properties", None, |window, _, _| {
+                window.show_properties(false);
+            });
+            klass.install_action("files.folder-properties", None, |window, _, _| {
+                window.show_properties(true);
+            });
+
             // Ctrl+Z: deshacer la última operación (el entry de la ruta
             // usa su propio Ctrl+Z al editar).
             klass.add_binding(gdk::Key::z, gdk::ModifierType::CONTROL_MASK, |window| {
@@ -678,6 +705,131 @@ impl TlacuacheWindow {
         self.action_set_enabled("files.rename", has_selection);
         self.action_set_enabled("clipboard.copy", has_selection);
         self.action_set_enabled("clipboard.cut", has_selection);
+        for action in [
+            "files.open",
+            "files.open-with",
+            "files.open-with-other",
+            "files.add-favorite",
+            "files.copy-path",
+            "files.properties",
+        ] {
+            self.action_set_enabled(action, has_selection);
+        }
+    }
+
+    fn active_pane(&self) -> Option<&Pane> {
+        self.pane(self.imp().active.get())
+    }
+
+    /// Abrir: una carpeta navega; si hay varias, cada una en una pestaña
+    /// nueva; los archivos, con su app predeterminada.
+    fn open_selection(&self) {
+        let Some(pane) = self.active_pane() else {
+            return;
+        };
+        let infos = pane.selected_infos();
+        if let [only] = infos.as_slice()
+            && only.is_dir
+        {
+            pane.navigate(&only.file);
+            return;
+        }
+        for info in infos {
+            if info.is_dir {
+                pane.add_tab(&info.file);
+            } else {
+                let name = crate::fs::display::display_name(&info.file);
+                crate::fs::launch::open_file(self, info.file, name);
+            }
+        }
+    }
+
+    /// Abrir con una app recomendada (por id) para el tipo del primero.
+    fn open_selection_with(&self, app_id: &str) {
+        let infos = self
+            .active_pane()
+            .map(Pane::selected_infos)
+            .unwrap_or_default();
+        let Some(content_type) = infos.first().and_then(|i| i.content_type.clone()) else {
+            return;
+        };
+        let app = gio::AppInfo::recommended_for_type(&content_type)
+            .into_iter()
+            .find(|app| app.id().as_deref() == Some(app_id));
+        let Some(app) = app else {
+            return;
+        };
+        let uris: Vec<String> = infos.iter().map(|i| i.file.uri().to_string()).collect();
+        let context = WidgetExt::display(self).app_launch_context();
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                let refs: Vec<&str> = uris.iter().map(String::as_str).collect();
+                if let Err(err) = app.launch_uris_future(&refs, Some(&context)).await {
+                    tracing::warn!("no se pudo abrir con {}: {err}", app.name());
+                    window.show_toast(strings::OPEN_FAILED_APP);
+                }
+            }
+        ));
+    }
+
+    /// «Otra aplicación…»: el selector del sistema (portal) para el primero.
+    fn open_with_other(&self) {
+        let Some(file) = self.active_selection().0.into_iter().next() else {
+            return;
+        };
+        let launcher = gtk::FileLauncher::new(Some(&file));
+        launcher.set_always_ask(true);
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            async move {
+                if let Err(err) = launcher.launch_future(Some(&window)).await {
+                    // Cerrar el selector sin elegir no es un error.
+                    if !err.matches(gtk::DialogError::Dismissed) {
+                        tracing::warn!("abrir con otra aplicación: {err}");
+                        window.show_toast(strings::OPEN_FAILED_APP);
+                    }
+                }
+            }
+        ));
+    }
+
+    fn add_selection_to_favorites(&self) {
+        let infos = self
+            .active_pane()
+            .map(Pane::selected_infos)
+            .unwrap_or_default();
+        for info in infos.iter().filter(|i| i.is_dir) {
+            self.imp().sidebar.add_favorite(&info.file);
+        }
+    }
+
+    /// Copiar ruta: rutas (o URIs si no son locales), una por línea.
+    fn copy_selection_paths(&self) {
+        let (files, _) = self.active_selection();
+        let text = files
+            .iter()
+            .map(crate::fs::display::display_path)
+            .collect::<Vec<_>>()
+            .join("\n");
+        WidgetExt::display(self).clipboard().set_text(&text);
+        self.show_toast(strings::PATH_COPIED);
+    }
+
+    /// Propiedades de la selección o, con `folder`, de la carpeta actual.
+    fn show_properties(&self, folder: bool) {
+        let (files, dir) = self.active_selection();
+        let files = if folder {
+            dir.into_iter().collect()
+        } else {
+            files
+        };
+        if files.is_empty() {
+            return;
+        }
+        crate::ui::properties_dialog::PropertiesDialog::new(files).present(Some(self));
     }
 
     /// Ctrl+C / Ctrl+X: la selección del panel activo al portapapeles.

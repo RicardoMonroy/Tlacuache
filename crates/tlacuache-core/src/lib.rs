@@ -13,6 +13,7 @@ pub mod history;
 pub mod names;
 pub mod ops;
 pub mod path_input;
+pub mod perms;
 pub mod places;
 pub mod session;
 pub mod sort;

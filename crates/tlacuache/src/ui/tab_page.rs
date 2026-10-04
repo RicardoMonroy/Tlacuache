@@ -11,6 +11,7 @@ use tlacuache_core::config::ViewMode;
 use tlacuache_core::history::History;
 use tlacuache_core::summary::ViewStatus;
 
+use crate::fs::file_item::SelectedInfo;
 use crate::strings;
 use crate::ui::list_view::FileListView;
 use crate::ui::miller_view::MillerView;
@@ -79,6 +80,13 @@ impl PageView {
         }
     }
 
+    fn selected_infos(&self) -> Vec<SelectedInfo> {
+        match self {
+            Self::Columns(view) => view.selected_infos(),
+            Self::Details(view) => view.selected_infos(),
+        }
+    }
+
     fn selected_files(&self) -> Vec<gio::File> {
         match self {
             Self::Columns(view) => view.selected_files(),
@@ -123,6 +131,8 @@ mod imp {
         pub directory: RefCell<Option<gio::File>>,
         pub(super) view: RefCell<Option<PageView>>,
         pub view_slot: adw::Bin,
+        /// Menú contextual (se crea al primer uso).
+        pub context_menu: std::cell::OnceCell<gtk::PopoverMenu>,
         pub path_bar: PathBar,
         pub status_bar: StatusBar,
         /// Consulta en curso del espacio libre.
@@ -162,6 +172,13 @@ mod imp {
             klass.install_action("nav.edit-path", None, |page, _, _| {
                 page.imp().path_bar.start_editing();
             });
+            // (x, y en coordenadas de la ventana, ¿sobre elementos?)
+            let menu_param = <(f64, f64, bool)>::static_variant_type();
+            klass.install_action("tab.context-menu", Some(&menu_param), |page, _, param| {
+                if let Some((x, y, on_item)) = param.and_then(|p| p.get::<(f64, f64, bool)>()) {
+                    page.show_context_menu(x, y, on_item);
+                }
+            });
             klass.install_action("view.toggle-hidden", None, |page, _, _| {
                 page.toggle_show_hidden();
             });
@@ -198,6 +215,12 @@ mod imp {
                 // Cambiaron los elementos o la selección de la vista.
                 vec![glib::subclass::Signal::builder("status-changed").build()]
             })
+        }
+
+        fn dispose(&self) {
+            if let Some(menu) = self.context_menu.get() {
+                menu.unparent();
+            }
         }
     }
     impl WidgetImpl for TabPage {}
@@ -363,6 +386,45 @@ impl TabPage {
         }
     }
 
+    /// Seleccionados con su tipo (menú contextual, abrir).
+    pub fn selected_infos(&self) -> Vec<SelectedInfo> {
+        self.view().map(|v| v.selected_infos()).unwrap_or_default()
+    }
+
+    /// Menú contextual en (x, y) de la ventana: de los elementos
+    /// seleccionados o, si no, de la carpeta. Usa las acciones de la
+    /// ventana, así que respeta qué está habilitado.
+    fn show_context_menu(&self, x: f64, y: f64, on_item: bool) {
+        let infos = if on_item {
+            self.selected_infos()
+        } else {
+            Vec::new()
+        };
+        let menu = if infos.is_empty() {
+            folder_menu()
+        } else {
+            items_menu(&infos)
+        };
+        let popover = self.imp().context_menu.get_or_init(|| {
+            let popover = gtk::PopoverMenu::from_model(None::<&gio::MenuModel>);
+            popover.set_parent(self);
+            popover.set_has_arrow(false);
+            popover.set_halign(gtk::Align::Start);
+            popover
+        });
+        popover.set_menu_model(Some(&menu));
+        let point = self
+            .root()
+            .and_then(|root| {
+                root.compute_point(self, &gtk::graphene::Point::new(x as f32, y as f32))
+            })
+            .unwrap_or_else(|| gtk::graphene::Point::new(x as f32, y as f32));
+        // Coordenadas a píxeles enteros para anclar el menú.
+        let rect = gtk::gdk::Rectangle::new(point.x() as i32, point.y() as i32, 1, 1);
+        popover.set_pointing_to(Some(&rect));
+        popover.popup();
+    }
+
     /// Archivos seleccionados en la vista.
     pub fn selected_files(&self) -> Vec<gio::File> {
         self.view().map(|v| v.selected_files()).unwrap_or_default()
@@ -486,4 +548,92 @@ fn view_switcher() -> gtk::Box {
         switcher.append(&button);
     }
     switcher
+}
+
+fn section(items: &[(&str, &str)]) -> gio::Menu {
+    let menu = gio::Menu::new();
+    for (label, action) in items {
+        menu.append(Some(label), Some(action));
+    }
+    menu
+}
+
+/// Máximo de apps en «Abrir con».
+const OPEN_WITH_LIMIT: usize = 8;
+
+fn items_menu(infos: &[SelectedInfo]) -> gio::Menu {
+    let menu = gio::Menu::new();
+
+    let open = section(&[(strings::ACTION_OPEN, "files.open")]);
+    let content_type = infos
+        .first()
+        .and_then(|i| i.content_type.clone())
+        .unwrap_or_else(|| "application/octet-stream".to_owned());
+    let open_with = gio::Menu::new();
+    for app in gio::AppInfo::recommended_for_type(&content_type)
+        .into_iter()
+        .take(OPEN_WITH_LIMIT)
+    {
+        let Some(id) = app.id() else {
+            continue;
+        };
+        let item = gio::MenuItem::new(Some(&app.display_name()), None);
+        item.set_action_and_target_value(Some("files.open-with"), Some(&id.to_variant()));
+        open_with.append_item(&item);
+    }
+    open_with.append(
+        Some(strings::OPEN_WITH_OTHER),
+        Some("files.open-with-other"),
+    );
+    open.append_submenu(Some(strings::OPEN_WITH), &open_with);
+    menu.append_section(None, &open);
+
+    menu.append_section(
+        None,
+        &section(&[
+            (strings::ACTION_CUT, "clipboard.cut"),
+            (strings::ACTION_COPY, "clipboard.copy"),
+            (strings::ACTION_PASTE, "clipboard.paste"),
+        ]),
+    );
+    menu.append_section(
+        None,
+        &section(&[
+            (strings::ACTION_RENAME_ELLIPSIS, "files.rename"),
+            (strings::ACTION_TRASH, "files.trash"),
+            (strings::ACTION_DELETE_ELLIPSIS, "files.delete"),
+        ]),
+    );
+    let extra = gio::Menu::new();
+    if infos.iter().any(|i| i.is_dir) {
+        extra.append(Some(strings::ADD_TO_FAVORITES), Some("files.add-favorite"));
+    }
+    extra.append(Some(strings::COPY_PATH), Some("files.copy-path"));
+    menu.append_section(None, &extra);
+    menu.append_section(None, &section(&[(strings::PROPERTIES, "files.properties")]));
+    menu
+}
+
+fn folder_menu() -> gio::Menu {
+    let menu = gio::Menu::new();
+    menu.append_section(
+        None,
+        &section(&[(strings::ACTION_PASTE, "clipboard.paste")]),
+    );
+    menu.append_section(
+        None,
+        &section(&[
+            (strings::NEW_FOLDER_ELLIPSIS, "files.new-folder"),
+            (strings::NEW_FILE_ELLIPSIS, "files.new-file"),
+        ]),
+    );
+    menu.append_section(
+        None,
+        &section(&[(strings::TOGGLE_HIDDEN, "view.toggle-hidden")]),
+    );
+    menu.append_section(
+        None,
+        &section(&[(strings::FOLDER_PROPERTIES, "files.folder-properties")]),
+    );
+    menu
 }

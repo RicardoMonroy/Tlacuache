@@ -68,6 +68,35 @@ pub const OPS_PANEL: &str = "Operaciones";
 pub const OPS_CLEAR: &str = "Limpiar";
 pub const ACTION_UNDO: &str = "Deshacer";
 pub const UNDO_NOTHING: &str = "No hay nada que deshacer";
+pub const OPEN_WITH: &str = "Abrir con";
+pub const OPEN_WITH_OTHER: &str = "Otra aplicación…";
+pub const ACTION_CUT: &str = "Cortar";
+pub const ACTION_COPY: &str = "Copiar";
+pub const ACTION_PASTE: &str = "Pegar";
+pub const ACTION_RENAME_ELLIPSIS: &str = "Renombrar…";
+pub const ACTION_DELETE_ELLIPSIS: &str = "Eliminar permanentemente…";
+pub const ADD_TO_FAVORITES: &str = "Añadir a favoritos";
+pub const COPY_PATH: &str = "Copiar ruta";
+pub const PROPERTIES: &str = "Propiedades";
+pub const FOLDER_PROPERTIES: &str = "Propiedades de la carpeta";
+pub const NEW_FOLDER_ELLIPSIS: &str = "Nueva carpeta…";
+pub const NEW_FILE_ELLIPSIS: &str = "Nuevo archivo…";
+pub const TOGGLE_HIDDEN: &str = "Mostrar u ocultar archivos ocultos";
+pub const PATH_COPIED: &str = "Ruta copiada al portapapeles";
+pub const OPEN_FAILED_APP: &str = "No se pudo abrir con esa aplicación";
+pub const PROP_NAME: &str = "Nombre";
+pub const PROP_TYPE: &str = "Tipo";
+pub const PROP_LOCATION: &str = "Ubicación";
+pub const PROP_SIZE: &str = "Tamaño";
+pub const PROP_TOTAL_SIZE: &str = "Tamaño total";
+pub const PROP_ITEMS: &str = "Elementos";
+pub const PROP_MODIFIED: &str = "Modificado";
+pub const PROP_CREATED: &str = "Creado";
+pub const PROP_ACCESSED: &str = "Último acceso";
+pub const PROP_PERMISSIONS: &str = "Permisos";
+pub const PROP_OWNER: &str = "Propietario:grupo";
+pub const PROP_ERROR: &str = "Error";
+pub const PROP_CALCULATING: &str = "Calculando…";
 pub const CLIPBOARD_FAILED: &str = "No se pudo usar el portapapeles";
 pub const CLIPBOARD_EMPTY: &str = "El portapapeles no contiene archivos";
 pub const OP_PREPARING: &str = "Preparando…";
@@ -307,4 +336,29 @@ pub fn ops_finished(count: usize) -> String {
 pub fn clipboard_copied(count: usize, cut: bool) -> String {
     let action = if cut { "cortados" } else { "copiados" };
     format!("{} {action} al portapapeles", items_count(count))
+}
+
+pub fn prop_symlink(target: &str) -> String {
+    format!("Enlace simbólico → {target}")
+}
+
+/// «1.2 MB (1 234 567 bytes)».
+pub fn prop_size(bytes: u64) -> String {
+    format!("{} ({bytes} bytes)", glib::format_size(bytes))
+}
+
+pub fn prop_measuring(bytes: u64, files: u64) -> String {
+    format!(
+        "Calculando… {} en {files} archivos",
+        glib::format_size(bytes)
+    )
+}
+
+pub fn prop_measured(bytes: u64, files: u64, dirs: u64) -> String {
+    let files_text = if files == 1 { "archivo" } else { "archivos" };
+    let dirs_text = if dirs == 1 { "carpeta" } else { "carpetas" };
+    format!(
+        "{} · {files} {files_text}, {dirs} {dirs_text}",
+        prop_size(bytes)
+    )
 }

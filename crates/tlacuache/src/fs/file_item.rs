@@ -58,6 +58,25 @@ impl FileItem {
     }
 }
 
+/// Un elemento seleccionado con lo que hace falta para su menú contextual.
+#[derive(Clone, Debug)]
+pub struct SelectedInfo {
+    pub file: gio::File,
+    pub is_dir: bool,
+    pub content_type: Option<String>,
+}
+
+impl SelectedInfo {
+    pub fn from_item(item: &FileItem) -> Option<Self> {
+        let entry = item.entry();
+        Some(Self {
+            file: item.file()?,
+            is_dir: entry.is_dir,
+            content_type: entry.content_type.clone(),
+        })
+    }
+}
+
 fn entry_from_info(info: &gio::FileInfo) -> FileEntry {
     let name = info.display_name().to_string();
     let mut entry = FileEntry::new(name, info.file_type() == gio::FileType::Directory);

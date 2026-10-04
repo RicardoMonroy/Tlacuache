@@ -214,6 +214,13 @@ impl Pane {
         }
     }
 
+    /// Seleccionados con su tipo en la pestaña actual.
+    pub fn selected_infos(&self) -> Vec<crate::fs::file_item::SelectedInfo> {
+        self.current_page()
+            .map(|p| p.selected_infos())
+            .unwrap_or_default()
+    }
+
     /// Archivos seleccionados en la pestaña actual.
     pub fn selected_files(&self) -> Vec<gio::File> {
         self.current_page()

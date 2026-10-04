@@ -16,12 +16,12 @@ use tlacuache_core::filter;
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 use tlacuache_core::summary::{SelectionSummary, ViewStatus};
 
-use crate::fs::file_item::FileItem;
+use crate::fs::file_item::{FileItem, SelectedInfo};
 use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
-use crate::ui::dnd;
 use crate::ui::filter_indicator::{FilterIndicator, filter_key};
+use crate::ui::{context_menu, dnd};
 use crate::window;
 
 /// Ancho inicial de la columna "Nombre" (px); el usuario puede cambiarlo.
@@ -176,6 +176,18 @@ impl FileListView {
             .child(&column_view)
             .build();
 
+        // Clic derecho en la zona vacía: sin selección y menú de carpeta.
+        context_menu::attach_background_menu(
+            &scrolled,
+            glib::clone!(
+                #[weak]
+                selection,
+                move || {
+                    selection.unselect_all();
+                }
+            ),
+        );
+
         // Soltar en la zona vacía: a la carpeta mostrada.
         dnd::attach_dir_drop(
             &scrolled,
@@ -241,6 +253,14 @@ impl FileListView {
             .into_iter()
             .flatten()
             .filter_map(|position| model.item(position))
+            .collect()
+    }
+
+    /// Seleccionados con su tipo: (archivo, es carpeta, tipo MIME).
+    pub fn selected_infos(&self) -> Vec<SelectedInfo> {
+        self.selected_items()
+            .iter()
+            .filter_map(SelectedInfo::from_item)
             .collect()
     }
 
@@ -469,6 +489,7 @@ fn column(id: ColumnId, selection: &gtk::SelectionModel) -> gtk::ColumnViewColum
             let cell = cell_widget(id);
             dnd::attach_file_drag(&cell, list_item, &selection);
             dnd::attach_row_drop(&cell, list_item);
+            context_menu::attach_row_menu(&cell, list_item, &selection);
             list_item.set_child(Some(&cell));
         }
     });
