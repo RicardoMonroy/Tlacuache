@@ -12,7 +12,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
-use tlacuache_core::config::{Config, ViewMode};
+use tlacuache_core::config::{Config, PreviewPosition, ViewMode};
 use tlacuache_core::keymap::Action;
 use tlacuache_core::preview;
 use tlacuache_core::session::{PaneSession, TabSession};
@@ -159,9 +159,8 @@ impl Pane {
             }
         ));
 
-        // Pestañas arriba, vista previa debajo (oculta hasta Espacio).
-        imp.preview_split
-            .set_orientation(gtk::Orientation::Vertical);
+        // Pestañas y vista previa (oculta hasta Espacio), debajo o a la
+        // derecha según la config.
         imp.preview_split.set_start_child(Some(&imp.tab_view));
         imp.preview_split.set_end_child(Some(&imp.preview));
         imp.preview_split.set_resize_end_child(false);
@@ -180,6 +179,7 @@ impl Pane {
         if let Some(config) = imp.config.get() {
             imp.preview
                 .set_max_text_bytes(config.preview.max_text_bytes);
+            self.set_preview_position(config.preview.position);
             let _ = imp.accels.set((
                 Accel::for_action(Action::ToggleTerminal, &config.keys),
                 Accel::for_action(Action::LeaveTerminal, &config.keys),
@@ -292,6 +292,25 @@ impl Pane {
             .unwrap_or(imp.split.height() * 2 / 3);
         imp.split.set_position(position.max(1));
         terminal.grab_focus();
+    }
+
+    /// Vista previa debajo de las pestañas o a su derecha.
+    pub fn set_preview_position(&self, position: PreviewPosition) {
+        let imp = self.imp();
+        let orientation = match position {
+            PreviewPosition::Bottom => gtk::Orientation::Vertical,
+            PreviewPosition::Right => gtk::Orientation::Horizontal,
+        };
+        imp.preview.set_position(position);
+        if imp.preview_split.orientation() == orientation {
+            return;
+        }
+        imp.preview_split.set_orientation(orientation);
+        // Un alto recordado no sirve como ancho.
+        imp.preview_position.set(None);
+        if imp.preview.is_visible() {
+            place_at_two_thirds(&imp.preview_split);
+        }
     }
 
     /// Espacio: muestra u oculta la vista previa, recordando su altura.
@@ -454,7 +473,8 @@ impl Pane {
             view.set_selected_page(&view.nth_page(selected));
         }
         let imp = self.imp();
-        if session.preview_position.is_some() {
+        let right = imp.preview_split.orientation() == gtk::Orientation::Horizontal;
+        if session.preview_position.is_some() && session.preview_right == right {
             imp.preview_position.set(session.preview_position);
         }
         if session.preview && !imp.preview.is_visible() {
@@ -492,6 +512,7 @@ impl Pane {
             tabs,
             preview,
             preview_position,
+            preview_right: imp.preview_split.orientation() == gtk::Orientation::Horizontal,
         }
     }
 
@@ -569,19 +590,26 @@ impl Pane {
     }
 }
 
-/// Dos tercios para las pestañas. Si el `Paned` aún no tiene tamaño (al
-/// restaurar la sesión), espera al primer cuadro con altura.
+/// Dos tercios para las pestañas (del alto o del ancho, según la
+/// orientación). Si el `Paned` aún no tiene tamaño (al restaurar la
+/// sesión), espera al primer cuadro con tamaño.
 fn place_at_two_thirds(paned: &gtk::Paned) {
-    if paned.height() > 0 {
-        paned.set_position(paned.height() * 2 / 3);
+    fn length(paned: &gtk::Paned) -> i32 {
+        match paned.orientation() {
+            gtk::Orientation::Horizontal => paned.width(),
+            _ => paned.height(),
+        }
+    }
+    if length(paned) > 0 {
+        paned.set_position(length(paned) * 2 / 3);
         return;
     }
     paned.add_tick_callback(|paned, _| {
-        let height = paned.height();
-        if height == 0 {
+        let size = length(paned);
+        if size == 0 {
             return glib::ControlFlow::Continue;
         }
-        paned.set_position(height * 2 / 3);
+        paned.set_position(size * 2 / 3);
         glib::ControlFlow::Break
     });
 }

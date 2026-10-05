@@ -267,7 +267,15 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
   border-top: var(--tl-border-width) solid var(--tl-border);
 }
 
-/* Vista previa: visual a la izquierda, detalles a la derecha. */
+/* Vista previa: visual a la izquierda, detalles a la derecha; con la vista
+ * previa a la derecha del panel, visual arriba y detalles debajo. */
+.tl-preview.right {
+  border-top: none;
+  border-left: var(--tl-border-width) solid var(--tl-border);
+}
+.tl-preview.right .tl-preview-details {
+  border-top: var(--tl-border-width) solid var(--tl-border);
+}
 .tl-preview-visual { padding: 12px; }
 .tl-preview-title { font-weight: bold; }
 .tl-preview-details { padding: 12px; }

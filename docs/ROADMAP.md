@@ -55,7 +55,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [x] **6.2 Imágenes** con escalado en segundo plano y zoom.
 - [x] **6.3 Texto/código** con sourceview5, límite de tamaño.
 - [x] **6.4 Carpetas**: conteo y tamaño en segundo plano.
-- [ ] **6.5 Posición configurable** (abajo/derecha).
+- [x] **6.5 Posición configurable** (abajo/derecha).
 
 ## Hito 7 — Identidad visual y temas
 Orden acordado: **7.1–7.5 antes del Hito 6** (la vista previa nace usando los tokens del tema); 7.6–7.10 después del Hito 6. Referencia visual: `branding/brand-board.html`.

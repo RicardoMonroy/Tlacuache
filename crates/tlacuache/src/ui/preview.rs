@@ -21,6 +21,7 @@ use adw::subclass::prelude::*;
 use gtk::prelude::*;
 use gtk::{gdk, gdk_pixbuf, gio, glib, pango};
 use tlacuache_core::age::Age;
+use tlacuache_core::config::PreviewPosition;
 use tlacuache_core::entry::FileEntry;
 use tlacuache_core::filetype::{FileCategory, classify};
 use tlacuache_core::perms;
@@ -43,6 +44,8 @@ use crate::ui::text_preview::TextPreview;
 const ICON_SIZE: i32 = 96;
 /// Lado mayor (px) al rasterizar imágenes vectoriales.
 const VECTOR_SIDE: i32 = 1024;
+/// Alto máximo de los detalles con la vista previa a la derecha.
+const DETAILS_MAX_HEIGHT: i32 = 260;
 const PAGE_ICON: &str = "icon";
 const PAGE_IMAGE: &str = "image";
 const PAGE_TEXT: &str = "text";
@@ -57,6 +60,7 @@ mod imp {
         pub icon: gtk::Image,
         pub title: gtk::Label,
         pub details: gtk::Grid,
+        pub details_scroll: gtk::ScrolledWindow,
         /// Páginas: `icon` (genérica) e `image`.
         pub stack: gtk::Stack,
         pub image: ImagePreview,
@@ -128,19 +132,41 @@ impl PreviewPane {
         imp.details.set_column_spacing(12);
         imp.details.set_row_spacing(4);
         imp.details.set_valign(gtk::Align::Start);
-        let scroll = gtk::ScrolledWindow::builder()
-            .hscrollbar_policy(gtk::PolicyType::Never)
-            .child(&imp.details)
-            .build();
-        scroll.set_hexpand(true);
+        let scroll = &imp.details_scroll;
+        scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
+        scroll.set_child(Some(&imp.details));
 
         imp.stack.add_named(&visual, Some(PAGE_ICON));
         imp.stack.add_named(&imp.image, Some(PAGE_IMAGE));
         imp.stack.add_named(&imp.text, Some(PAGE_TEXT));
         imp.max_text_bytes.set(DEFAULT_MAX_TEXT_BYTES);
-        imp.stack.set_hexpand(true);
         self.append(&imp.stack);
-        self.append(&scroll);
+        self.append(scroll);
+        self.set_position(PreviewPosition::Bottom);
+    }
+
+    /// Abajo: visual y detalles lado a lado. A la derecha (panel estrecho):
+    /// visual arriba y detalles debajo, a su altura natural.
+    pub fn set_position(&self, position: PreviewPosition) {
+        let imp = self.imp();
+        let scroll = &imp.details_scroll;
+        let right = position == PreviewPosition::Right;
+        self.set_orientation(if right {
+            gtk::Orientation::Vertical
+        } else {
+            gtk::Orientation::Horizontal
+        });
+        imp.stack.set_hexpand(!right);
+        imp.stack.set_vexpand(right);
+        scroll.set_hexpand(!right);
+        scroll.set_vexpand(!right);
+        scroll.set_propagate_natural_height(right);
+        scroll.set_max_content_height(if right { DETAILS_MAX_HEIGHT } else { -1 });
+        if right {
+            self.add_css_class("right");
+        } else {
+            self.remove_css_class("right");
+        }
     }
 
     /// Muestra `target` tras el debounce; `dir` es la carpeta actual (para

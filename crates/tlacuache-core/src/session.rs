@@ -62,8 +62,10 @@ pub struct PaneSession {
     pub tabs: Vec<TabSession>,
     /// Vista previa visible.
     pub preview: bool,
-    /// Alto (px) de la zona de pestañas sobre la vista previa.
+    /// Alto (px) de la zona de pestañas sobre la vista previa, o su ancho
+    /// si la vista previa estaba a la derecha (`preview_right`).
     pub preview_position: Option<i32>,
+    pub preview_right: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -194,6 +196,7 @@ mod tests {
                     ],
                     preview: true,
                     preview_position: Some(420),
+                    preview_right: true,
                 },
                 PaneSession {
                     selected: 0,
