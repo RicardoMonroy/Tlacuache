@@ -1,0 +1,80 @@
+# Tlacuache Browser — tema claro
+[meta]
+id = "claro"
+name = "Claro"
+description = "Claro, frío y de alto contraste para trabajar de día."
+variant = "light"
+credits = ""
+
+[style]
+font_ui = ""
+font_mono = "JetBrains Mono"
+mono_ui = false
+radius = 8
+border_width = 1
+row_height = 26
+flat = false
+glow = false
+uppercase_headers = false
+bracket_titles = false
+icon_style = "color"
+selection_style = "fill"
+age_style = "chip"
+
+[colors]
+window_bg = "#F4F6F9"
+sidebar_bg = "#E9EDF2"
+sidebar_fg = "#1F2430"
+header_bg = "#EEF1F5"
+header_fg = "#1F2430"
+pane_bg = "#FFFFFF"
+pane_alt_row = "#F7F9FB"
+fg = "#1F2430"
+fg_muted = "#5B6475"
+border = "#D9DEE6"
+border_strong = "#B9C1CE"
+hover_bg = "#EEF2F7"
+accent = "#3B6EA8"
+accent_fg = "#FFFFFF"
+focus_ring = "#3B6EA8"
+selection_bg = "#D3E1F2"
+selection_fg = "#1F2430"
+selection_inactive_bg = "#E3E8EF"
+pane_active_border = "#3B6EA8"
+success = "#3E7D3A"
+warning = "#8F5F00"
+error = "#B3261E"
+info = "#2F6DB5"
+link = "#2F6DB5"
+
+[age]
+chip_fg = "#1F2430"
+hour = "#B7DDB0"
+day = "#A9DCD8"
+week = "#B4D3EA"
+month = "#CDD5E1"
+year = "#E3E7ED"
+
+[filetypes]
+folder = "#4A7FB8"
+code = "#2E8B84"
+image = "#8E5BA8"
+video = "#B5444F"
+audio = "#C0652F"
+archive = "#A27A12"
+document = "#3B6EA8"
+pdf = "#B5444F"
+spreadsheet = "#3E7D3A"
+text = "#5B6475"
+executable = "#3E7D3A"
+other = "#7A8394"
+
+[terminal]
+background = "#FFFFFF"
+foreground = "#1F2430"
+cursor = "#3B6EA8"
+cursor_text = "#FFFFFF"
+selection_bg = "#D3E1F2"
+selection_fg = "#1F2430"
+palette = ["#1F2430", "#B3261E", "#3E7D3A", "#8F5F00", "#2F6DB5", "#8E5BA8", "#2E8B84", "#6B7484",
+           "#4A5263", "#C9372C", "#4C8C46", "#9E6A00", "#3D7CC4", "#9C68B6", "#2B7F78", "#3A4150"]

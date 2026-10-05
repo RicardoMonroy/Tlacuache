@@ -1,0 +1,155 @@
+/* Tlacuache Browser — hoja de estilo base.
+ *
+ * Este archivo NO contiene colores. Todos los valores salen de variables --tl-*
+ * que ThemeManager genera a partir del TOML del tema activo (ver docs/THEMES.md §5)
+ * y carga en un CssProvider aparte, como un bloque :root { ... }.
+ *
+ * Requiere GTK >= 4.16 (CSS custom properties / var()). Verificar la versión
+ * instalada antes de cambiar el enfoque.
+ *
+ * Los flags de estilo del tema se aplican como clases en la ventana:
+ *   .tl-mono  .tl-flat  .tl-glow  .tl-uppercase  .tl-select-invert  .tl-age-text
+ */
+
+/* ---------- Ventana y estructura ---------- */
+window.tl-window {
+  background-color: var(--tl-window-bg);
+  color: var(--tl-fg);
+}
+
+.tl-sidebar {
+  background-color: var(--tl-sidebar-bg);
+  color: var(--tl-sidebar-fg);
+  border-radius: var(--tl-radius);
+}
+
+.tl-sidebar .tl-section-title {
+  color: var(--tl-fg-muted);
+  font-size: 0.85em;
+}
+
+.tl-sidebar row:hover { background-color: var(--tl-hover-bg); }
+
+.tl-sidebar .tl-decor {               /* franja decorativa opcional (Talavera) */
+  min-height: 24px;
+  background-image: var(--tl-decor-image);
+  background-repeat: repeat-x;
+}
+
+/* ---------- Paneles ---------- */
+.tl-pane {
+  background-color: var(--tl-pane-bg);
+  border: var(--tl-border-width) solid var(--tl-border);
+  border-radius: var(--tl-radius);
+}
+
+.tl-pane.active { border-color: var(--tl-pane-active-border); }
+
+.tl-glow .tl-pane.active {
+  box-shadow: 0 0 10px alpha(var(--tl-pane-active-border), 0.4);
+}
+
+.tl-pane-header {
+  background-color: var(--tl-header-bg);
+  color: var(--tl-header-fg);
+  border-bottom: 1px solid var(--tl-border);
+  padding: 4px 10px;
+  font-weight: 600;
+}
+
+.tl-uppercase .tl-pane-header,
+.tl-uppercase .tl-section-title {
+  text-transform: uppercase;          /* si la versión de GTK no lo soporta, hacerlo en Rust */
+  letter-spacing: 0.08em;
+}
+
+.tl-pane-header .tl-path { color: var(--tl-header-fg); opacity: 0.75; font-weight: 400; }
+
+/* ---------- Filas de archivos (ColumnView / ListView) ---------- */
+.tl-pane columnview,
+.tl-pane listview {
+  background-color: var(--tl-pane-bg);
+  color: var(--tl-fg);
+}
+
+.tl-pane row { min-height: var(--tl-row-height); }
+.tl-pane row:nth-child(even) { background-color: var(--tl-pane-alt-row); }
+.tl-pane row:hover { background-color: var(--tl-hover-bg); }
+
+.tl-pane row:selected {
+  background-color: var(--tl-selection-inactive-bg);
+  color: var(--tl-fg);
+}
+.tl-pane.active row:selected {
+  background-color: var(--tl-selection-bg);
+  color: var(--tl-selection-fg);
+}
+
+.tl-pane .tl-size,
+.tl-pane .tl-date { color: var(--tl-fg-muted); }
+.tl-pane row:selected .tl-size,
+.tl-pane row:selected .tl-date { color: inherit; }
+
+/* ---------- Edad relativa ---------- */
+.tl-age {
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--tl-age-chip-fg);
+}
+.tl-age.hour  { background-color: var(--tl-age-hour); }
+.tl-age.day   { background-color: var(--tl-age-day); }
+.tl-age.week  { background-color: var(--tl-age-week); }
+.tl-age.month { background-color: var(--tl-age-month); }
+.tl-age.year  { background-color: var(--tl-age-year); }
+
+.tl-age-text .tl-age { background-color: transparent; padding: 0; font-weight: 400; }
+.tl-age-text .tl-age.hour  { color: var(--tl-age-hour); }
+.tl-age-text .tl-age.day   { color: var(--tl-age-day); }
+.tl-age-text .tl-age.week  { color: var(--tl-age-week); }
+.tl-age-text .tl-age.month { color: var(--tl-age-month); }
+.tl-age-text .tl-age.year  { color: var(--tl-age-year); }
+
+/* ---------- Íconos por tipo (simbólicos: toman el color de `color`) ---------- */
+.tl-ft-folder      { color: var(--tl-ft-folder); }
+.tl-ft-code        { color: var(--tl-ft-code); }
+.tl-ft-image       { color: var(--tl-ft-image); }
+.tl-ft-video       { color: var(--tl-ft-video); }
+.tl-ft-audio       { color: var(--tl-ft-audio); }
+.tl-ft-archive     { color: var(--tl-ft-archive); }
+.tl-ft-document    { color: var(--tl-ft-document); }
+.tl-ft-pdf         { color: var(--tl-ft-pdf); }
+.tl-ft-spreadsheet { color: var(--tl-ft-spreadsheet); }
+.tl-ft-text        { color: var(--tl-ft-text); }
+.tl-ft-executable  { color: var(--tl-ft-executable); }
+.tl-ft-other       { color: var(--tl-ft-other); }
+
+/* ---------- Terminal y vista previa ---------- */
+.tl-terminal-frame,
+.tl-preview {
+  border: var(--tl-border-width) solid var(--tl-border);
+  border-radius: var(--tl-radius);
+}
+.tl-terminal-frame:focus-within { border-color: var(--tl-focus-ring); }
+.tl-terminal-frame.desync { border-color: var(--tl-warning); }
+
+/* ---------- Foco y estados ---------- */
+*:focus-visible { outline-color: var(--tl-focus-ring); }
+.tl-success { color: var(--tl-success); }
+.tl-warning { color: var(--tl-warning); }
+.tl-error   { color: var(--tl-error); }
+.tl-info    { color: var(--tl-info); }
+link, .tl-link { color: var(--tl-link); }
+
+/* ---------- Variantes por flags ---------- */
+.tl-mono, .tl-mono * { font-family: var(--tl-font-mono); }
+
+.tl-flat * { box-shadow: none; }
+.tl-flat .tl-glow-keep { box-shadow: inherit; }
+
+.tl-select-invert .tl-pane.active row:selected {
+  background-color: var(--tl-selection-bg);
+  color: var(--tl-selection-fg);
+  font-weight: 600;
+}

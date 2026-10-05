@@ -34,7 +34,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
   - Columnas Miller: cada nivel es una columna; seleccionar carpeta abre la siguiente columna a la derecha y hace scroll automático. La última columna puede mostrarse como lista detallada (como OneCommander).
   - Lista detallada (`gtk::ColumnView`): columnas visibles según ancho del panel.
 - **Panel activo**: el que tiene el foco; en modo dual se marca con una línea de acento arriba. Tab cambia de panel activo (salvo escribiendo en un campo de texto, donde autocompleta). Las operaciones F5/F6 usan el otro panel como destino. F3 o el botón de la barra ocultan el panel derecho, que conserva sus pestañas.
-- **Edad relativa**: chip de color en la columna "Edad": < 1 día verde, < 7 días cian, < 30 días azul, < 1 año gris, ≥ 1 año gris tenue.
+- **Edad relativa**: chip (o texto, según el tema) en la columna "Edad" con formato compacto (`ahora`, `12min`, `2h`, `3d`, `3M`, `1a`); colores por bucket según `docs/THEMES.md` §3.
 - **Barra de estado** del panel: elementos, seleccionados, tamaño seleccionado, espacio libre de la unidad.
 
 ## 3. Vista previa y detalles
@@ -97,7 +97,4 @@ Con el foco en la terminal, todas las teclas son del programa que corre en ella,
 
 ## 7. Tema
 
-- Oscuro por defecto con paleta Nord (`#2E3440`, `#3B4252`, `#434C5E`, `#4C566A`, `#D8DEE9`, `#E5E9F0`, `#ECEFF4`, `#8FBCBB`, `#88C0D0`, `#81A1C1`, `#5E81AC`, `#BF616A`, `#D08770`, `#EBCB8B`, `#A3BE8C`, `#B48EAD`).
-- Implementar vía `resources/style.css` en un gresource: `adw::Application` lo carga solo desde su ruta base (`/io/github/rmonroy/Tlacuache/`). La paleta se expone como variables `--nord0`…`--nord15` y se mapea sobre los colores con nombre de libadwaita (`--window-bg-color`, `--accent-bg-color`, …) dentro de `@media (prefers-color-scheme: dark)` (`style-dark.css` está obsoleto desde libadwaita 1.9). Respetar `adw::StyleManager` (claro/oscuro del sistema) como opción.
-- La paleta de la terminal VTE usa los mismos 16 colores.
-- Densidad compacta: filas de 24–26 px.
+Ver `docs/THEMES.md`. Tema predeterminado: `nord`. Temas incluidos: Nord, Consola, Claro, Cyberpunk, Talavera. Identidad visual (logo, íconos, voz): `docs/BRAND.md`.

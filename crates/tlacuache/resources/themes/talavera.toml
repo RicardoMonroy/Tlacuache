@@ -1,0 +1,83 @@
+# Tlacuache Browser — inspirado en la talavera poblana
+[meta]
+id = "talavera"
+name = "Talavera"
+description = "Azul cobalto sobre crema, con ocre, verde y terracota. Claro y con identidad mexicana."
+variant = "light"
+credits = ""
+
+[style]
+font_ui = ""
+font_mono = "JetBrains Mono"
+mono_ui = false
+radius = 6
+border_width = 1
+row_height = 26
+flat = false
+glow = false
+uppercase_headers = false
+bracket_titles = false
+icon_style = "color"
+selection_style = "fill"
+age_style = "chip"
+
+[colors]
+window_bg = "#F6F0E3"
+sidebar_bg = "#EFE6D3"
+sidebar_fg = "#1E2A44"
+header_bg = "#1F3F8F"
+header_fg = "#FCF9F2"
+pane_bg = "#FCF9F2"
+pane_alt_row = "#F7F1E5"
+fg = "#1E2A44"
+fg_muted = "#665F52"
+border = "#E2D6BC"
+border_strong = "#C9B892"
+hover_bg = "#F1E9D8"
+accent = "#1F3F8F"
+accent_fg = "#FCF9F2"
+focus_ring = "#A86F00"
+selection_bg = "#D9E2F5"
+selection_fg = "#1E2A44"
+selection_inactive_bg = "#EDE4CF"
+pane_active_border = "#1F3F8F"
+success = "#3C7A3E"
+warning = "#8A5C00"
+error = "#B4432A"
+info = "#1F3F8F"
+link = "#1F3F8F"
+
+[age]
+chip_fg = "#FCF9F2"
+hour = "#3C7A3E"
+day = "#1A6E7E"
+week = "#1F3F8F"
+month = "#8A5C00"
+year = "#665F52"
+
+[filetypes]
+folder = "#1F3F8F"
+code = "#1A6E7E"
+image = "#8A3F7A"
+video = "#B4432A"
+audio = "#C8562B"
+archive = "#9C6A00"
+document = "#24489C"
+pdf = "#B4432A"
+spreadsheet = "#3C7A3E"
+text = "#665F52"
+executable = "#3C7A3E"
+other = "#8F8676"
+
+[decor]                     # opcional: franja de azulejo en el pie de la sidebar
+pattern = "talavera-strip"  # resources/decor/talavera-strip.svg
+
+[terminal]
+background = "#FCF9F2"
+foreground = "#1E2A44"
+cursor = "#1F3F8F"
+cursor_text = "#FCF9F2"
+selection_bg = "#D9E2F5"
+selection_fg = "#1E2A44"
+palette = ["#1E2A44", "#B4432A", "#3C7A3E", "#8A5C00", "#1F3F8F", "#8A3F7A", "#1A6E7E", "#8F8676",
+           "#5C6478", "#C04E2B", "#46874A", "#9A6800", "#3557B0", "#9A4D8C", "#1F7E90", "#665F52"]

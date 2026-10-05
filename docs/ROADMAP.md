@@ -57,9 +57,23 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 - [ ] **6.4 Carpetas**: conteo y tamaño en segundo plano.
 - [ ] **6.5 Posición configurable** (abajo/derecha).
 
+## Hito 7 — Identidad visual y temas
+Orden acordado: **7.1–7.5 antes del Hito 6** (la vista previa nace usando los tokens del tema); 7.6–7.10 después del Hito 6. Referencia visual: `branding/brand-board.html`.
+
+- [ ] **7.1 Íconos e identidad**: instalar el ícono de la app (hicolor scalable + symbolic, en `data/icons/`) con un `.desktop` y un script de instalación local; registrar los íconos `tl-*` en el gresource y usarlos en los botones de la HeaderBar y la barra de cada panel (reemplazan a `view-columns-symbolic`). CA: el ícono aparece en el lanzador (Walker/rofi/GNOME) tras instalar el `.desktop`; los íconos se ven a 16 px.
+- [ ] **7.2 `core::filetype`**: tipo MIME → categoría (`folder`, `code`, `image`…) con pruebas para al menos 30 tipos comunes.
+- [ ] **7.3 `core::theme`**: parseo con `deny_unknown_fields`, validación de contraste portada de `scripts/check-theme-contrast.py` y `css_variables()` con prueba de snapshot. Edad con los buckets de THEMES §3 y formato compacto (`ahora · 12min · 2h · 3d · 3M · 1a`). CA: prueba que valida los 5 temas incluidos.
+- [ ] **7.4 ThemeManager**: `base.css` (adaptado a los widgets reales) + provider de variables + `StyleManager` + clases de flags + sobrescritura de las variables de libadwaita (verificando sus nombres). Config `[theme]` de THEMES §5.4. CA: el tema `nord` se ve igual que en `branding/brand-board.html`.
+- [ ] **7.5 Terminal temática**: paleta, cursor, selección y fuente de VTE desde el tema (tamaño desde la config); se actualiza con `theme-changed`.
+- [ ] **7.6 Flags en Rust**: `bracket_titles` (en el título de la pestaña), `icon_style = "glyph"` (glifo + nombre coloreado + `/` en carpetas), `age_style = "text"`, `uppercase_headers`. CA: el tema `consola` se parece a su vista en el board.
+- [ ] **7.7 Selector de temas**: Preferencias (`adw::PreferencesDialog`) con lista de temas, cambio en vivo y `follow_system` con temas light/dark. Persistencia en config.
+- [ ] **7.8 Temas de usuario**: cargar `~/.config/tlacuache/themes/*.toml`; toast con los pares de contraste fallidos; respaldo a `nord` si hay error de parseo.
+- [ ] **7.9 Decor Talavera**: franja `talavera-strip.svg` en el pie de la sidebar cuando el tema define `[decor]`.
+- [ ] **7.10 README**: lockup, captura de cada tema y créditos (paleta Nord MIT, JetBrains Mono OFL).
+
 **→ Release v0.1 (MVP).** Checklist: usar 3 días seguidos como gestor principal y registrar fallos en `docs/BUGS.md`.
 
-## Hito 7 — v0.2
+## Hito 8 — v0.2
 - [ ] PDF (poppler), video/audio (`gtk::Video`), Markdown renderizado.
 - [ ] Vista de iconos (cuadrícula con `gtk::GridView`) como tercera opción del selector de vista.
 - [ ] Miniaturas freedesktop.

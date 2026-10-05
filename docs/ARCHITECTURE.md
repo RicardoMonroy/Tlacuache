@@ -17,10 +17,12 @@ tlacuache/
 │   │       ├── filter.rs       # filtro rápido (substring/fuzzy)
 │   │       ├── age.rs          # edad relativa -> bucket de color
 │   │       ├── ops/            # cola de operaciones (modelo, estados, progreso)
-│   │       └── shell.rs        # escapado seguro de rutas para shells
+│   │       ├── shell.rs        # escapado seguro de rutas para shells
+│   │       ├── theme.rs        # Theme (TOML), validación de contraste, variables CSS
+│   │       └── filetype.rs     # tipo MIME → categoría de ícono
 │   └── tlacuache/             # binario GTK
 │       ├── build.rs            # compila recursos (gresource) si hace falta
-│       ├── resources/          # style.css, iconos propios
+│       ├── resources/          # style/base.css, themes/*.toml, icons/, decor/
 │       └── src/
 │           ├── main.rs         # adw::Application, app-id
 │           ├── app.rs          # acciones globales, carga de config y CSS
@@ -36,6 +38,7 @@ tlacuache/
 │           │   ├── details.rs
 │           │   ├── terminal.rs     # wrapper de vte4::Terminal
 │           │   ├── ops_panel.rs    # progreso de la cola
+│           │   ├── theme_manager.rs # base.css + variables del tema + StyleManager
 │           │   └── dialogs.rs
 │           ├── fs/
 │           │   ├── listing.rs      # gtk::DirectoryList + mapeo a FileEntry
@@ -116,8 +119,10 @@ sync_panel_to_terminal = true
 sync_terminal_to_panel = true
 
 [theme]
-name = "nord"
-color_scheme = "dark"   # dark | light | system
+name = "nord"            # tema fijo
+follow_system = false    # true: usa light/dark según la preferencia del sistema
+light = "claro"
+dark = "nord"
 
 [[favorites]]
 group = "Proyectos"

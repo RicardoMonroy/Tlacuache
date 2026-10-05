@@ -13,6 +13,8 @@ Gestor de archivos para Linux (prioridad Arch Linux) inspirado en OneCommander: 
 | `docs/ROADMAP.md` | Hitos y tareas con criterios de aceptación. **Trabaja en orden** |
 | `docs/DECISIONS.md` | Decisiones de arquitectura (ADR). Añade una entrada si tomas una decisión nueva |
 | `docs/SETUP_ARCH.md` | Dependencias del sistema y cómo compilar en Arch |
+| `docs/BRAND.md` | Logo, paleta de marca, íconos, voz |
+| `docs/THEMES.md` | Esquema de temas, tokens CSS, validación de contraste. Léelo antes de tocar cualquier estilo |
 
 ## Stack (no cambiar sin un ADR nuevo)
 
@@ -36,6 +38,7 @@ cargo test --workspace          # pruebas (la lógica vive en tlacuache-core)
 cargo fmt --all                 # formato
 cargo clippy --workspace --all-targets -- -D warnings
 scripts/check.sh                # fmt --check + clippy + tests (--fix aplica fmt)
+python scripts/check-theme-contrast.py crates/tlacuache/resources/themes   # contraste de los temas
 ```
 
 Definición de "terminado" para cualquier tarea: compila, `cargo fmt` limpio, `clippy` sin warnings, pruebas en verde y criterio de aceptación de la tarea en `ROADMAP.md` cumplido. Marca la casilla `[x]` en el roadmap al terminar.
@@ -50,6 +53,7 @@ Definición de "terminado" para cualquier tarea: compila, `cargo fmt` limpio, `c
 6. Widgets propios como subclases GObject (`glib::subclass`) en `crates/tlacuache/src/ui/`, un archivo por widget.
 7. Nombres de código en inglés; textos de UI en español a través de una capa de strings (preparado para i18n con `gettext` más adelante).
 8. Commits pequeños, uno por tarea del roadmap, mensaje en imperativo: `feat(pane): add miller columns view`.
+9. Ningún color, radio ni fuente escrito en Rust o CSS: todo sale del tema activo (`docs/THEMES.md`). Los íconos nuevos siguen `docs/BRAND.md` §5.
 
 ## Flujo de trabajo esperado
 

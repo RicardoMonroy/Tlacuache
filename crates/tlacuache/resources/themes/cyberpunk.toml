@@ -1,0 +1,80 @@
+# Tlacuache Browser — neón nocturno
+[meta]
+id = "cyberpunk"
+name = "Cyberpunk"
+description = "Neón sobre noche violeta: cian, magenta y amarillo señal, con brillo en el panel activo."
+variant = "dark"
+credits = ""
+
+[style]
+font_ui = ""
+font_mono = "JetBrains Mono"
+mono_ui = false
+radius = 2
+border_width = 1
+row_height = 26
+flat = true
+glow = true                 # box-shadow de neón en el panel activo y el foco
+uppercase_headers = true
+bracket_titles = false
+icon_style = "color"
+selection_style = "fill"
+age_style = "chip"
+
+[colors]
+window_bg = "#0B0A17"
+sidebar_bg = "#120F24"
+sidebar_fg = "#E6E1FF"
+header_bg = "#150F2E"
+header_fg = "#E6E1FF"
+pane_bg = "#0B0A17"
+pane_alt_row = "#100E20"
+fg = "#E6E1FF"
+fg_muted = "#A69CCF"
+border = "#2A2350"
+border_strong = "#4B3F8A"
+hover_bg = "#1A1535"
+accent = "#00F0FF"
+accent_fg = "#0B0A17"
+focus_ring = "#FF2BD6"
+selection_bg = "#FF2BD6"
+selection_fg = "#0B0A17"
+selection_inactive_bg = "#2A2350"
+pane_active_border = "#00F0FF"
+success = "#39FF88"
+warning = "#FCEE0A"
+error = "#FF3B5C"
+info = "#00F0FF"
+link = "#00F0FF"
+
+[age]
+chip_fg = "#0B0A17"
+hour = "#39FF88"
+day = "#00F0FF"
+week = "#9C85FF"
+month = "#FF2BD6"
+year = "#8A7FB8"
+
+[filetypes]
+folder = "#00F0FF"
+code = "#FCEE0A"
+image = "#FF2BD6"
+video = "#FF3B5C"
+audio = "#9C85FF"
+archive = "#FF8A00"
+document = "#E6E1FF"
+pdf = "#FF3B5C"
+spreadsheet = "#39FF88"
+text = "#A69CCF"
+executable = "#39FF88"
+other = "#A69CCF"
+
+[terminal]
+background = "#0B0A17"
+foreground = "#E6E1FF"
+cursor = "#FF2BD6"
+cursor_text = "#0B0A17"
+selection_bg = "#4B3F8A"
+selection_fg = "#FFFFFF"
+palette = ["#1A1535", "#FF3B5C", "#39FF88", "#FCEE0A", "#00A3FF", "#FF2BD6", "#00F0FF", "#E6E1FF",
+           "#5A4FA0", "#FF6F8A", "#7DFFB0", "#FFF56B", "#5CC2FF", "#FF7AE6", "#7DF7FF", "#FFFFFF"]

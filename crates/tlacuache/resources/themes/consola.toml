@@ -1,0 +1,86 @@
+# Tlacuache Browser — aspecto de aplicación TUI
+[meta]
+id = "consola"
+name = "Consola"
+description = "Monoespaciado, sin redondeos ni sombras, selección en video inverso. Como una TUI."
+variant = "dark"
+credits = ""
+
+[style]
+font_ui = "JetBrains Mono"
+font_mono = "JetBrains Mono"
+mono_ui = true
+radius = 0
+border_width = 1
+row_height = 20
+flat = true
+glow = false
+uppercase_headers = false
+bracket_titles = true       # títulos de panel como "┤ Descargas ├"
+icon_style = "glyph"        # tipo de archivo como glifo/color de texto, estilo LS_COLORS
+selection_style = "invert"
+age_style = "text"          # edad como texto coloreado ("7d"), sin chip
+
+[colors]
+window_bg = "#0C0C0C"
+sidebar_bg = "#0C0C0C"
+sidebar_fg = "#C8C8C8"
+header_bg = "#0C0C0C"
+header_fg = "#C8C8C8"
+pane_bg = "#0C0C0C"
+pane_alt_row = "#0C0C0C"
+fg = "#C8C8C8"
+fg_muted = "#8A8A8A"
+border = "#3A3A3A"
+border_strong = "#6A6A6A"
+hover_bg = "#1C1C1C"
+accent = "#5FD75F"
+accent_fg = "#0C0C0C"
+focus_ring = "#5FD75F"
+selection_bg = "#5FD75F"
+selection_fg = "#0C0C0C"
+selection_inactive_bg = "#3A3A3A"
+pane_active_border = "#5FD75F"
+success = "#5FD75F"
+warning = "#FFD75F"
+error = "#FF5F5F"
+info = "#5FAFFF"
+link = "#5FAFFF"
+
+[age]
+chip_fg = "#0C0C0C"
+hour = "#5FD75F"
+day = "#5FD7D7"
+week = "#5FAFFF"
+month = "#AFAFAF"
+year = "#8A8A8A"
+
+[filetypes]
+folder = "#5FAFFF"
+code = "#FFD75F"
+image = "#D787D7"
+video = "#D787D7"
+audio = "#5FD7D7"
+archive = "#FF5F5F"
+document = "#C8C8C8"
+pdf = "#FF875F"
+spreadsheet = "#87D787"
+text = "#C8C8C8"
+executable = "#5FD75F"
+other = "#8A8A8A"
+
+[glyphs]                    # solo con icon_style = "glyph"
+folder = "▸"
+file = "·"
+symlink = "↪"
+executable = "*"
+
+[terminal]
+background = "#0C0C0C"
+foreground = "#C8C8C8"
+cursor = "#5FD75F"
+cursor_text = "#0C0C0C"
+selection_bg = "#C8C8C8"
+selection_fg = "#0C0C0C"
+palette = ["#1C1C1C", "#FF5F5F", "#5FD75F", "#FFD75F", "#5FAFFF", "#D787D7", "#5FD7D7", "#C8C8C8",
+           "#6A6A6A", "#FF8787", "#87FF87", "#FFFF87", "#87D7FF", "#FFAFFF", "#87FFFF", "#FFFFFF"]
