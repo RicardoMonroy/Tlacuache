@@ -71,3 +71,21 @@ fn normalize(key: gtk::gdk::Key) -> gtk::gdk::Key {
         key.to_lower()
     }
 }
+
+/// Ícono de la categoría del archivo (`tl-*`) con su clase `tl-ft-*`, que
+/// el tema colorea. Quita la clase anterior: las filas se reciclan.
+pub fn set_file_icon(image: &gtk::Image, entry: &tlacuache_core::entry::FileEntry) {
+    use tlacuache_core::filetype::{FileCategory, classify};
+
+    let category = classify(
+        entry.content_type.as_deref(),
+        &entry.name,
+        entry.is_dir,
+        entry.is_executable,
+    );
+    for other in FileCategory::ALL {
+        image.remove_css_class(other.css_class());
+    }
+    image.set_icon_name(Some(category.icon_name()));
+    image.add_css_class(category.css_class());
+}

@@ -8,6 +8,7 @@ pub mod clipboard;
 pub mod config;
 pub mod entry;
 pub mod favorites;
+pub mod filetype;
 pub mod filter;
 pub mod history;
 pub mod keymap;

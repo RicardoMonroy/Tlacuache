@@ -560,10 +560,7 @@ fn bind_cell(id: ColumnId, item: &FileItem, child: &gtk::Widget) {
             let icon = child.first_child().and_downcast::<gtk::Image>();
             let label = child.last_child().and_downcast::<gtk::Label>();
             if let Some(icon) = icon {
-                match item.info().and_then(|i| i.icon()) {
-                    Some(gicon) => icon.set_from_gicon(&gicon),
-                    None => icon.clear(),
-                }
+                crate::ui::set_file_icon(&icon, &entry);
             }
             if let Some(label) = label {
                 label.set_text(&entry.name);

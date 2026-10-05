@@ -727,10 +727,7 @@ fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
         let chevron = row.last_child();
         let entry = item.entry();
         if let Some(icon) = icon {
-            match item.info().and_then(|i| i.icon()) {
-                Some(gicon) => icon.set_from_gicon(&gicon),
-                None => icon.clear(),
-            }
+            crate::ui::set_file_icon(&icon, &entry);
         }
         if let Some(label) = label {
             label.set_text(&entry.name);

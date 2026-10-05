@@ -15,7 +15,8 @@ use tlacuache_core::sort::SortSpec;
 use super::file_item::FileItem;
 
 /// Atributos que se piden a gio por cada entrada.
-pub const ATTRIBUTES: &str = "standard::*,time::modified,time::created,unix::mode,owner::user";
+pub const ATTRIBUTES: &str =
+    "standard::*,time::modified,time::created,unix::mode,owner::user,access::can-execute";
 
 #[derive(Clone)]
 pub struct DirectoryModel {

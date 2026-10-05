@@ -82,6 +82,7 @@ fn entry_from_info(info: &gio::FileInfo) -> FileEntry {
     let mut entry = FileEntry::new(name, info.file_type() == gio::FileType::Directory);
     entry.is_hidden |= info.is_hidden();
     entry.is_symlink = info.is_symlink();
+    entry.is_executable = info.boolean(gio::FILE_ATTRIBUTE_ACCESS_CAN_EXECUTE);
     entry.size = if entry.is_dir {
         0
     } else {

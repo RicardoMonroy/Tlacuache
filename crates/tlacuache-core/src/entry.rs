@@ -11,6 +11,8 @@ pub struct FileEntry {
     /// Carpeta, o enlace simbólico que apunta a una carpeta.
     pub is_dir: bool,
     pub is_symlink: bool,
+    /// El usuario puede ejecutarlo (`access::can-execute`).
+    pub is_executable: bool,
     pub is_hidden: bool,
     /// Tamaño en bytes; 0 para carpetas.
     pub size: u64,
@@ -29,6 +31,7 @@ impl FileEntry {
             name,
             is_dir,
             is_symlink: false,
+            is_executable: false,
             size: 0,
             modified: None,
             created: None,
