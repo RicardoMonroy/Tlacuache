@@ -2,6 +2,7 @@
 //! comportamiento que la lista detallada: selección múltiple y por
 //! rectángulo, Enter/doble clic, filtro rápido, Espacio, arrastrar y soltar
 //! y menú contextual. El orden es el del modelo (carpetas primero, nombre).
+//! Imágenes y PDF muestran su miniatura (`fs::thumbnails`, 8.5).
 
 use std::cell::{OnceCell, RefCell};
 use std::sync::OnceLock;
@@ -252,6 +253,8 @@ impl IconView {
         };
         let previous = imp.directory.replace(Some(dir.clone()));
         imp.pending_focus.replace(previous);
+        // Las miniaturas pedidas de la carpeta anterior ya no hacen falta.
+        crate::fs::thumbnails::get().clear_queue();
         if !imp.query.borrow().is_empty() {
             imp.query.replace(String::new());
             model.set_query("");

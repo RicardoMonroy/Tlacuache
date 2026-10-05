@@ -12,12 +12,15 @@ use gtk::{glib, pango};
 use tlacuache_core::entry::FileEntry;
 use tlacuache_core::filetype::{FileCategory, classify};
 use tlacuache_core::theme::{GlyphKind, Theme};
+use tlacuache_core::thumbnail::can_thumbnail;
 
-use crate::fs::cut_marks;
+use crate::fs::{cut_marks, thumbnails};
 use crate::ui::{set_category_icon, theme_manager};
 
 /// Ícono y ancho del nombre en la vista de íconos.
 const TILE_ICON_SIZE: i32 = 48;
+/// Lado de las miniaturas en los mosaicos.
+const THUMB_SIZE: i32 = 96;
 const TILE_CHARS: i32 = 12;
 
 mod imp {
@@ -34,6 +37,11 @@ mod imp {
         pub uri: RefCell<Option<String>>,
         pub theme_handler: RefCell<Option<glib::SignalHandlerId>>,
         pub cut_handler: RefCell<Option<glib::SignalHandlerId>>,
+        /// Mosaico de la vista de íconos (muestra miniaturas, 8.5).
+        pub tile: std::cell::Cell<bool>,
+        /// Clave de la miniatura que espera este mosaico.
+        pub thumb_key: RefCell<Option<String>>,
+        pub thumb_handler: RefCell<Option<glib::SignalHandlerId>>,
     }
 
     #[glib::object_subclass]
@@ -55,6 +63,9 @@ mod imp {
             }
             if let Some(id) = self.cut_handler.take() {
                 cut_marks::get().disconnect(id);
+            }
+            if let Some(id) = self.thumb_handler.take() {
+                thumbnails::get().disconnect(id);
             }
         }
     }
@@ -93,6 +104,20 @@ impl FileNameCell {
         imp.name.set_width_chars(TILE_CHARS);
         imp.name.set_max_width_chars(TILE_CHARS);
         imp.name.set_hexpand(false);
+        imp.tile.set(true);
+        // Repinta cuando llega su miniatura.
+        let id = thumbnails::get().connect_ready(glib::clone!(
+            #[weak]
+            cell,
+            move |_, key| {
+                if cell.imp().thumb_key.borrow().as_deref() == Some(key) {
+                    let theme =
+                        theme_manager::get().map_or_else(Theme::default_theme, |t| t.theme());
+                    cell.render(&theme);
+                }
+            }
+        ));
+        imp.thumb_handler.replace(Some(id));
         cell
     }
 
@@ -151,6 +176,39 @@ impl FileNameCell {
         self.render(&theme);
     }
 
+    /// En mosaicos: la miniatura si ya está; si no, la pide (y se repinta
+    /// con `ready`). `None` = usar el ícono del tipo.
+    fn thumbnail(&self, entry: &FileEntry, category: FileCategory) -> Option<gtk::gdk::Texture> {
+        let imp = self.imp();
+        imp.thumb_key.replace(None);
+        if !imp.tile.get() || !can_thumbnail(category) {
+            return None;
+        }
+        let uri = imp.uri.borrow().clone()?;
+        let path = gtk::gio::File::for_uri(&uri).path()?;
+        let mtime = entry
+            .modified?
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        let key = thumbnails::key(&uri, mtime);
+        imp.thumb_key.replace(Some(key.clone()));
+        let thumbnailer = thumbnails::get();
+        if let Some(texture) = thumbnailer.lookup(&key) {
+            return Some(texture);
+        }
+        let scale = u32::try_from(self.scale_factor().max(1)).unwrap_or(1);
+        thumbnailer.request(thumbnails::Job {
+            key,
+            path,
+            uri,
+            mtime,
+            category,
+            needed: THUMB_SIZE as u32 * scale,
+        });
+        None
+    }
+
     fn render(&self, theme: &Theme) {
         let imp = self.imp();
         let entry = imp.entry.borrow();
@@ -177,7 +235,20 @@ impl FileNameCell {
                 imp.icon.set_visible(false);
             }
             None => {
-                set_category_icon(&imp.icon, category);
+                match self.thumbnail(entry, category) {
+                    Some(texture) => {
+                        imp.icon.set_paintable(Some(&texture));
+                        imp.icon.set_pixel_size(THUMB_SIZE);
+                        imp.icon.add_css_class("tl-thumb");
+                    }
+                    None => {
+                        set_category_icon(&imp.icon, category);
+                        if imp.tile.get() {
+                            imp.icon.set_pixel_size(TILE_ICON_SIZE);
+                        }
+                        imp.icon.remove_css_class("tl-thumb");
+                    }
+                }
                 imp.icon.set_visible(true);
                 imp.glyph.set_visible(false);
             }

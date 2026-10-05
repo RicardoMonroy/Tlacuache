@@ -90,7 +90,7 @@ Orden acordado: completar la vista previa, luego vistas, búsqueda, renombrado, 
 - [x] **8.2 Video y audio** con `gtk::Video` (GStreamer). CA: mp4, webm y mp3 se reproducen en la vista previa y se detienen al cambiar de selección. Requiere `gst-plugins-good` y `gst-libav`.
 - [x] **8.3 Markdown renderizado** (`pulldown-cmark` → `TextView` con estilos del tema, sin webview), alternable con la vista de código. CA: encabezados, listas, énfasis, código y enlaces con los colores del tema.
 - [x] **8.4 Vista de íconos** (`gtk::GridView`) como tercera opción del selector (Ctrl+3). CA: navegación, selección, arrastrar y soltar y menú contextual como en las otras vistas.
-- [ ] **8.5 Miniaturas freedesktop** (caché compartida `~/.cache/thumbnails`), generadas en segundo plano. CA: las imágenes muestran miniatura en la vista de íconos y no se regeneran si ya existen.
+- [x] **8.5 Miniaturas freedesktop** (caché compartida `~/.cache/thumbnails`), generadas en segundo plano. CA: las imágenes muestran miniatura en la vista de íconos y no se regeneran si ya existen.
 - [ ] **8.6 Búsqueda recursiva** (Ctrl+F) en segundo plano y cancelable, con resultados en una pestaña. CA: buscar en `~` no traba la app; Esc cancela.
 - [ ] **8.7 Renombrado masivo** con regex y vista previa del resultado. CA: detecta conflictos antes de aplicar y se deshace con Ctrl+Z.
 - [ ] **8.8 Notas por carpeta** (decidir antes si se guardan en un archivo oculto de la carpeta o en un almacén central).

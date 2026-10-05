@@ -9,3 +9,4 @@ pub mod launch;
 pub mod listing;
 pub mod ops_runner;
 pub mod size;
+pub mod thumbnails;

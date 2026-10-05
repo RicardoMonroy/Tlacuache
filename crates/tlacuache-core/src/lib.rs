@@ -26,6 +26,7 @@ pub mod summary;
 pub mod text;
 pub mod theme;
 pub mod theme_catalog;
+pub mod thumbnail;
 pub mod usage;
 
 /// Identificador de la aplicación (D-Bus / desktop file).

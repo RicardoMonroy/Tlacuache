@@ -66,12 +66,13 @@ impl Default for PdfPreview {
 }
 
 /// Una página renderizada (sin `gdk`: la textura se crea en el hilo de GTK).
-struct Rendered {
-    pages: i32,
-    width: i32,
-    height: i32,
-    stride: usize,
-    data: Vec<u8>,
+/// `data` es BGRA premultiplicado (cairo ARGB32).
+pub(crate) struct Rendered {
+    pub pages: i32,
+    pub width: i32,
+    pub height: i32,
+    pub stride: usize,
+    pub data: Vec<u8>,
 }
 
 impl PdfPreview {
@@ -184,7 +185,7 @@ impl PdfPreview {
 }
 
 async fn render_in_worker(path: PathBuf, index: i32) -> Result<Rendered, String> {
-    gio::spawn_blocking(move || render_page(&path, index))
+    gio::spawn_blocking(move || render_page(&path, index, PDF_RENDER_SIDE))
         .await
         .map_err(|_| "falló el hilo de render".to_owned())?
 }
@@ -192,7 +193,7 @@ async fn render_in_worker(path: PathBuf, index: i32) -> Result<Rendered, String>
 /// En un hilo de trabajo: abre el PDF y dibuja la página `index` sobre
 /// blanco (el papel del documento, no un color del tema; cairo ARGB32 =
 /// BGRA premultiplicado en memoria).
-fn render_page(path: &Path, index: i32) -> Result<Rendered, String> {
+pub(crate) fn render_page(path: &Path, index: i32, side: f64) -> Result<Rendered, String> {
     use gtk::cairo;
 
     let uri = glib::filename_to_uri(path, None).map_err(|e| e.to_string())?;
@@ -202,7 +203,7 @@ fn render_page(path: &Path, index: i32) -> Result<Rendered, String> {
         .page(index)
         .ok_or_else(|| format!("el PDF no tiene la página {}", index + 1))?;
     let (width, height) = page.size();
-    let scale = pdf_scale(width, height, PDF_RENDER_SIDE);
+    let scale = pdf_scale(width, height, side);
     let (w, h) = (
         ((width * scale).ceil() as i32).max(1),
         ((height * scale).ceil() as i32).max(1),
@@ -276,7 +277,7 @@ mod tests {
         let path = dir.path().join("largo con espacio.pdf");
         std::fs::write(&path, minimal_pdf(120)).unwrap();
 
-        let first = render_page(&path, 0).unwrap();
+        let first = render_page(&path, 0, PDF_RENDER_SIDE).unwrap();
         assert_eq!(first.pages, 120);
         // Lado mayor a PDF_RENDER_SIDE; proporción de carta.
         assert_eq!(first.height, PDF_RENDER_SIDE as i32);
@@ -288,8 +289,8 @@ mod tests {
         // Página en blanco: el fondo es blanco opaco (BGRA).
         assert_eq!(&first.data[..4], &[255, 255, 255, 255]);
 
-        assert_eq!(render_page(&path, 119).unwrap().pages, 120);
-        assert!(render_page(&path, 120).is_err());
+        assert_eq!(render_page(&path, 119, PDF_RENDER_SIDE).unwrap().pages, 120);
+        assert!(render_page(&path, 120, PDF_RENDER_SIDE).is_err());
     }
 
     #[test]
@@ -297,6 +298,6 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("roto.pdf");
         std::fs::write(&path, b"%PDF-1.4\nesto no es un PDF").unwrap();
-        assert!(render_page(&path, 0).is_err());
+        assert!(render_page(&path, 0, PDF_RENDER_SIDE).is_err());
     }
 }

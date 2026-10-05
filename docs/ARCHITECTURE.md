@@ -97,6 +97,7 @@ tlacuache/
   - carpetas → conteo/tamaño en segundo plano.
   - resto → icono grande + detalles.
 - Cada solicitud de preview lleva un `Cancellable`; al cambiar la selección se cancela la anterior.
+- Miniaturas (8.5, `fs/thumbnails.rs` + `core::thumbnail`): caché freedesktop compartida (`~/.cache/thumbnails/<tamaño>/<md5(uri)>.png`, válida si `Thumb::URI` y `Thumb::MTime` coinciden), así se reutilizan las de otras apps. Si falta, se genera en `large` (imágenes con gdk-pixbuf, PDF con poppler), 0600 y escritura atómica; los fallos se marcan en `fail/tlacuache/`. Dos hilos de trabajo atienden primero lo último pedido; las texturas se cachean en memoria y la señal `ready` repinta los mosaicos.
 
 ## 7. Configuración
 
