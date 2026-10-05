@@ -90,6 +90,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Filtro rápido | escribir directamente; Esc limpia |
 | Mostrar ocultos | Ctrl+H |
 | Ruta editable | Ctrl+L |
+| Buscar desde la carpeta actual (pestaña de resultados) | Ctrl+F; Esc detiene |
 | Vista columnas / detalles / íconos | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Nueva pestaña / cerrar | Ctrl+T / Ctrl+W |
 | Abrir terminal externa aquí | Ctrl+Alt+T |

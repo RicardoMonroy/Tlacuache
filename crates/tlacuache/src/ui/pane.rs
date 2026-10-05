@@ -21,6 +21,7 @@ use crate::fs::display::{display_name, display_path};
 use crate::strings;
 use crate::ui::Accel;
 use crate::ui::preview::PreviewPane;
+use crate::ui::search_page::SearchPage;
 use crate::ui::tab_page::TabPage;
 use crate::ui::tab_strip::TabStrip;
 use crate::ui::terminal::TerminalView;
@@ -70,12 +71,14 @@ mod imp {
         fn class_init(klass: &mut Self::Class) {
             klass.install_action("pane.new-tab", None, |pane, _, _| pane.new_tab());
             klass.install_action("pane.close-tab", None, |pane, _, _| pane.close_tab());
+            klass.install_action("pane.search", None, |pane, _, _| pane.open_search());
             klass.install_property_action("pane.terminal", "terminal-visible");
             klass.install_property_action("pane.preview", "preview-visible");
 
             let ctrl = gdk::ModifierType::CONTROL_MASK;
             klass.add_binding_action(gdk::Key::t, ctrl, "pane.new-tab");
             klass.add_binding_action(gdk::Key::w, ctrl, "pane.close-tab");
+            klass.add_binding_action(gdk::Key::f, ctrl, "pane.search");
         }
     }
 
@@ -145,8 +148,11 @@ impl Pane {
             move |_, tab, _| pane.attach_tab(tab)
         ));
         imp.tab_view.connect_page_detached(|_, tab, _| {
-            if let Ok(page) = tab.child().downcast::<TabPage>() {
+            let child = tab.child();
+            if let Some(page) = child.downcast_ref::<TabPage>() {
                 page.disconnect_pane_handlers();
+            } else if let Some(search) = child.downcast_ref::<SearchPage>() {
+                search.disconnect_pane_handlers();
             }
         });
         // La última pestaña no se cierra: el panel nunca queda vacío.
@@ -158,12 +164,13 @@ impl Pane {
             #[weak(rename_to = pane)]
             self,
             move |view| {
-                if let Some(page) = view
-                    .selected_page()
-                    .map(|p| p.child())
-                    .and_downcast::<TabPage>()
-                {
+                let child = view.selected_page().map(|p| p.child());
+                if let Some(page) = child.as_ref().and_then(|c| c.downcast_ref::<TabPage>()) {
                     page.focus_view();
+                } else if let Some(search) =
+                    child.as_ref().and_then(|c| c.downcast_ref::<SearchPage>())
+                {
+                    search.focus_results();
                 }
                 pane.emit_by_name::<()>("selection-changed", &[]);
                 pane.sync_terminal();
@@ -386,11 +393,65 @@ impl Pane {
         if !imp.preview.is_visible() {
             return;
         }
+        if let Some(search) = self.current_search() {
+            let target = preview::target(search.selected_infos(), search.status().selection);
+            imp.preview.request(target, None);
+            return;
+        }
         let Some(page) = self.current_page() else {
             return;
         };
         let target = preview::target(page.selected_infos(), page.status().selection);
         imp.preview.request(target, page.directory());
+    }
+
+    /// Ctrl+F: pestaña de búsqueda desde la carpeta actual (solo locales).
+    fn open_search(&self) {
+        let Some(page) = self.current_page() else {
+            return;
+        };
+        let Some(dir) = page.directory().filter(|d| d.path().is_some()) else {
+            crate::window::show_toast_from(self, strings::SEARCH_LOCAL_ONLY);
+            return;
+        };
+        let search = SearchPage::new(&dir, page.show_hidden());
+        let tab = self.imp().tab_view.append(&search);
+        search
+            .bind_property("title", &tab, "title")
+            .sync_create()
+            .build();
+        tab.set_tooltip(&crate::fs::display::display_path(&dir));
+        self.imp().tab_view.set_selected_page(&tab);
+        search.focus_entry();
+    }
+
+    /// Pestaña de búsqueda seleccionada, si es la actual.
+    fn current_search(&self) -> Option<SearchPage> {
+        self.imp()
+            .tab_view
+            .selected_page()
+            .map(|p| p.child())
+            .and_downcast()
+    }
+
+    /// Señales de una pestaña de búsqueda que entra en este panel.
+    fn attach_search(&self, search: &SearchPage) {
+        let status = search.connect_status_changed(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            move |search| {
+                if pane.current_search().as_ref() == Some(search) {
+                    pane.emit_by_name::<()>("selection-changed", &[]);
+                    pane.update_preview();
+                }
+            }
+        ));
+        let activated = search.connect_directory_activated(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            move |_, dir| pane.add_tab(dir)
+        ));
+        search.set_pane_handlers(vec![status, activated]);
     }
 
     /// Panel → terminal: lleva la terminal a la carpeta de la pestaña
@@ -482,6 +543,10 @@ impl Pane {
 
     /// Conecta las señales de una pestaña que entra en este panel.
     fn attach_tab(&self, tab: &adw::TabPage) {
+        if let Some(search) = tab.child().downcast_ref::<SearchPage>() {
+            self.attach_search(search);
+            return;
+        }
         let Ok(page) = tab.child().downcast::<TabPage>() else {
             return;
         };
@@ -598,6 +663,8 @@ impl Pane {
     pub fn focus_current(&self) {
         if let Some(page) = self.current_page() {
             page.focus_view();
+        } else if let Some(search) = self.current_search() {
+            search.focus_results();
         }
     }
 
@@ -618,6 +685,9 @@ impl Pane {
 
     /// Seleccionados con su tipo en la pestaña actual.
     pub fn selected_infos(&self) -> Vec<crate::fs::file_item::SelectedInfo> {
+        if let Some(search) = self.current_search() {
+            return search.selected_infos();
+        }
         self.current_page()
             .map(|p| p.selected_infos())
             .unwrap_or_default()
@@ -625,6 +695,9 @@ impl Pane {
 
     /// Archivos seleccionados en la pestaña actual.
     pub fn selected_files(&self) -> Vec<gio::File> {
+        if let Some(search) = self.current_search() {
+            return search.selected_files();
+        }
         self.current_page()
             .map(|p| p.selected_files())
             .unwrap_or_default()

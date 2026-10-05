@@ -20,6 +20,7 @@ pub mod pdf_preview;
 pub mod preferences_dialog;
 pub mod preview;
 pub mod properties_dialog;
+pub mod search_page;
 pub mod sidebar;
 pub mod status_bar;
 pub mod tab_button;

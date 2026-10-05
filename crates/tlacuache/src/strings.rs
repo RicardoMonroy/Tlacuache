@@ -184,6 +184,12 @@ pub const TAB_DUPLICATE: &str = "Duplicar pestaña";
 pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";
 pub const VIEW_DETAILS: &str = "Detalles (Ctrl+2)";
 pub const VIEW_ICONS: &str = "Íconos (Ctrl+3)";
+pub const SEARCH_TAB: &str = "Buscar";
+pub const SEARCH_LOCAL_ONLY: &str = "La búsqueda solo funciona en carpetas locales";
+pub const SEARCH_STOP: &str = "Detener la búsqueda (Esc)";
+pub const SEARCH_HINT: &str = "Escribe un nombre y pulsa Enter. Puedes usar * y ? como comodines.";
+pub const SEARCHING: &str = "Buscando…";
+pub const COLUMN_FOLDER: &str = "Carpeta";
 
 pub fn config_load_failed(path: &Path) -> String {
     format!(
@@ -437,6 +443,32 @@ pub fn preview_truncated(bytes: u64) -> String {
         "Vista previa recortada: se muestran los primeros {}",
         glib::format_size(bytes)
     )
+}
+
+pub fn search_placeholder(root: &str) -> String {
+    format!("Buscar en {root}")
+}
+
+pub fn search_title(query: &str) -> String {
+    format!("Buscar: {query}")
+}
+
+pub fn search_progress(count: u32) -> String {
+    format!("Buscando… {}", items_count(count as usize))
+}
+
+pub fn search_done(count: usize, cancelled: bool, truncated: bool) -> String {
+    let found = match count {
+        0 => "Sin resultados".to_owned(),
+        n => items_count(n),
+    };
+    if cancelled {
+        format!("{found} · búsqueda detenida")
+    } else if truncated {
+        format!("{found} · se alcanzó el límite de resultados")
+    } else {
+        found
+    }
 }
 
 pub fn pdf_page(page: i32, pages: i32) -> String {

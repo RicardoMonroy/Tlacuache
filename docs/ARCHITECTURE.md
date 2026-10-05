@@ -99,6 +99,11 @@ tlacuache/
 - Cada solicitud de preview lleva un `Cancellable`; al cambiar la selección se cancela la anterior.
 - Miniaturas (8.5, `fs/thumbnails.rs` + `core::thumbnail`): caché freedesktop compartida (`~/.cache/thumbnails/<tamaño>/<md5(uri)>.png`, válida si `Thumb::URI` y `Thumb::MTime` coinciden), así se reutilizan las de otras apps. Si falta, se genera en `large` (imágenes con gdk-pixbuf, PDF con poppler), 0600 y escritura atómica; los fallos se marcan en `fail/tlacuache/`. Dos hilos de trabajo atienden primero lo último pedido; las texturas se cachean en memoria y la señal `ready` repinta los mosaicos.
 
+## 6b. Búsqueda recursiva (8.6)
+
+- `core::search`: recorrido en profundidad por nombre (sin seguir enlaces, ocultos opcionales, tope de resultados, cancelable con un `AtomicBool`), con subcadena o comodines `*`/`?` sin mayúsculas ni acentos.
+- `ui/search_page.rs`: pestaña propia dentro del `adw::TabView` del panel. Un hilo de trabajo recorre y manda lotes por `async-channel`; cada búsqueda tiene un número de generación para ignorar mensajes de una anterior. El panel trata su selección como la de una `TabPage` (copiar, mover, papelera, vista previa); no se guarda en la sesión.
+
 ## 7. Configuración
 
 `~/.config/tlacuache/config.toml` (ruta vía `glib::user_config_dir()`):

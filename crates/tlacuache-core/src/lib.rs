@@ -19,6 +19,7 @@ pub mod path_input;
 pub mod perms;
 pub mod places;
 pub mod preview;
+pub mod search;
 pub mod session;
 pub mod shell;
 pub mod sort;

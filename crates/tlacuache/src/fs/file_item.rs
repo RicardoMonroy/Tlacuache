@@ -16,6 +16,8 @@ mod imp {
     pub struct FileItem {
         pub entry: RefCell<FileEntry>,
         pub info: RefCell<Option<gio::FileInfo>>,
+        /// Archivo, si el elemento no viene de un `DirectoryList`.
+        pub file: RefCell<Option<gio::File>>,
     }
 
     #[glib::object_subclass]
@@ -39,6 +41,14 @@ impl FileItem {
         item
     }
 
+    /// Elemento armado fuera de un listado (resultados de búsqueda).
+    pub fn from_entry(entry: FileEntry, file: gio::File) -> Self {
+        let item: Self = glib::Object::new();
+        item.imp().entry.replace(entry);
+        item.imp().file.replace(Some(file));
+        item
+    }
+
     pub fn entry(&self) -> Ref<'_, FileEntry> {
         self.imp().entry.borrow()
     }
@@ -49,6 +59,9 @@ impl FileItem {
 
     /// Archivo de la entrada; `DirectoryList` lo guarda en `standard::file`.
     pub fn file(&self) -> Option<gio::File> {
+        if let Some(file) = self.imp().file.borrow().clone() {
+            return Some(file);
+        }
         self.imp()
             .info
             .borrow()
