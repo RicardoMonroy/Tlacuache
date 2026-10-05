@@ -250,6 +250,47 @@ mod tests {
         assert!(tested > 0, "no hay ningún shell para probar");
     }
 
+    /// `cd_command` con shells reales: entra en carpetas con nombres
+    /// difíciles y `pwd` confirma que llegó (fish incluido). Omite los
+    /// shells no instalados.
+    #[test]
+    fn real_shells_cd_into_tricky_folders() {
+        use std::process::Command;
+
+        let Ok(root) = tempfile::tempdir() else {
+            return;
+        };
+        let names = [
+            "con espacio",
+            "it's",
+            "$HOME `id`",
+            "-rf",
+            "*.txt ; && |",
+            "\"dobles\" \\ barra",
+            "Canción ñandú 🎵",
+        ];
+        let mut tested = 0;
+        for shell in ["bash", "sh", "zsh", "dash", "fish"] {
+            let kind = ShellKind::from_shell_path(shell);
+            for name in names {
+                let dir = root.path().join(name);
+                std::fs::create_dir_all(&dir).unwrap();
+                let script = format!("{}pwd", cd_command(&dir.to_string_lossy(), kind));
+                let Ok(output) = Command::new(shell).arg("-c").arg(&script).output() else {
+                    break; // shell no instalado
+                };
+                assert!(output.status.success(), "{shell}: {script:?}");
+                assert_eq!(
+                    String::from_utf8_lossy(&output.stdout).trim_end_matches('\n'),
+                    dir.to_string_lossy(),
+                    "{shell}: {script:?}"
+                );
+                tested += 1;
+            }
+        }
+        assert!(tested > 0, "no hay ningún shell para probar");
+    }
+
     /// El rcfile con bash real: emite OSC 7 con la carpeta (codificada) en
     /// cada prompt y conserva el `PROMPT_COMMAND` del usuario.
     #[test]
