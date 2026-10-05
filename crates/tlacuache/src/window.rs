@@ -591,7 +591,12 @@ impl TlacuacheWindow {
         dialog.set_default_response(Some("keep"));
         dialog.set_close_response("cancel");
         let apply_all = gtk::CheckButton::with_label(strings::CONFLICT_APPLY_ALL);
-        dialog.set_extra_child(Some(&apply_all));
+        let extra = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        if let Some(details) = conflict_details(&conflict).await {
+            extra.append(&details);
+        }
+        extra.append(&apply_all);
+        dialog.set_extra_child(Some(&extra));
 
         let action = match dialog.choose_future(Some(self)).await.as_str() {
             "skip" => Some(ConflictAction::Skip),
@@ -1292,6 +1297,62 @@ impl TlacuacheWindow {
 }
 
 /// Muestra un toast en la ventana que contiene `widget`, si la hay.
+/// Tamaño y fecha de la versión existente y la nueva, marcando la más
+/// reciente. `None` si no se pueden leer (el diálogo sigue sin ellos).
+async fn conflict_details(conflict: &Conflict) -> Option<gtk::Grid> {
+    use tlacuache_core::ops::{Newer, newer};
+
+    let flags = gio::FileQueryInfoFlags::NOFOLLOW_SYMLINKS;
+    let priority = glib::Priority::DEFAULT;
+    let attrs = crate::fs::listing::ATTRIBUTES;
+    let existing = conflict
+        .dest
+        .query_info_future(attrs, flags, priority)
+        .await
+        .ok()?;
+    let incoming = conflict
+        .source
+        .query_info_future(attrs, flags, priority)
+        .await
+        .ok()?;
+    let (existing, incoming) = (
+        crate::fs::file_item::entry_from_info(&existing),
+        crate::fs::file_item::entry_from_info(&incoming),
+    );
+    let which = newer(existing.modified, incoming.modified);
+
+    let grid = gtk::Grid::builder()
+        .column_spacing(12)
+        .row_spacing(4)
+        .build();
+    grid.add_css_class("tl-conflict-details");
+    let rows = [
+        (
+            strings::CONFLICT_EXISTING,
+            &existing,
+            which == Some(Newer::Existing),
+        ),
+        (
+            strings::CONFLICT_INCOMING,
+            &incoming,
+            which == Some(Newer::Incoming),
+        ),
+    ];
+    for (row, (title, entry, is_newer)) in (0i32..).zip(rows) {
+        let key = gtk::Label::builder().label(title).xalign(1.0).build();
+        key.add_css_class("tl-detail-key");
+        let value = gtk::Label::builder()
+            .label(strings::conflict_version(entry, is_newer))
+            .xalign(0.0)
+            .wrap(true)
+            .build();
+        value.add_css_class("numeric");
+        grid.attach(&key, 0, row, 1, 1);
+        grid.attach(&value, 1, row, 1, 1);
+    }
+    Some(grid)
+}
+
 /// Menú principal: tema (radio) y Preferencias.
 fn main_menu_button() -> gtk::MenuButton {
     let themes = gio::Menu::new();

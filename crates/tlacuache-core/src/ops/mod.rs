@@ -8,7 +8,7 @@ mod conflict;
 mod queue;
 mod undo;
 
-pub use conflict::{ConflictAction, ConflictPolicy, replace_allowed};
+pub use conflict::{ConflictAction, ConflictPolicy, Newer, newer, replace_allowed};
 pub use queue::{OpQueue, OpsError};
 pub use undo::{Journal, undo_request};
 

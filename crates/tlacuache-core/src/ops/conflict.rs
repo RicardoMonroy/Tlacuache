@@ -39,9 +39,53 @@ pub fn replace_allowed(source_is_dir: bool, dest_is_dir: bool, same_item: bool) 
     source_is_dir == dest_is_dir && !same_item
 }
 
+/// Cuál de las dos versiones en conflicto es más reciente.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Newer {
+    /// La que ya está en el destino.
+    Existing,
+    /// La que se copia o mueve.
+    Incoming,
+    /// Misma fecha (con un segundo de margen: copiar puede redondearla).
+    Same,
+}
+
+/// Compara las fechas de modificación; `None` si falta alguna.
+pub fn newer(
+    existing: Option<std::time::SystemTime>,
+    incoming: Option<std::time::SystemTime>,
+) -> Option<Newer> {
+    const MARGIN: std::time::Duration = std::time::Duration::from_secs(1);
+    let (existing, incoming) = (existing?, incoming?);
+    Some(match incoming.duration_since(existing) {
+        Ok(diff) if diff > MARGIN => Newer::Incoming,
+        Ok(_) => Newer::Same,
+        Err(err) if err.duration() > MARGIN => Newer::Existing,
+        Err(_) => Newer::Same,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn newer_version_with_margin() {
+        use std::time::{Duration, SystemTime};
+        let t = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let later = t + Duration::from_secs(60);
+        assert_eq!(newer(Some(t), Some(later)), Some(Newer::Incoming));
+        assert_eq!(newer(Some(later), Some(t)), Some(Newer::Existing));
+        assert_eq!(
+            newer(Some(t), Some(t + Duration::from_millis(900))),
+            Some(Newer::Same)
+        );
+        assert_eq!(
+            newer(Some(t + Duration::from_millis(900)), Some(t)),
+            Some(Newer::Same)
+        );
+        assert_eq!(newer(None, Some(t)), None);
+    }
 
     #[test]
     fn nothing_remembered_by_default() {

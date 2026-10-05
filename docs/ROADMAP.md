@@ -77,7 +77,7 @@ Orden acordado: **7.1–7.5 antes del Hito 6** (la vista previa nace usando los 
 Surgieron al probar. Acordado: atenderlos antes del Hito 8, en este orden.
 
 - [x] **P.1 Cortados atenuados**: los archivos cortados con Ctrl+X se ven atenuados en todas las vistas hasta pegarlos o cancelar (copiar otra cosa o Esc). CA: cortar, ver atenuados en ambos paneles; pegar o copiar otra cosa los restaura.
-- [ ] **P.2 Conflictos con detalle**: el diálogo de conflictos muestra tamaño y fecha de modificación de la versión existente y de la nueva, y cuál es más reciente. CA: copiar un archivo sobre otro distinto muestra ambos datos.
+- [x] **P.2 Conflictos con detalle**: el diálogo de conflictos muestra tamaño y fecha de modificación de la versión existente y de la nueva, y cuál es más reciente. CA: copiar un archivo sobre otro distinto muestra ambos datos.
 - [ ] **P.3 Terminal en la sesión**: guardar por panel si la terminal estaba visible y su altura. CA: abrir la terminal, ajustar la altura, reiniciar: vuelve igual (con un shell nuevo en la carpeta del panel).
 - [ ] **P.4 OSC 7 para zsh**: integración automática con `ZDOTDIR` propio que carga la config del usuario (ver ADR-008). CA: con zsh, el panel sigue los `cd`. Requiere instalar `zsh` para probar.
 - [ ] **P.5 Escapado con fish**: probar `cd` y pegar rutas con espacios, comillas y `$` en fish real. CA: prueba automática con fish (se omite si no está instalado). Requiere instalar `fish`.

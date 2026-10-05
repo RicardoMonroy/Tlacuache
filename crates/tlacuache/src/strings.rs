@@ -52,6 +52,8 @@ pub const CONFLICT_TYPES: &str =
     "En el destino hay un elemento de otro tipo con ese nombre; no se puede reemplazar.";
 pub const CONFLICT_SAME: &str =
     "El origen y el destino son el mismo elemento. «Conservar ambos» crea una copia.";
+pub const CONFLICT_EXISTING: &str = "Existente";
+pub const CONFLICT_INCOMING: &str = "Nueva";
 pub const CONFLICT_APPLY_ALL: &str = "Aplicar a todos los conflictos de esta operación";
 pub const ACTION_SKIP: &str = "Omitir";
 pub const ACTION_KEEP_BOTH: &str = "Conservar ambos";
@@ -343,6 +345,27 @@ pub fn delete_confirm(names: &[String]) -> String {
         "Se eliminarán {}. Esta acción no se puede deshacer.",
         names_summary(names)
     )
+}
+
+/// «1.2 MB · 2026-10-01 12:00 · más reciente» (sin tamaño en carpetas).
+pub fn conflict_version(entry: &tlacuache_core::entry::FileEntry, newer: bool) -> String {
+    let mut parts = Vec::new();
+    if !entry.is_dir {
+        parts.push(glib::format_size(entry.size).to_string());
+    }
+    if let Some(date) = entry
+        .modified
+        .and_then(|t| t.duration_since(std::time::SystemTime::UNIX_EPOCH).ok())
+        .and_then(|d| i64::try_from(d.as_secs()).ok())
+        .and_then(|secs| glib::DateTime::from_unix_local(secs).ok())
+        .and_then(|dt| dt.format("%Y-%m-%d %H:%M").ok())
+    {
+        parts.push(date.to_string());
+    }
+    if newer {
+        parts.push("más reciente".to_owned());
+    }
+    parts.join(" · ")
 }
 
 pub fn conflict_title(name: &str) -> String {
