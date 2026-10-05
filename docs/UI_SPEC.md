@@ -83,6 +83,8 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Copiar / cortar / pegar archivos | Ctrl+C / Ctrl+X / Ctrl+V |
 | Deshacer la última operación | Ctrl+Z |
 | Vista previa | Espacio (alternar) |
+| Preferencias | Ctrl+, |
+| Menú principal (tema, Preferencias) | F10 |
 | Sidebar | F9 |
 | Filtro rápido | escribir directamente; Esc limpia |
 | Mostrar ocultos | Ctrl+H |

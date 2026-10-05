@@ -13,6 +13,7 @@ pub mod ops_indicator;
 pub mod pane;
 pub mod pane_actions;
 pub mod path_bar;
+pub mod preferences_dialog;
 pub mod preview;
 pub mod properties_dialog;
 pub mod sidebar;
@@ -21,6 +22,7 @@ pub mod tab_page;
 pub mod terminal;
 pub mod text_preview;
 pub mod theme_manager;
+pub mod theme_thumbnail;
 
 use gtk::prelude::*;
 

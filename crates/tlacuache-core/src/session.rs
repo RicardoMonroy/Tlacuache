@@ -17,6 +17,20 @@ const MIN_WINDOW: i32 = 400;
 const MAX_WINDOW: i32 = 16_384;
 const MIN_SIDEBAR: i32 = 140;
 const MAX_SIDEBAR: i32 = 800;
+/// Ningún panel queda por debajo del 10 % del ancho.
+pub const MIN_PANES_RATIO: f64 = 0.1;
+
+/// Posición del divisor para `ratio` en un ancho de `width` px.
+pub fn ratio_position(ratio: f64, width: i32) -> i32 {
+    (ratio.clamp(MIN_PANES_RATIO, 1.0 - MIN_PANES_RATIO) * f64::from(width)).round() as i32
+}
+
+/// Proporción de `position` en `width` px (`None` si aún no hay ancho).
+pub fn position_ratio(position: i32, width: i32) -> Option<f64> {
+    (width > 0).then(|| {
+        (f64::from(position) / f64::from(width)).clamp(MIN_PANES_RATIO, 1.0 - MIN_PANES_RATIO)
+    })
+}
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -35,8 +49,10 @@ pub struct WindowSession {
     pub sidebar_visible: bool,
     pub sidebar_width: i32,
     pub dual_pane: bool,
-    /// Posición del divisor entre paneles; `None` = mitad y mitad.
-    pub panes_position: Option<i32>,
+    /// Proporción del panel izquierdo (0–1) en el modo dual; se respeta al
+    /// redimensionar la ventana. `None` = mitad y mitad. (Antes se guardaba
+    /// `panes_position` en píxeles; esa clave vieja se ignora.)
+    pub panes_ratio: Option<f64>,
     pub active_pane: usize,
 }
 
@@ -49,7 +65,7 @@ impl Default for WindowSession {
             sidebar_visible: true,
             sidebar_width: 200,
             dual_pane: true,
-            panes_position: None,
+            panes_ratio: None,
             active_pane: 0,
         }
     }
@@ -143,7 +159,10 @@ impl Session {
         w.width = w.width.clamp(MIN_WINDOW, MAX_WINDOW);
         w.height = w.height.clamp(MIN_WINDOW, MAX_WINDOW);
         w.sidebar_width = w.sidebar_width.clamp(MIN_SIDEBAR, MAX_SIDEBAR);
-        w.panes_position = w.panes_position.filter(|p| *p > 0);
+        w.panes_ratio = w
+            .panes_ratio
+            .filter(|r| r.is_finite())
+            .map(|r| r.clamp(MIN_PANES_RATIO, 1.0 - MIN_PANES_RATIO));
         if w.active_pane > 1 || (w.active_pane == 1 && !w.dual_pane) {
             w.active_pane = 0;
         }
@@ -180,7 +199,7 @@ mod tests {
                 sidebar_visible: false,
                 sidebar_width: 260,
                 dual_pane: true,
-                panes_position: Some(700),
+                panes_ratio: Some(0.6),
                 active_pane: 1,
             },
             panes: vec![
@@ -234,7 +253,7 @@ mod tests {
         session.window.width = 10;
         session.window.height = 1_000_000;
         session.window.sidebar_width = 5;
-        session.window.panes_position = Some(-3);
+        session.window.panes_ratio = Some(-3.0);
         session.window.active_pane = 7;
         session.panes[0].selected = 9;
         session.panes[0].preview_position = Some(0);
@@ -245,12 +264,27 @@ mod tests {
         assert_eq!(s.window.width, MIN_WINDOW);
         assert_eq!(s.window.height, MAX_WINDOW);
         assert_eq!(s.window.sidebar_width, MIN_SIDEBAR);
-        assert_eq!(s.window.panes_position, None);
+        assert_eq!(s.window.panes_ratio, Some(MIN_PANES_RATIO));
         assert_eq!(s.window.active_pane, 0);
         assert_eq!(s.panes.len(), 2);
         assert_eq!(s.panes[0].selected, 0);
         assert_eq!(s.panes[0].preview_position, None);
         assert_eq!(s.panes[1].tabs.len(), 1);
+    }
+
+    #[test]
+    fn panes_ratio_round_trip_and_limits() {
+        assert_eq!(ratio_position(0.5, 1001), 501);
+        assert_eq!(ratio_position(0.0, 1000), 100);
+        assert_eq!(position_ratio(300, 1200), Some(0.25));
+        assert_eq!(position_ratio(5, 1000), Some(MIN_PANES_RATIO));
+        assert_eq!(position_ratio(10, 0), None);
+        // Al redimensionar se conserva la proporción.
+        let ratio = position_ratio(400, 1000).unwrap();
+        assert_eq!(ratio_position(ratio, 1600), 640);
+        // Una sesión vieja con la posición en píxeles se ignora.
+        let old = Session::from_toml("[window]\npanes_position = 700\n").unwrap();
+        assert_eq!(old.window.panes_ratio, None);
     }
 
     #[test]

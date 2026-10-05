@@ -104,6 +104,18 @@ pub const PROP_FOLDERS: &str = "Carpetas";
 pub const PROP_CALCULATING: &str = "Calculando…";
 pub const TOGGLE_TERMINAL: &str = "Terminal (F4)";
 pub const TOGGLE_PREVIEW: &str = "Vista previa (Espacio)";
+pub const MAIN_MENU: &str = "Menú principal";
+pub const MENU_THEME: &str = "Tema";
+pub const MENU_PREFERENCES: &str = "Preferencias";
+pub const PREFERENCES: &str = "Preferencias";
+pub const PREF_APPEARANCE: &str = "Apariencia";
+pub const PREF_THEME: &str = "Tema";
+pub const PREF_THEMES: &str = "Temas";
+pub const PREF_FOLLOW_SYSTEM: &str = "Seguir el modo del sistema";
+pub const PREF_FOLLOW_SYSTEM_HINT: &str =
+    "Usa un tema claro u oscuro según la preferencia del sistema";
+pub const PREF_LIGHT_THEME: &str = "Tema claro";
+pub const PREF_DARK_THEME: &str = "Tema oscuro";
 pub const TERMINAL_DESYNC: &str = "Carpeta desincronizada";
 pub const TERMINAL_SYNC: &str = "Sincronizar";
 pub const TERMINAL_BUSY: &str = "La terminal está ocupada con otro programa";
@@ -242,6 +254,10 @@ pub fn drive_unmount_failed(name: &str, err: &glib::Error) -> String {
 pub fn group_remove_confirm(name: &str, count: usize) -> String {
     let favorites = if count == 1 { "favorito" } else { "favoritos" };
     format!("¿Eliminar el grupo «{name}»?\n\nTiene {count} {favorites}. Las carpetas no se borran.")
+}
+
+pub fn theme_save_failed(detail: &str) -> String {
+    format!("No se pudo guardar el tema en la configuración: {detail}")
 }
 
 pub fn favorites_save_failed(detail: &str) -> String {

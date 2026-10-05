@@ -12,6 +12,8 @@ use tlacuache_core::config::{self, Config};
 use tlacuache_core::session::{self, Session};
 
 use crate::strings;
+use crate::ui::preferences_dialog::PreferencesDialog;
+use crate::ui::theme_manager;
 use crate::window::TlacuacheWindow;
 
 /// Ruta de `config.toml` según XDG (`~/.config/tlacuache/config.toml`).
@@ -56,6 +58,46 @@ fn load_session() -> (Option<Session>, Option<String>) {
     }
 }
 
+/// `app.preferences` (Ctrl+,) y `app.theme` (radio con el id del tema, para
+/// el menú principal; sigue al tema aplicado).
+fn install_app_actions(app: &adw::Application) {
+    let preferences = gio::ActionEntry::builder("preferences")
+        .activate(|app: &adw::Application, _, _| {
+            let dialog = PreferencesDialog::default();
+            dialog.present(app.active_window().as_ref());
+        })
+        .build();
+    app.add_action_entries([preferences]);
+    app.set_accels_for_action("app.preferences", &["<Control>comma"]);
+
+    let Some(themes) = theme_manager::get() else {
+        return;
+    };
+    let theme = gio::SimpleAction::new_stateful(
+        "theme",
+        Some(glib::VariantTy::STRING),
+        &themes.theme().meta.id.to_variant(),
+    );
+    // Elegir un tema en el menú lo fija (deja de seguir al sistema).
+    theme.connect_change_state(|_, value| {
+        let (Some(id), Some(themes)) =
+            (value.and_then(|v| v.get::<String>()), theme_manager::get())
+        else {
+            return;
+        };
+        let mut settings = themes.settings();
+        settings.name = id;
+        settings.follow_system = false;
+        themes.set_settings(settings);
+    });
+    themes.connect_theme_changed(glib::clone!(
+        #[weak]
+        theme,
+        move |themes| theme.set_state(&themes.theme().meta.id.to_variant())
+    ));
+    app.add_action(&theme);
+}
+
 pub fn build() -> adw::Application {
     let (config, config_warning) = load_config();
     for name in tlacuache_core::keymap::unknown_actions(&config.keys) {
@@ -74,7 +116,7 @@ pub fn build() -> adw::Application {
         .build();
 
     let theme_settings = config.theme.clone();
-    app.connect_startup(move |_| {
+    app.connect_startup(move |app| {
         // Ícono de las ventanas (incluido en el gresource: funciona aunque
         // la app no esté instalada).
         gtk::Window::set_default_icon_name(APP_ID);
@@ -85,6 +127,7 @@ pub fn build() -> adw::Application {
             }
             None => tracing::warn!("sin display: no se aplica el tema"),
         }
+        install_app_actions(app);
     });
 
     let present = move |app: &adw::Application, dir: Option<&gio::File>| {

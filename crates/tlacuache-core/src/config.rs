@@ -289,6 +289,41 @@ pub fn update_favorites_toml(
     Ok(doc.to_string())
 }
 
+/// Reescribe las claves de `[theme]` en el texto de config.toml (Preferencias),
+/// conservando comentarios, formato y el resto del archivo. Falla si el
+/// texto no es TOML válido (en ese caso no hay que tocar el archivo).
+pub fn update_theme_toml(text: &str, theme: &Theme) -> Result<String, toml_edit::TomlError> {
+    let mut doc: toml_edit::DocumentMut = text.parse()?;
+    if !doc.contains_table("theme") {
+        doc.insert("theme", toml_edit::Item::Table(toml_edit::Table::new()));
+    }
+    let table = &mut doc["theme"];
+    // Una config vieja puede traer `color_scheme` (antes de ADR-009).
+    if let Some(table) = table.as_table_mut() {
+        table.remove("color_scheme");
+    }
+    for (key, value) in [
+        ("name", toml_edit::value(theme.name.as_str())),
+        ("follow_system", toml_edit::value(theme.follow_system)),
+        ("light", toml_edit::value(theme.light.as_str())),
+        ("dark", toml_edit::value(theme.dark.as_str())),
+    ] {
+        match table.get_mut(key).and_then(|item| item.as_value_mut()) {
+            // Conserva el comentario al final de la línea.
+            Some(old) => {
+                let decor = old.decor().clone();
+                let mut new = value
+                    .into_value()
+                    .unwrap_or_else(|_| toml_edit::Value::from(""));
+                *new.decor_mut() = decor;
+                *old = new;
+            }
+            None => table[key] = value,
+        }
+    }
+    Ok(doc.to_string())
+}
+
 fn write_template(path: &Path) -> io::Result<()> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir)?;
@@ -428,6 +463,34 @@ mod tests {
         }
         let c = Config::from_toml("[terminal]\nfont_size = 14\n").unwrap();
         assert_eq!(c.terminal.font_size(), 14.0);
+    }
+
+    #[test]
+    fn update_theme_keeps_comments_and_other_sections() {
+        let text = "# mi config\n[general]\nshow_hidden = true\n\n[theme]\nname = \"nord\"              # comentario\ncolor_scheme = \"dark\"\n\n[keys]\n";
+        let theme = Theme {
+            name: "claro".into(),
+            follow_system: true,
+            light: "talavera".into(),
+            dark: "consola".into(),
+        };
+        let updated = update_theme_toml(text, &theme).unwrap();
+        assert!(updated.starts_with("# mi config\n[general]\nshow_hidden = true\n"));
+        assert!(updated.contains("name = \"claro\"              # comentario\n"));
+        assert!(!updated.contains("color_scheme"));
+        let config = Config::from_toml(&updated).unwrap();
+        assert_eq!(config.theme, theme);
+        assert!(config.general.show_hidden);
+
+        // Sin sección [theme] (o archivo vacío) se crea.
+        let created = update_theme_toml("", &theme).unwrap();
+        assert_eq!(Config::from_toml(&created).unwrap().theme, theme);
+        // La plantilla por defecto conserva sus comentarios.
+        let template = update_theme_toml(DEFAULT_TEMPLATE, &theme).unwrap();
+        assert!(template.contains("# nord | consola | claro | cyberpunk | talavera"));
+        assert_eq!(Config::from_toml(&template).unwrap().theme, theme);
+
+        assert!(update_theme_toml("[theme", &theme).is_err());
     }
 
     #[test]

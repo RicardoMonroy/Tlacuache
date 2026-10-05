@@ -66,9 +66,9 @@ Orden acordado: **7.1–7.5 antes del Hito 6** (la vista previa nace usando los 
 - [x] **7.4 ThemeManager**: `base.css` (adaptado a los widgets reales) + provider de variables + `StyleManager` + clases de flags + sobrescritura de las variables de libadwaita (verificando sus nombres). Config `[theme]` de THEMES §5.4. CA: el tema `nord` se ve igual que en `branding/brand-board.html`.
 - [x] **7.5 Terminal temática**: paleta, cursor, selección y fuente de VTE desde el tema (tamaño desde la config); se actualiza con `theme-changed`.
 - [x] **7.6 Flags en Rust**: `bracket_titles` (en el título de la pestaña), `icon_style = "glyph"` (glifo + nombre coloreado + `/` en carpetas), `age_style = "text"`, `uppercase_headers`. CA: el tema `consola` se parece a su vista en el board.
-- [ ] **7.7 Selector de temas**: Preferencias (`adw::PreferencesDialog`) con lista de temas, cambio en vivo y `follow_system` con temas light/dark. Persistencia en config.
+- [x] **7.7 Selector de temas**: Preferencias (`adw::PreferencesDialog`) con lista de temas, cambio en vivo y `follow_system` con temas light/dark. Persistencia en config.
 - [ ] **7.8 Temas de usuario**: cargar `~/.config/tlacuache/themes/*.toml`; toast con los pares de contraste fallidos; respaldo a `nord` si hay error de parseo.
-- [ ] **7.9 Decor Talavera**: franja `talavera-strip.svg` en el pie de la sidebar cuando el tema define `[decor]`.
+- [x] **7.9 Decor Talavera**: franja `talavera-strip.svg` en el pie de la sidebar cuando el tema define `[decor]`.
 - [ ] **7.10 README**: lockup, captura de cada tema y créditos (paleta Nord MIT, JetBrains Mono OFL).
 
 **→ Release v0.1 (MVP).** Checklist: usar 3 días seguidos como gestor principal y registrar fallos en `docs/BUGS.md`.

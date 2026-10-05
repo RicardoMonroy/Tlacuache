@@ -14,24 +14,26 @@
 
 /* ---------- Variables de libadwaita → tokens del tema ----------
  * Para que los widgets nativos (header bar, popovers, diálogos, botones
- * sugeridos…) sigan el tema. Nombres verificados en libadwaita 1.9. */
+ * sugeridos…) sigan el tema. Nombres verificados en libadwaita 1.9.
+ * Cada fondo va con el texto de su misma familia: `header_*` solo se usa en
+ * la cabecera de los paneles (en Talavera es azul cobalto con texto claro). */
 :root {
   --window-bg-color: var(--tl-window-bg);
   --window-fg-color: var(--tl-fg);
   --view-bg-color: var(--tl-pane-bg);
   --view-fg-color: var(--tl-fg);
   --headerbar-bg-color: var(--tl-window-bg);
-  --headerbar-fg-color: var(--tl-header-fg);
+  --headerbar-fg-color: var(--tl-fg);
   --headerbar-backdrop-color: var(--tl-window-bg);
   --headerbar-border-color: var(--tl-border);
   --sidebar-bg-color: var(--tl-sidebar-bg);
   --sidebar-fg-color: var(--tl-sidebar-fg);
   --sidebar-backdrop-color: var(--tl-sidebar-bg);
   --sidebar-border-color: var(--tl-border);
-  --card-bg-color: var(--tl-header-bg);
-  --card-fg-color: var(--tl-fg);
-  --popover-bg-color: var(--tl-header-bg);
-  --popover-fg-color: var(--tl-fg);
+  --card-bg-color: var(--tl-sidebar-bg);
+  --card-fg-color: var(--tl-sidebar-fg);
+  --popover-bg-color: var(--tl-sidebar-bg);
+  --popover-fg-color: var(--tl-sidebar-fg);
   --dialog-bg-color: var(--tl-window-bg);
   --dialog-fg-color: var(--tl-fg);
   --accent-bg-color: var(--tl-accent);
@@ -94,10 +96,15 @@ levelbar.tl-usage block.filled { background-color: var(--tl-info); }
 levelbar.tl-usage.warning block.filled { background-color: var(--tl-warning); }
 levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
 
-.tl-sidebar .tl-decor {               /* franja decorativa opcional (Talavera, tarea 7.9) */
-  min-height: 24px;
+/* Franja decorativa opcional al pie de la sidebar (`[decor]`, Talavera). */
+.tl-sidebar .tl-decor {
+  min-height: 32px;
+  margin: 8px;
+  border-radius: var(--tl-radius);
   background-image: var(--tl-decor-image);
-  background-repeat: repeat-x;
+  background-repeat: repeat;
+  background-size: 24px 24px;
+  background-position: center;
 }
 
 /* ---------- Paneles ---------- */
@@ -145,7 +152,7 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
   padding: 2px 6px;
   min-height: 24px;
   font-weight: normal;
-  color: var(--tl-header-fg);
+  color: var(--tl-fg);                /* sobre pane_bg, no sobre header_bg */
 }
 
 .tl-path-bar .tl-crumb.current { font-weight: bold; }

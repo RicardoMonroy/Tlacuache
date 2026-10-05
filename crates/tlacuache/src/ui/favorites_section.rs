@@ -24,6 +24,7 @@ use tlacuache_core::config::{self, FavoriteGroup};
 use tlacuache_core::favorites::{self, FavoritesError};
 use tlacuache_core::path_input::expand_tilde;
 
+use crate::fs::config_file;
 use crate::fs::display::{display_name, display_path};
 use crate::ui::dnd;
 use crate::{strings, window};
@@ -573,32 +574,10 @@ impl FavoritesSection {
             return;
         };
         let groups = imp.groups.borrow().clone();
-        let file = gio::File::for_path(&path);
-
-        let text = match file.load_contents_future().await {
-            Ok((bytes, _)) => String::from_utf8_lossy(&bytes).into_owned(),
-            Err(err) if err.matches(gio::IOErrorEnum::NotFound) => {
-                config::DEFAULT_TEMPLATE.to_owned()
-            }
-            Err(err) => return self.report_save_error(&err.to_string()),
-        };
-        let updated = match config::update_favorites_toml(&text, &groups) {
-            Ok(updated) => updated,
-            Err(err) => return self.report_save_error(&err.to_string()),
-        };
-        // La carpeta de config ya existe (se crea al cargar la config); si
-        // faltara, el error de escritura se muestra como toast.
-        // `replace_contents` escribe en un temporal y renombra (atómico).
-        let result = file
-            .replace_contents_future(
-                updated.into_bytes(),
-                None,
-                false,
-                gio::FileCreateFlags::NONE,
-            )
-            .await;
-        if let Err((_, err)) = result {
-            self.report_save_error(&err.to_string());
+        let result =
+            config_file::update(&path, |text| config::update_favorites_toml(text, &groups)).await;
+        if let Err(err) = result {
+            self.report_save_error(&err);
         }
     }
 

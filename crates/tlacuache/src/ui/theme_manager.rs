@@ -20,6 +20,9 @@ use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config;
+
+use crate::fs::config_file;
+use crate::{strings, window};
 use tlacuache_core::theme::{AgeStyle, IconStyle, SelectionStyle, Theme, Variant};
 
 const BASE_CSS: &str = "/io/github/rmonroy/Tlacuache/style/base.css";
@@ -110,6 +113,35 @@ impl ThemeManager {
     /// Esquema de GtkSourceView del tema aplicado, si ya está escrito.
     pub fn source_scheme(&self) -> Option<sourceview5::StyleScheme> {
         sourceview5::StyleSchemeManager::default().scheme(&self.theme().source_scheme_id())
+    }
+
+    /// `[theme]` actual.
+    pub fn settings(&self) -> config::Theme {
+        self.imp().settings.borrow().clone()
+    }
+
+    /// Cambia el tema en vivo (Preferencias, menú) y lo guarda en
+    /// config.toml. Un error al guardar se avisa con un toast.
+    pub fn set_settings(&self, settings: config::Theme) {
+        if *self.imp().settings.borrow() == settings {
+            return;
+        }
+        self.imp().settings.replace(settings.clone());
+        self.apply();
+        glib::spawn_future_local(async move {
+            let path = crate::app::config_path();
+            let result =
+                config_file::update(&path, |text| config::update_theme_toml(text, &settings)).await;
+            if let Err(err) = result {
+                tracing::warn!("no se guardó el tema: {err}");
+                let window = gio::Application::default()
+                    .and_downcast::<gtk::Application>()
+                    .and_then(|app| app.active_window());
+                if let Some(window) = window {
+                    window::show_toast_from(&window, &strings::theme_save_failed(&err));
+                }
+            }
+        });
     }
 
     /// Tema aplicado (el predeterminado si aún no hay ninguno).

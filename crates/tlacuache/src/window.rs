@@ -12,7 +12,8 @@ use gtk::{gdk, gio, glib};
 use tlacuache_core::config::Config;
 use tlacuache_core::names;
 use tlacuache_core::ops::{ConflictAction, OpId, OpKind, OpState};
-use tlacuache_core::session::{Session, WindowSession};
+use tlacuache_core::session::{self, Session, WindowSession};
+use tlacuache_core::theme::Theme;
 
 use crate::fs::ops_runner::{Conflict, ConflictDecision, OpsManager, Resolver};
 use crate::strings;
@@ -37,6 +38,10 @@ mod imp {
         pub sidebar: Sidebar,
         /// Panel izquierdo | panel derecho.
         pub paned: gtk::Paned,
+        /// Proporción del panel izquierdo; se respeta al redimensionar.
+        pub panes_ratio: Cell<f64>,
+        /// Ancho del `Paned` en la última asignación de tamaño.
+        pub panes_width: Cell<i32>,
         /// Izquierdo y derecho.
         pub panes: OnceCell<[Pane; 2]>,
         /// Índice del panel activo (0 izquierdo, 1 derecho).
@@ -226,6 +231,7 @@ mod imp {
                 .build();
             let header = adw::HeaderBar::new();
             header.pack_start(&sidebar_toggle);
+            header.pack_end(&main_menu_button());
             header.pack_end(&dual);
             let _ = self.dual_button.set(dual);
             header.pack_end(&OpsIndicator::new(&self.ops));
@@ -386,9 +392,10 @@ impl TlacuacheWindow {
         paned.set_end_child(Some(&imp.right_side));
         paned.set_shrink_start_child(false);
         paned.set_shrink_end_child(false);
-        // Al mostrarse: posición guardada o mitad y mitad; y foco al panel
+        // Al mostrarse: proporción guardada o mitad y mitad; y foco al panel
         // activo.
-        let saved_position = state.panes_position;
+        imp.panes_ratio.set(state.panes_ratio.unwrap_or(0.5));
+        self.keep_panes_ratio();
         let active = state.active_pane;
         paned.connect_map(glib::clone!(
             #[weak(rename_to = window)]
@@ -400,7 +407,11 @@ impl TlacuacheWindow {
                     #[weak]
                     paned,
                     move || {
-                        paned.set_position(saved_position.unwrap_or(paned.width() / 2));
+                        window.imp().panes_width.set(paned.width());
+                        paned.set_position(session::ratio_position(
+                            window.imp().panes_ratio.get(),
+                            paned.width(),
+                        ));
                         if let Some(pane) = window.pane(active) {
                             pane.focus_current();
                         }
@@ -589,7 +600,7 @@ impl TlacuacheWindow {
                 sidebar_visible: self.show_sidebar(),
                 sidebar_width: imp.outer.position(),
                 dual_pane: self.dual_pane(),
-                panes_position: Some(imp.paned.position()).filter(|p| *p > 0),
+                panes_ratio: Some(imp.panes_ratio.get()),
                 active_pane: imp.active.get(),
             },
             panes: (0..2)
@@ -642,9 +653,55 @@ impl TlacuacheWindow {
     }
 
     /// Muestra u oculta el panel derecho (conserva sus pestañas).
+    /// Al cambiar el ancho de la ventana, el divisor conserva la proporción;
+    /// al moverlo (arrastre o franja central), se guarda la nueva.
+    fn keep_panes_ratio(&self) {
+        let paned = &self.imp().paned;
+        // `max-position` cambia con cada asignación de tamaño.
+        paned.connect_max_position_notify(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |paned| {
+                let imp = window.imp();
+                let width = paned.width();
+                if width <= 0 || width == imp.panes_width.get() {
+                    return;
+                }
+                imp.panes_width.set(width);
+                if window.dual_pane() {
+                    paned.set_position(session::ratio_position(imp.panes_ratio.get(), width));
+                }
+            }
+        ));
+        paned.connect_position_notify(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |paned| {
+                let imp = window.imp();
+                // Solo movimientos con el mismo ancho: los del usuario.
+                if !window.dual_pane() || paned.width() != imp.panes_width.get() {
+                    return;
+                }
+                if let Some(ratio) = session::position_ratio(paned.position(), paned.width()) {
+                    imp.panes_ratio.set(ratio);
+                }
+            }
+        ));
+    }
+
     fn apply_dual_pane(&self) {
         let dual = self.dual_pane();
         self.imp().right_side.set_visible(dual);
+        // Al volver al modo dual, la proporción de antes.
+        if dual {
+            let imp = self.imp();
+            let width = imp.paned.width();
+            if width > 0 {
+                imp.panes_width.set(width);
+                imp.paned
+                    .set_position(session::ratio_position(imp.panes_ratio.get(), width));
+            }
+        }
         if let Some(button) = self.imp().dual_button.get() {
             button.set_icon_name(if dual {
                 "tl-pane-dual-symbolic"
@@ -1201,6 +1258,28 @@ impl TlacuacheWindow {
 }
 
 /// Muestra un toast en la ventana que contiene `widget`, si la hay.
+/// Menú principal: tema (radio) y Preferencias.
+fn main_menu_button() -> gtk::MenuButton {
+    let themes = gio::Menu::new();
+    for theme in Theme::builtin_ids().filter_map(Theme::builtin) {
+        let item = gio::MenuItem::new(Some(&theme.meta.name), None);
+        item.set_action_and_target_value(Some("app.theme"), Some(&theme.meta.id.to_variant()));
+        themes.append_item(&item);
+    }
+    let menu = gio::Menu::new();
+    menu.append_submenu(Some(strings::MENU_THEME), &themes);
+    let section = gio::Menu::new();
+    section.append(Some(strings::MENU_PREFERENCES), Some("app.preferences"));
+    menu.append_section(None, &section);
+    gtk::MenuButton::builder()
+        .icon_name("open-menu-symbolic")
+        .tooltip_text(strings::MAIN_MENU)
+        .menu_model(&menu)
+        .primary(true)
+        .focusable(false)
+        .build()
+}
+
 pub fn show_toast_from(widget: &impl IsA<gtk::Widget>, text: &str) {
     if let Some(window) = widget.root().and_downcast::<TlacuacheWindow>() {
         window.show_toast(text);

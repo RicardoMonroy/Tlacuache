@@ -17,6 +17,7 @@ use tlacuache_core::places::{self, PlaceKind, PlaceTarget};
 use crate::strings;
 use crate::ui::drive_row::{DriveKind, DriveRow};
 use crate::ui::favorites_section::FavoritesSection;
+use crate::ui::theme_manager;
 
 mod imp {
     use super::*;
@@ -130,7 +131,30 @@ impl Sidebar {
             .vexpand(true)
             .child(&content)
             .build();
-        self.set_child(Some(&scrolled));
+
+        // Franja decorativa al pie (`[decor]` del tema, p. ej. azulejo de
+        // Talavera); la imagen sale de `--tl-decor-image`.
+        let decor = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        decor.add_css_class("tl-decor");
+        let update_decor = glib::clone!(
+            #[weak]
+            decor,
+            move |themes: &theme_manager::ThemeManager| {
+                decor.set_visible(themes.theme().decor.is_some());
+            }
+        );
+        match theme_manager::get() {
+            Some(themes) => {
+                update_decor(&themes);
+                themes.connect_theme_changed(update_decor);
+            }
+            None => decor.set_visible(false),
+        }
+
+        let layout = gtk::Box::new(gtk::Orientation::Vertical, 0);
+        layout.append(&scrolled);
+        layout.append(&decor);
+        self.set_child(Some(&layout));
     }
 
     /// Favoritos de la config y ruta donde guardarlos.
