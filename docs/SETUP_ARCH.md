@@ -10,7 +10,7 @@ rustup default stable
 ```
 
 - `vte4` es la variante de VTE para GTK4 (la de GTK3 es `vte3`).
-- `poppler-glib` y los plugins de GStreamer solo se necesitan desde el Hito 8 (v0.2: PDF, video y audio).
+- `poppler-glib` se usa desde la 8.1 (vista previa de PDF); los plugins de GStreamer, desde la 8.2 (video y audio).
 - `ttf-jetbrains-mono`: la fuente monoespaciada de los temas (si falta, se usa `monospace`).
 - Si algún nombre de paquete cambió, buscar con `pacman -Ss <nombre>` antes de suponer.
 

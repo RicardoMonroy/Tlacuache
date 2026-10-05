@@ -34,6 +34,8 @@ pub enum PreviewKind {
     Image,
     /// Texto o código (sourceview).
     Text,
+    /// PDF (poppler), página por página.
+    Pdf,
     Folder,
     /// Ícono grande y detalles.
     Other,
@@ -45,6 +47,7 @@ pub fn kind(content_type: Option<&str>, name: &str, is_dir: bool) -> PreviewKind
         FileCategory::Folder => PreviewKind::Folder,
         FileCategory::Image => PreviewKind::Image,
         FileCategory::Code | FileCategory::Text => PreviewKind::Text,
+        FileCategory::Pdf => PreviewKind::Pdf,
         _ => PreviewKind::Other,
     }
 }
@@ -76,6 +79,27 @@ pub fn scale_to_side(width: i32, height: i32, side: i32) -> (i32, i32) {
     let scale = f64::from(side) / f64::from(width.max(height));
     let px = |v: i32| ((f64::from(v) * scale).round() as i32).max(1);
     (px(width), px(height))
+}
+
+/// Lado mayor (px) de una página de PDF renderizada.
+pub const PDF_RENDER_SIDE: f64 = 1600.0;
+
+/// Escala de render de una página de `width`×`height` puntos para que su
+/// lado mayor mida `side` px (como mucho ×4 para páginas diminutas).
+pub fn pdf_scale(width: f64, height: f64, side: f64) -> f64 {
+    // `f64::max` ignora un NaN: se validan los dos lados.
+    if !(width.is_finite() && height.is_finite()) || width.max(height) <= 0.0 {
+        return 1.0;
+    }
+    (side / width.max(height)).min(4.0)
+}
+
+/// Página válida (0-based) tras moverse `delta` desde `current`.
+pub fn page_step(current: i32, delta: i32, pages: i32) -> i32 {
+    if pages <= 0 {
+        return 0;
+    }
+    current.saturating_add(delta).clamp(0, pages - 1)
 }
 
 /// Escala que encaja una imagen de `image` px en `area` px sin agrandarla.
@@ -163,6 +187,20 @@ mod tests {
     }
 
     #[test]
+    fn pdf_scale_and_page_steps() {
+        // Carta (612×792 pt) a 1600 px de alto.
+        assert!((pdf_scale(612.0, 792.0, 1600.0) - 1600.0 / 792.0).abs() < 1e-9);
+        assert_eq!(pdf_scale(100.0, 50.0, 1600.0), 4.0);
+        assert_eq!(pdf_scale(0.0, 0.0, 1600.0), 1.0);
+        assert_eq!(pdf_scale(f64::NAN, 10.0, 1600.0), 1.0);
+
+        assert_eq!(page_step(0, -1, 10), 0);
+        assert_eq!(page_step(0, 1, 10), 1);
+        assert_eq!(page_step(9, 1, 10), 9);
+        assert_eq!(page_step(3, 1, 0), 0);
+    }
+
+    #[test]
     fn fit_never_enlarges() {
         assert_eq!(fit_scale((100.0, 50.0), (400.0, 400.0)), 1.0);
         assert_eq!(fit_scale((1000.0, 500.0), (500.0, 500.0)), 0.5);
@@ -221,7 +259,7 @@ mod tests {
             (None, "Cargo.toml", false, PreviewKind::Text),
             (Some("inode/directory"), "src", false, PreviewKind::Folder),
             (None, "src", true, PreviewKind::Folder),
-            (Some("application/pdf"), "a.pdf", false, PreviewKind::Other),
+            (Some("application/pdf"), "a.pdf", false, PreviewKind::Pdf),
             (Some("application/zip"), "a.zip", false, PreviewKind::Other),
             (Some("video/mp4"), "a.mp4", false, PreviewKind::Other),
             (

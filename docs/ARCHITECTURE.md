@@ -92,7 +92,7 @@ tlacuache/
   - `image/*` → `gtk::Picture` cargando `gdk::Texture` en segundo plano (escalar imágenes grandes).
   - texto/código → `sourceview5::Buffer` + `LanguageManager::guess_language`; lectura limitada a 1 MB en hilo de trabajo.
   - `video/*`, `audio/*` → `gtk::Video` (v0.2).
-  - `application/pdf` → `poppler` renderiza la página 1 a textura (v0.2).
+  - `application/pdf` → `ui/pdf_preview.rs`: `poppler` abre el documento y renderiza una página a una superficie de cairo en un hilo de trabajo; los bytes vuelven al hilo de GTK como `MemoryTexture` y se muestran con el visor de imágenes (zoom). Botones ‹ › para cambiar de página.
   - carpetas → conteo/tamaño en segundo plano.
   - resto → icono grande + detalles.
 - Cada solicitud de preview lleva un `Cancellable`; al cambiar la selección se cancela la anterior.

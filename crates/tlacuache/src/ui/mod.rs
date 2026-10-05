@@ -13,6 +13,7 @@ pub mod ops_indicator;
 pub mod pane;
 pub mod pane_actions;
 pub mod path_bar;
+pub mod pdf_preview;
 pub mod preferences_dialog;
 pub mod preview;
 pub mod properties_dialog;

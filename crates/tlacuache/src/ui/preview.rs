@@ -37,6 +37,7 @@ use crate::fs::listing::ATTRIBUTES;
 use crate::fs::size::{self, Measure};
 use crate::strings;
 use crate::ui::image_preview::ImagePreview;
+use crate::ui::pdf_preview::PdfPreview;
 use crate::ui::set_category_icon;
 use crate::ui::text_preview::TextPreview;
 
@@ -49,6 +50,7 @@ const DETAILS_MAX_HEIGHT: i32 = 260;
 const PAGE_ICON: &str = "icon";
 const PAGE_IMAGE: &str = "image";
 const PAGE_TEXT: &str = "text";
+const PAGE_PDF: &str = "pdf";
 /// Límite de texto si la config no dice otro.
 const DEFAULT_MAX_TEXT_BYTES: u64 = 1 << 20;
 
@@ -65,6 +67,7 @@ mod imp {
         pub stack: gtk::Stack,
         pub image: ImagePreview,
         pub text: TextPreview,
+        pub pdf: PdfPreview,
         /// `[preview] max_text_bytes`.
         pub max_text_bytes: Cell<u64>,
         /// Carga pendiente del debounce.
@@ -139,6 +142,7 @@ impl PreviewPane {
         imp.stack.add_named(&visual, Some(PAGE_ICON));
         imp.stack.add_named(&imp.image, Some(PAGE_IMAGE));
         imp.stack.add_named(&imp.text, Some(PAGE_TEXT));
+        imp.stack.add_named(&imp.pdf, Some(PAGE_PDF));
         imp.max_text_bytes.set(DEFAULT_MAX_TEXT_BYTES);
         self.append(&imp.stack);
         self.append(scroll);
@@ -245,6 +249,7 @@ impl PreviewPane {
                     (PreviewKind::Text, Some(path)) => {
                         self.load_text(path, &name, content_type.as_deref()).await;
                     }
+                    (PreviewKind::Pdf, Some(path)) => self.load_pdf(path).await,
                     (PreviewKind::Folder, _) => self.measure_folder(file).await,
                     _ => {}
                 }
@@ -256,6 +261,22 @@ impl PreviewPane {
             }
         }
         self.imp().task.take();
+    }
+
+    /// Primera página del PDF y fila con el número de páginas. Si no se
+    /// puede abrir (dañado, con contraseña), se queda el ícono.
+    async fn load_pdf(&self, path: PathBuf) {
+        let imp = self.imp();
+        match imp.pdf.open(path).await {
+            Ok(pages) => {
+                imp.stack.set_visible_child_name(PAGE_PDF);
+                self.add_row(strings::PROP_PAGES, &pages.to_string());
+            }
+            Err(err) => {
+                tracing::debug!("vista previa de PDF: {err}");
+                self.add_row(strings::PROP_ERROR, &err);
+            }
+        }
     }
 
     /// Cuenta los elementos y mide la carpeta, actualizando las filas.
@@ -419,6 +440,7 @@ impl PreviewPane {
         imp.stack.set_visible_child_name(PAGE_ICON);
         imp.image.set_texture(None);
         imp.text.clear();
+        imp.pdf.clear();
         imp.icon.set_icon_name(None);
         imp.title.set_text("");
     }

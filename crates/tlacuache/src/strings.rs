@@ -100,6 +100,9 @@ pub const PROP_OWNER: &str = "Propietario:grupo";
 pub const PROP_ERROR: &str = "Error";
 pub const PROP_AGE: &str = "Edad";
 pub const PROP_DIMENSIONS: &str = "Dimensiones";
+pub const PROP_PAGES: &str = "Páginas";
+pub const PDF_PREVIOUS: &str = "Página anterior";
+pub const PDF_NEXT: &str = "Página siguiente";
 pub const PREVIEW_IMAGE_HINT: &str = "Rueda: zoom · Arrastrar: mover · Doble clic: encajar";
 pub const PROP_FILES: &str = "Archivos";
 pub const PROP_FOLDERS: &str = "Carpetas";
@@ -430,6 +433,10 @@ pub fn preview_truncated(bytes: u64) -> String {
         "Vista previa recortada: se muestran los primeros {}",
         glib::format_size(bytes)
     )
+}
+
+pub fn pdf_page(page: i32, pages: i32) -> String {
+    format!("Página {page} de {pages}")
 }
 
 pub fn prop_dimensions(width: i32, height: i32) -> String {
