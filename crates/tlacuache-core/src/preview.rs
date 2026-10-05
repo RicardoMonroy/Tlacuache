@@ -102,9 +102,49 @@ pub fn anchored_offset(offset: f64, pointer: f64, old: f64, new: f64) -> f64 {
     ((offset + pointer) / old * new - pointer).max(0.0)
 }
 
+/// Texto a mostrar de los primeros bytes de un archivo (`truncated`: el
+/// archivo sigue). `None` si parece binario (tiene bytes NUL). Si está
+/// truncado, se corta en el último salto de línea para no dejar una línea
+/// (ni un carácter UTF-8) a medias; lo que no sea UTF-8 válido se sustituye.
+pub fn text_excerpt(bytes: &[u8], truncated: bool) -> Option<String> {
+    if bytes.contains(&0) {
+        return None;
+    }
+    let end = if truncated {
+        bytes
+            .iter()
+            .rposition(|b| *b == b'\n')
+            .map_or(bytes.len(), |i| i + 1)
+    } else {
+        bytes.len()
+    };
+    Some(String::from_utf8_lossy(&bytes[..end]).into_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_excerpt_cases() {
+        assert_eq!(
+            text_excerpt(b"hola\nmundo", false).as_deref(),
+            Some("hola\nmundo")
+        );
+        // Truncado: hasta el último salto de línea.
+        assert_eq!(
+            text_excerpt(b"uno\ndos\ntr", true).as_deref(),
+            Some("uno\ndos\n")
+        );
+        // Una sola línea larga truncada se muestra completa.
+        assert_eq!(text_excerpt(b"abc", true).as_deref(), Some("abc"));
+        // Binario.
+        assert_eq!(text_excerpt(b"PK\x03\x04\x00\x00", false), None);
+        // UTF-8 cortado a la mitad de «ñ» sin salto de línea: se sustituye.
+        let cut = &"año".as_bytes()[..2];
+        assert_eq!(text_excerpt(cut, true).as_deref(), Some("a\u{FFFD}"));
+        assert_eq!(text_excerpt(b"", false).as_deref(), Some(""));
+    }
 
     #[test]
     fn decode_size_scales_only_large_images() {

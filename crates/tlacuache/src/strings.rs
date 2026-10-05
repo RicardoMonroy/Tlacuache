@@ -352,6 +352,14 @@ pub fn prop_symlink(target: &str) -> String {
 }
 
 /// «1.2 MB (1 234 567 bytes)».
+/// Nota bajo la vista previa de texto recortada.
+pub fn preview_truncated(bytes: u64) -> String {
+    format!(
+        "Vista previa recortada: se muestran los primeros {}",
+        glib::format_size(bytes)
+    )
+}
+
 pub fn prop_dimensions(width: i32, height: i32) -> String {
     format!("{width} × {height} px")
 }

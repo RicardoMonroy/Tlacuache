@@ -10,6 +10,7 @@ tlacuache-core.workspace = true
 gtk.workspace = true
 adw.workspace = true
 vte.workspace = true
+sourceview5.workspace = true
 glib.workspace = true
 gio.workspace = true
 async-channel.workspace = true

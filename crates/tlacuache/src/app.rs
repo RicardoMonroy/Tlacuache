@@ -78,6 +78,7 @@ pub fn build() -> adw::Application {
         // Ícono de las ventanas (incluido en el gresource: funciona aunque
         // la app no esté instalada).
         gtk::Window::set_default_icon_name(APP_ID);
+        sourceview5::init();
         match gtk::gdk::Display::default() {
             Some(display) => {
                 crate::ui::theme_manager::init(theme_settings.clone(), &display);

@@ -106,6 +106,7 @@ Además, para que los widgets nativos de libadwaita sigan el tema, se sobrescrib
 
    Verifica las firmas en docs.rs de la versión de `vte4` fijada.
 7. Cambio en vivo sin reiniciar. El tema se elige en Preferencias (lista con miniatura de cada tema) y en el menú principal.
+8. Vista previa de código (ADR-011): `Theme::source_scheme()` genera un esquema de GtkSourceView (`tlacuache-<id>`) con la sintaxis tomada de la paleta ANSI de `[terminal]`; se escribe en `~/.cache/tlacuache/styles/` y se emite `source-scheme-changed`.
 
 ### 5.4 Configuración
 

@@ -76,6 +76,13 @@ impl<'de> Deserialize<'de> for Color {
     }
 }
 
+fn xml_escape(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 /// Relación de contraste WCAG entre dos colores (1–21).
 pub fn contrast(a: Color, b: Color) -> f64 {
     let (la, lb) = (a.luminance(), b.luminance());
@@ -402,6 +409,84 @@ impl Theme {
         ]
     }
 
+    /// Id del esquema de GtkSourceView generado para este tema.
+    pub fn source_scheme_id(&self) -> String {
+        format!("tlacuache-{}", self.meta.id)
+    }
+
+    /// Esquema de GtkSourceView (XML) para la vista previa de código
+    /// (ADR-011): fondo, texto y selección de `[colors]`; la sintaxis, de la
+    /// paleta ANSI de `[terminal]`, como la ven los programas en la terminal.
+    pub fn source_scheme(&self) -> String {
+        let c = &self.colors;
+        let t = &self.terminal;
+        let p = &t.palette;
+        let kind = match self.meta.variant {
+            Variant::Dark => "dark",
+            Variant::Light => "light",
+        };
+        // (estilo, frente, fondo, extra)
+        let styles: [(&str, Option<Color>, Option<Color>, &str); 26] = [
+            ("text", Some(t.foreground), Some(t.background), ""),
+            ("selection", Some(c.selection_fg), Some(c.selection_bg), ""),
+            (
+                "selection-unfocused",
+                None,
+                Some(c.selection_inactive_bg),
+                "",
+            ),
+            ("cursor", Some(t.cursor), None, ""),
+            ("current-line", None, Some(c.pane_alt_row), ""),
+            ("line-numbers", Some(c.fg_muted), Some(t.background), ""),
+            ("bracket-match", Some(c.accent_fg), Some(c.accent), ""),
+            (
+                "search-match",
+                Some(c.selection_fg),
+                Some(c.selection_bg),
+                "",
+            ),
+            ("def:comment", Some(c.fg_muted), None, r#" italic="true""#),
+            ("def:shebang", Some(c.fg_muted), None, r#" bold="true""#),
+            ("def:keyword", Some(p[4]), None, r#" bold="true""#),
+            ("def:statement", Some(p[4]), None, ""),
+            ("def:type", Some(p[14]), None, ""),
+            ("def:function", Some(p[6]), None, ""),
+            ("def:identifier", Some(t.foreground), None, ""),
+            ("def:string", Some(p[2]), None, ""),
+            ("def:special-char", Some(p[3]), None, ""),
+            ("def:constant", Some(p[5]), None, ""),
+            ("def:number", Some(p[5]), None, ""),
+            ("def:preprocessor", Some(p[3]), None, ""),
+            ("def:builtin", Some(p[12]), None, ""),
+            ("def:error", Some(p[1]), None, r#" underline="error""#),
+            ("def:heading", Some(p[4]), None, r#" bold="true""#),
+            ("def:link-text", Some(c.link), None, ""),
+            ("def:inserted", Some(p[2]), None, ""),
+            ("def:deleted", Some(p[1]), None, ""),
+        ];
+        let mut xml = format!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+             <!-- Generado por Tlacuache desde el tema «{id}»; no editar. -->\n\
+             <style-scheme id=\"{scheme}\" name=\"{name}\" version=\"1.0\" kind=\"{kind}\">\n",
+            id = xml_escape(&self.meta.id),
+            scheme = xml_escape(&self.source_scheme_id()),
+            name = xml_escape(&format!("Tlacuache {}", self.meta.name)),
+        );
+        for (name, fg, bg, extra) in styles {
+            xml.push_str(&format!("  <style name=\"{name}\""));
+            if let Some(fg) = fg {
+                xml.push_str(&format!(" foreground=\"{fg}\""));
+            }
+            if let Some(bg) = bg {
+                xml.push_str(&format!(" background=\"{bg}\""));
+            }
+            xml.push_str(extra);
+            xml.push_str("/>\n");
+        }
+        xml.push_str("</style-scheme>\n");
+        xml
+    }
+
     /// Bloque `:root { --tl-*: …; }` que carga el `ThemeManager`.
     /// Convención: `--tl-<clave con guiones>` (`docs/THEMES.md` §5.2).
     pub fn css_variables(&self) -> String {
@@ -513,6 +598,46 @@ mod tests {
     }
 
     /// Criterio de aceptación de la tarea 7.3.
+    #[test]
+    fn source_scheme_uses_theme_colors_and_escapes() {
+        let mut theme = Theme::default_theme();
+        let xml = theme.source_scheme();
+        assert!(xml.contains(r#"<style-scheme id="tlacuache-nord" name="Tlacuache Nord""#));
+        assert!(xml.contains(r#"kind="dark""#));
+        assert!(
+            xml.contains(r##"<style name="text" foreground="#d8dee9" background="#2e3440"/>"##)
+        );
+        assert!(xml.contains(r##"<style name="def:string" foreground="#a3be8c"/>"##));
+        assert!(xml.contains(r#"italic="true""#));
+        assert_eq!(xml.matches("<style ").count(), 26);
+        assert!(xml.trim_end().ends_with("</style-scheme>"));
+
+        theme.meta.name = "A & <B>".into();
+        assert!(
+            theme
+                .source_scheme()
+                .contains(r#"name="Tlacuache A &amp; &lt;B&gt;""#)
+        );
+    }
+
+    #[test]
+    fn syntax_colors_are_readable_in_every_builtin_theme() {
+        for id in Theme::builtin_ids() {
+            let theme = Theme::builtin(id).unwrap();
+            let t = &theme.terminal;
+            let mut colors: Vec<Color> = [1, 2, 3, 4, 5, 6, 12, 14].map(|i| t.palette[i]).into();
+            colors.extend([theme.colors.fg_muted, theme.colors.link]);
+            for color in colors {
+                let ratio = contrast(color, t.background);
+                assert!(
+                    ratio >= 3.0,
+                    "{id}: {color} sobre {} = {ratio:.2}",
+                    t.background
+                );
+            }
+        }
+    }
+
     #[test]
     fn builtin_themes_parse_and_pass_contrast() {
         let ids: Vec<_> = Theme::builtin_ids().collect();

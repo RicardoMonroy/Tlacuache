@@ -7,14 +7,18 @@
 //!    siguiendo al sistema con `follow_system` (tema `light`/`dark`).
 //! 4. `theme-changed` para lo que no es CSS: clases de flags en la ventana
 //!    y colores de la terminal.
+//! 5. El esquema de GtkSourceView del tema (ADR-011) se escribe en
+//!    `~/.cache/tlacuache/styles/` en un hilo de trabajo; al quedar listo se
+//!    emite `source-scheme-changed`.
 
 use std::cell::{OnceCell, RefCell};
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
-use gtk::{gdk, glib};
+use gtk::{gdk, gio, glib};
 use tlacuache_core::config;
 use tlacuache_core::theme::{AgeStyle, IconStyle, SelectionStyle, Theme, Variant};
 
@@ -51,7 +55,12 @@ mod imp {
     impl ObjectImpl for ThemeManager {
         fn signals() -> &'static [Signal] {
             static SIGNALS: OnceLock<Vec<Signal>> = OnceLock::new();
-            SIGNALS.get_or_init(|| vec![Signal::builder("theme-changed").build()])
+            SIGNALS.get_or_init(|| {
+                vec![
+                    Signal::builder("theme-changed").build(),
+                    Signal::builder("source-scheme-changed").build(),
+                ]
+            })
         }
     }
 }
@@ -90,6 +99,19 @@ impl ThemeManager {
         );
     }
 
+    pub fn connect_source_scheme_changed<F: Fn(&Self) + 'static>(&self, f: F) {
+        self.connect_closure(
+            "source-scheme-changed",
+            false,
+            glib::closure_local!(move |manager: &Self| f(manager)),
+        );
+    }
+
+    /// Esquema de GtkSourceView del tema aplicado, si ya está escrito.
+    pub fn source_scheme(&self) -> Option<sourceview5::StyleScheme> {
+        sourceview5::StyleSchemeManager::default().scheme(&self.theme().source_scheme_id())
+    }
+
     /// Tema aplicado (el predeterminado si aún no hay ninguno).
     pub fn theme(&self) -> Theme {
         self.imp()
@@ -114,6 +136,9 @@ impl ThemeManager {
             &imp.variables,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
         );
+
+        sourceview5::StyleSchemeManager::default()
+            .prepend_search_path(&styles_dir().to_string_lossy());
 
         // Con `follow_system`, cambiar el modo del sistema cambia de tema.
         adw::StyleManager::default().connect_dark_notify(glib::clone!(
@@ -149,9 +174,44 @@ impl ThemeManager {
         }
         imp.variables.load_from_string(&theme.css_variables());
         tracing::debug!("tema aplicado: {}", theme.meta.id);
+        let (file_name, xml) = (
+            format!("{}.xml", theme.source_scheme_id()),
+            theme.source_scheme(),
+        );
         imp.current.replace(Some(theme));
         self.emit_by_name::<()>("theme-changed", &[]);
+        self.write_source_scheme(file_name, xml);
     }
+
+    fn write_source_scheme(&self, file_name: String, xml: String) {
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = manager)]
+            self,
+            async move {
+                let written = gio::spawn_blocking(move || {
+                    let dir = styles_dir();
+                    std::fs::create_dir_all(&dir)?;
+                    std::fs::write(dir.join(file_name), xml)
+                })
+                .await;
+                match written {
+                    Ok(Ok(())) => {
+                        sourceview5::StyleSchemeManager::default().force_rescan();
+                        manager.emit_by_name::<()>("source-scheme-changed", &[]);
+                    }
+                    Ok(Err(err)) => {
+                        tracing::warn!("no se pudo escribir el esquema de sintaxis: {err}");
+                    }
+                    Err(_) => tracing::warn!("falló el hilo que escribe el esquema de sintaxis"),
+                }
+            }
+        ));
+    }
+}
+
+/// Carpeta de los esquemas de GtkSourceView generados.
+fn styles_dir() -> PathBuf {
+    glib::user_cache_dir().join("tlacuache").join("styles")
 }
 
 /// Pone en `widget` (la ventana) las clases de los flags de `[style]` del

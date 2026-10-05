@@ -51,3 +51,8 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
 - **Contexto**: los íconos de tipo de archivo deben cambiar de color con cada tema.
 - **Decisión**: un solo set de SVG simbólicos de 16 px (solo `fill`, `evenodd`). El color se aplica con la clase CSS `tl-ft-<categoría>`. Los íconos genéricos se toman de Adwaita. El ícono de la app (hicolor) vive en `data/icons/` y se instala con el `.desktop`.
 - **Consecuencias**: no hay sets duplicados por tema. El estilo multicolor tipo OneCommander queda descartado a favor de la consistencia.
+
+## ADR-011 — Resaltado de sintaxis desde el tema
+- **Contexto**: la vista previa de código usa GtkSourceView, que toma sus colores de un *style scheme* (XML en disco). Con los esquemas incluidos (Adwaita) los colores no coinciden con el tema y se rompería la regla 9.
+- **Decisión**: `Theme::source_scheme()` genera el esquema `tlacuache-<id>`: texto, fondo y selección de `[colors]`/`[terminal]`; la sintaxis, de la paleta ANSI de `[terminal]` (palabras clave = azul, tipos = cian brillante, funciones = cian, cadenas = verde, números y constantes = magenta, preprocesador = amarillo, errores = rojo) y los comentarios en `fg_muted`. El `ThemeManager` lo escribe en `~/.cache/tlacuache/styles/` en un hilo de trabajo, añade esa carpeta a la ruta de búsqueda de `StyleSchemeManager` y emite `source-scheme-changed`.
+- **Consecuencias**: el código se ve con los colores de la terminal y cambia con el tema. Una prueba exige contraste ≥ 3:1 de esos colores sobre el fondo en los temas incluidos; los temas de usuario (7.8) deberán validarlo también.

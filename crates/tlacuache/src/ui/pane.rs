@@ -178,6 +178,8 @@ impl Pane {
         imp.split.set_vexpand(true);
 
         if let Some(config) = imp.config.get() {
+            imp.preview
+                .set_max_text_bytes(config.preview.max_text_bytes);
             let _ = imp.accels.set((
                 Accel::for_action(Action::ToggleTerminal, &config.keys),
                 Accel::for_action(Action::LeaveTerminal, &config.keys),
