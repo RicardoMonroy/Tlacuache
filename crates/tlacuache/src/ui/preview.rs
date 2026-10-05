@@ -1,32 +1,43 @@
 //! Vista previa y detalles de un panel (`docs/UI_SPEC.md` §3): a la
-//! izquierda la vista previa (por ahora el ícono grande del tipo; las
-//! imágenes y el texto llegan en 6.2 y 6.3), a la derecha los detalles.
+//! izquierda la vista previa (imagen, o el ícono grande del tipo; el texto
+//! llega en 6.3), a la derecha los detalles.
+//!
+//! Las imágenes se decodifican y escalan (lado mayor `MAX_DECODE_SIDE`) en
+//! un hilo de trabajo con gdk-pixbuf; la textura se crea en el hilo de GTK.
 //!
 //! `request` espera `preview::DEBOUNCE_MS` desde el último cambio de
 //! selección; cada carga nueva aborta la anterior (su consulta de gio se
 //! cancela al soltar el future).
 
 use std::cell::{Cell, RefCell};
+use std::path::Path;
 use std::time::{Duration, SystemTime};
 
 use adw::subclass::prelude::*;
 use gtk::prelude::*;
-use gtk::{gio, glib, pango};
+use gtk::{gdk, gdk_pixbuf, gio, glib, pango};
 use tlacuache_core::age::Age;
 use tlacuache_core::entry::FileEntry;
 use tlacuache_core::filetype::{FileCategory, classify};
 use tlacuache_core::perms;
-use tlacuache_core::preview::{DEBOUNCE_MS, Target};
+use tlacuache_core::preview::{
+    DEBOUNCE_MS, MAX_DECODE_SIDE, PreviewKind, Target, decode_size, kind, scale_to_side,
+};
 use tlacuache_core::summary::SelectionSummary;
 
 use crate::fs::display::display_name;
 use crate::fs::file_item::{SelectedInfo, entry_from_info};
 use crate::fs::listing::ATTRIBUTES;
 use crate::strings;
+use crate::ui::image_preview::ImagePreview;
 use crate::ui::set_category_icon;
 
 /// Tamaño del ícono de la vista previa genérica.
 const ICON_SIZE: i32 = 96;
+/// Lado mayor (px) al rasterizar imágenes vectoriales.
+const VECTOR_SIDE: i32 = 1024;
+const PAGE_ICON: &str = "icon";
+const PAGE_IMAGE: &str = "image";
 
 mod imp {
     use super::*;
@@ -36,6 +47,9 @@ mod imp {
         pub icon: gtk::Image,
         pub title: gtk::Label,
         pub details: gtk::Grid,
+        /// Páginas: `icon` (genérica) e `image`.
+        pub stack: gtk::Stack,
+        pub image: ImagePreview,
         /// Carga pendiente del debounce.
         pub timer: RefCell<Option<glib::SourceId>>,
         /// Carga en curso (se aborta al pedir otra).
@@ -91,7 +105,6 @@ impl PreviewPane {
         imp.title.set_max_width_chars(30);
         let visual = gtk::Box::new(gtk::Orientation::Vertical, 8);
         visual.add_css_class("tl-preview-visual");
-        visual.set_hexpand(true);
         visual.set_valign(gtk::Align::Center);
         visual.append(&imp.icon);
         visual.append(&imp.title);
@@ -106,7 +119,10 @@ impl PreviewPane {
             .build();
         scroll.set_hexpand(true);
 
-        self.append(&visual);
+        imp.stack.add_named(&visual, Some(PAGE_ICON));
+        imp.stack.add_named(&imp.image, Some(PAGE_IMAGE));
+        imp.stack.set_hexpand(true);
+        self.append(&imp.stack);
         self.append(&scroll);
     }
 
@@ -171,15 +187,58 @@ impl PreviewPane {
                 glib::Priority::DEFAULT,
             )
             .await;
-        self.imp().task.take();
         match info {
-            Ok(info) => self.show_file(file, &info),
+            Ok(info) => {
+                self.show_file(file, &info);
+                let is_image = kind(
+                    info.content_type().as_deref(),
+                    &info.display_name(),
+                    info.file_type() == gio::FileType::Directory,
+                ) == PreviewKind::Image;
+                if is_image && let Some(path) = file.path() {
+                    self.load_image(path).await;
+                }
+            }
             Err(err) => {
                 self.clear();
                 self.imp().title.set_text(&display_name(file));
                 self.add_row(strings::PROP_ERROR, err.message());
             }
         }
+        self.imp().task.take();
+    }
+
+    /// Decodifica en un hilo de trabajo y muestra la imagen. Si se aborta
+    /// la tarea, el resultado del hilo se descarta.
+    async fn load_image(&self, path: std::path::PathBuf) {
+        let decoded = match gio::spawn_blocking(move || decode_image(&path)).await {
+            Ok(Ok(decoded)) => decoded,
+            Ok(Err(message)) => {
+                tracing::debug!("vista previa de imagen: {message}");
+                return;
+            }
+            Err(_) => return,
+        };
+        let format = if decoded.has_alpha {
+            gdk::MemoryFormat::R8g8b8a8
+        } else {
+            gdk::MemoryFormat::R8g8b8
+        };
+        let texture = gdk::MemoryTexture::new(
+            decoded.width,
+            decoded.height,
+            format,
+            &decoded.bytes,
+            decoded.stride,
+        );
+        let imp = self.imp();
+        imp.image.set_texture(Some(texture.upcast_ref()));
+        imp.stack.set_visible_child_name(PAGE_IMAGE);
+        let (width, height) = decoded.original;
+        self.add_row(
+            strings::PROP_DIMENSIONS,
+            &strings::prop_dimensions(width, height),
+        );
     }
 
     fn show_file(&self, file: &gio::File, info: &gio::FileInfo) {
@@ -247,6 +306,8 @@ impl PreviewPane {
             imp.details.remove(&child);
         }
         imp.rows.set(0);
+        imp.stack.set_visible_child_name(PAGE_ICON);
+        imp.image.set_texture(None);
         imp.icon.set_icon_name(None);
         imp.title.set_text("");
     }
@@ -290,4 +351,39 @@ fn date_text(time: SystemTime) -> String {
         .and_then(|dt| dt.format("%Y-%m-%d %H:%M").ok())
         .map(|text| text.to_string())
         .unwrap_or_default()
+}
+
+/// Píxeles de una imagen decodificada (sin `gdk`: `MemoryTexture` solo se
+/// crea en el hilo de GTK).
+struct Decoded {
+    width: i32,
+    height: i32,
+    has_alpha: bool,
+    stride: usize,
+    bytes: glib::Bytes,
+    /// Dimensiones del archivo.
+    original: (i32, i32),
+}
+
+/// En un hilo de trabajo: lee, escala y orienta (EXIF) la imagen.
+fn decode_image(path: &Path) -> Result<Decoded, String> {
+    let (format, width, height) = gdk_pixbuf::Pixbuf::file_info(path)
+        .ok_or_else(|| format!("formato no reconocido: {}", path.display()))?;
+    // Los vectoriales (SVG) se rasterizan grandes para que se vean nítidos.
+    let (w, h) = if format.is_scalable() {
+        scale_to_side(width, height, VECTOR_SIDE)
+    } else {
+        decode_size(width, height, MAX_DECODE_SIDE)
+    };
+    let pixbuf =
+        gdk_pixbuf::Pixbuf::from_file_at_scale(path, w, h, true).map_err(|err| err.to_string())?;
+    let pixbuf = pixbuf.apply_embedded_orientation().unwrap_or(pixbuf);
+    Ok(Decoded {
+        width: pixbuf.width(),
+        height: pixbuf.height(),
+        has_alpha: pixbuf.has_alpha(),
+        stride: usize::try_from(pixbuf.rowstride()).map_err(|err| err.to_string())?,
+        bytes: pixbuf.read_pixel_bytes(),
+        original: (width, height),
+    })
 }

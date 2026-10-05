@@ -97,6 +97,8 @@ pub const PROP_PERMISSIONS: &str = "Permisos";
 pub const PROP_OWNER: &str = "Propietario:grupo";
 pub const PROP_ERROR: &str = "Error";
 pub const PROP_AGE: &str = "Edad";
+pub const PROP_DIMENSIONS: &str = "Dimensiones";
+pub const PREVIEW_IMAGE_HINT: &str = "Rueda: zoom · Arrastrar: mover · Doble clic: encajar";
 pub const PROP_FILES: &str = "Archivos";
 pub const PROP_FOLDERS: &str = "Carpetas";
 pub const PROP_CALCULATING: &str = "Calculando…";
@@ -350,6 +352,10 @@ pub fn prop_symlink(target: &str) -> String {
 }
 
 /// «1.2 MB (1 234 567 bytes)».
+pub fn prop_dimensions(width: i32, height: i32) -> String {
+    format!("{width} × {height} px")
+}
+
 pub fn prop_size(bytes: u64) -> String {
     format!("{} ({bytes} bytes)", glib::format_size(bytes))
 }

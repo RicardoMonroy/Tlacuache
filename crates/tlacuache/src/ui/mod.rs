@@ -5,6 +5,7 @@ pub mod dnd;
 pub mod drive_row;
 pub mod favorites_section;
 pub mod filter_indicator;
+pub mod image_preview;
 pub mod list_view;
 pub mod miller_view;
 pub mod ops_indicator;

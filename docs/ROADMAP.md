@@ -52,7 +52,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 
 ## Hito 6 — Vista previa
 - [x] **6.1 Contenedor de preview + detalles** por panel (Espacio alterna), debounce y cancelación.
-- [ ] **6.2 Imágenes** con escalado en segundo plano y zoom.
+- [x] **6.2 Imágenes** con escalado en segundo plano y zoom.
 - [ ] **6.3 Texto/código** con sourceview5, límite de tamaño.
 - [ ] **6.4 Carpetas**: conteo y tamaño en segundo plano.
 - [ ] **6.5 Posición configurable** (abajo/derecha).

@@ -49,9 +49,106 @@ pub fn kind(content_type: Option<&str>, name: &str, is_dir: bool) -> PreviewKind
     }
 }
 
+/// Lado mayor (px) al decodificar imágenes para la vista previa: las más
+/// grandes se escalan en el hilo de trabajo.
+pub const MAX_DECODE_SIDE: i32 = 2560;
+/// Factor por paso de la rueda.
+pub const ZOOM_STEP: f64 = 1.15;
+pub const MAX_ZOOM: f64 = 16.0;
+
+/// Tamaño de decodificación: el original si cabe en `max`; si no, escalado
+/// conservando la proporción (al menos 1 px por lado).
+pub fn decode_size(width: i32, height: i32, max: i32) -> (i32, i32) {
+    let longest = width.max(height);
+    if longest <= max || longest <= 0 {
+        return (width, height);
+    }
+    let scale = f64::from(max) / f64::from(longest);
+    let side = |v: i32| ((f64::from(v) * scale).round() as i32).max(1);
+    (side(width), side(height))
+}
+
+/// Escala (agrandando o reduciendo) para que el lado mayor mida `side`.
+pub fn scale_to_side(width: i32, height: i32, side: i32) -> (i32, i32) {
+    if width <= 0 || height <= 0 {
+        return (width, height);
+    }
+    let scale = f64::from(side) / f64::from(width.max(height));
+    let px = |v: i32| ((f64::from(v) * scale).round() as i32).max(1);
+    (px(width), px(height))
+}
+
+/// Escala que encaja una imagen de `image` px en `area` px sin agrandarla.
+pub fn fit_scale(image: (f64, f64), area: (f64, f64)) -> f64 {
+    if image.0 <= 0.0 || image.1 <= 0.0 || area.0 <= 0.0 || area.1 <= 0.0 {
+        return 1.0;
+    }
+    (area.0 / image.0).min(area.1 / image.1).min(1.0)
+}
+
+/// Zoom tras un paso de rueda (`dy` < 0 acerca). `None` = volver a encajar
+/// (no se aleja más allá de la escala de encaje).
+pub fn zoom(current: f64, fit: f64, dy: f64) -> Option<f64> {
+    let next = current * ZOOM_STEP.powf(-dy);
+    (next > fit * 1.001).then(|| next.min(MAX_ZOOM))
+}
+
+/// Desplazamiento nuevo para que el punto bajo el puntero (`pointer`, en
+/// coordenadas de la vista) siga en su sitio al pasar de `old` a `new`.
+pub fn anchored_offset(offset: f64, pointer: f64, old: f64, new: f64) -> f64 {
+    if old <= 0.0 {
+        return 0.0;
+    }
+    ((offset + pointer) / old * new - pointer).max(0.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn decode_size_scales_only_large_images() {
+        assert_eq!(decode_size(800, 600, 2560), (800, 600));
+        assert_eq!(decode_size(5120, 2560, 2560), (2560, 1280));
+        assert_eq!(decode_size(1000, 8000, 2000), (250, 2000));
+        assert_eq!(decode_size(10000, 1, 100), (100, 1));
+        assert_eq!(decode_size(0, 0, 100), (0, 0));
+    }
+
+    #[test]
+    fn scale_to_side_enlarges_and_shrinks() {
+        assert_eq!(scale_to_side(64, 32, 1024), (1024, 512));
+        assert_eq!(scale_to_side(4096, 4096, 1024), (1024, 1024));
+        assert_eq!(scale_to_side(0, 5, 1024), (0, 5));
+    }
+
+    #[test]
+    fn fit_never_enlarges() {
+        assert_eq!(fit_scale((100.0, 50.0), (400.0, 400.0)), 1.0);
+        assert_eq!(fit_scale((1000.0, 500.0), (500.0, 500.0)), 0.5);
+        assert_eq!(fit_scale((1000.0, 2000.0), (500.0, 500.0)), 0.25);
+        assert_eq!(fit_scale((0.0, 10.0), (500.0, 500.0)), 1.0);
+    }
+
+    #[test]
+    fn zoom_steps_and_limits() {
+        let fit = 0.5;
+        let zoomed = zoom(fit, fit, -1.0).unwrap();
+        assert!((zoomed - 0.575).abs() < 1e-9);
+        // Alejar desde el encaje vuelve a encajar.
+        assert_eq!(zoom(fit, fit, 1.0), None);
+        assert_eq!(zoom(zoomed, fit, 1.0), None);
+        assert_eq!(zoom(15.0, fit, -5.0), Some(MAX_ZOOM));
+    }
+
+    #[test]
+    fn anchor_keeps_point_under_pointer() {
+        // Punto 100 px dentro de la vista, sin desplazamiento, al doble.
+        assert_eq!(anchored_offset(0.0, 100.0, 1.0, 2.0), 100.0);
+        assert_eq!(anchored_offset(50.0, 100.0, 1.0, 2.0), 200.0);
+        assert_eq!(anchored_offset(200.0, 100.0, 2.0, 1.0), 50.0);
+        assert_eq!(anchored_offset(0.0, 100.0, 2.0, 1.0), 0.0);
+    }
 
     #[test]
     fn target_depends_on_selection_size() {
