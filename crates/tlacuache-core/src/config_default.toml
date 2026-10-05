@@ -13,7 +13,8 @@ max_text_bytes = 1048576
 
 [terminal]
 shell = ""                 # vacío = $SHELL
-font = "JetBrains Mono 11"
+font = ""                  # vacío = font_mono del tema
+font_size = 11
 sync_panel_to_terminal = true
 sync_terminal_to_panel = true
 shell_integration = true   # OSC 7 automático (bash) para que el panel siga los cd

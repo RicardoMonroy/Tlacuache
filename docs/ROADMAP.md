@@ -64,7 +64,7 @@ Orden acordado: **7.1–7.5 antes del Hito 6** (la vista previa nace usando los 
 - [x] **7.2 `core::filetype`**: tipo MIME → categoría (`folder`, `code`, `image`…) con pruebas para al menos 30 tipos comunes.
 - [x] **7.3 `core::theme`**: parseo con `deny_unknown_fields`, validación de contraste portada de `scripts/check-theme-contrast.py` y `css_variables()` con prueba de snapshot. Edad con los buckets de THEMES §3 y formato compacto (`ahora · 12min · 2h · 3d · 3M · 1a`). CA: prueba que valida los 5 temas incluidos.
 - [x] **7.4 ThemeManager**: `base.css` (adaptado a los widgets reales) + provider de variables + `StyleManager` + clases de flags + sobrescritura de las variables de libadwaita (verificando sus nombres). Config `[theme]` de THEMES §5.4. CA: el tema `nord` se ve igual que en `branding/brand-board.html`.
-- [ ] **7.5 Terminal temática**: paleta, cursor, selección y fuente de VTE desde el tema (tamaño desde la config); se actualiza con `theme-changed`.
+- [x] **7.5 Terminal temática**: paleta, cursor, selección y fuente de VTE desde el tema (tamaño desde la config); se actualiza con `theme-changed`.
 - [ ] **7.6 Flags en Rust**: `bracket_titles` (en el título de la pestaña), `icon_style = "glyph"` (glifo + nombre coloreado + `/` en carpetas), `age_style = "text"`, `uppercase_headers`. CA: el tema `consola` se parece a su vista en el board.
 - [ ] **7.7 Selector de temas**: Preferencias (`adw::PreferencesDialog`) con lista de temas, cambio en vivo y `follow_system` con temas light/dark. Persistencia en config.
 - [ ] **7.8 Temas de usuario**: cargar `~/.config/tlacuache/themes/*.toml`; toast con los pares de contraste fallidos; respaldo a `nord` si hay error de parseo.

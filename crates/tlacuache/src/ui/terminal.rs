@@ -1,5 +1,6 @@
 //! Terminal de un panel: envuelve `vte4::Terminal` con el shell del usuario,
-//! la fuente de la config y la paleta Nord. Emite `exited` cuando el shell
+//! los colores y la fuente del tema activo (se actualizan al cambiarlo; el
+//! tamaño y una fuente propia salen de `[terminal]`). Emite `exited` cuando el shell
 //! termina (el panel la oculta y la recrea en el siguiente F4).
 //!
 //! Panel → terminal: `change_directory` manda `cd` solo si el shell está en
@@ -16,11 +17,12 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
-use tlacuache_core::config::Config;
+use tlacuache_core::config::{self, Config};
 use tlacuache_core::shell::{self, ShellKind, cd_command, paste_paths};
 use tlacuache_core::theme::{Color, Theme};
 use vte::prelude::*;
 
+use crate::ui::theme_manager;
 use crate::{strings, window};
 
 /// Respaldo si ni la config ni `$SHELL` indican un shell.
@@ -42,6 +44,8 @@ mod imp {
         /// Carpeta del panel que falta aplicar (programa corriendo).
         pub pending_dir: RefCell<Option<gio::File>>,
         pub desync: gtk::Revealer,
+        /// `[terminal]` de la config (fuente al cambiar de tema).
+        pub settings: OnceCell<config::Terminal>,
     }
 
     #[glib::object_subclass]
@@ -114,10 +118,24 @@ impl TerminalView {
         terminal.set_vexpand(true);
         terminal.set_scrollback_lines(SCROLLBACK_LINES);
         terminal.set_mouse_autohide(true);
-        terminal.set_font(Some(&pango::FontDescription::from_string(
-            &config.terminal.font,
-        )));
-        apply_palette(&terminal);
+        let _ = self.imp().settings.set(config.terminal.clone());
+        match theme_manager::get() {
+            Some(themes) => {
+                apply_theme(&terminal, &themes.theme(), &config.terminal);
+                themes.connect_theme_changed(glib::clone!(
+                    #[weak]
+                    terminal,
+                    #[weak(rename_to = view)]
+                    self,
+                    move |themes| {
+                        if let Some(settings) = view.imp().settings.get() {
+                            apply_theme(&terminal, &themes.theme(), settings);
+                        }
+                    }
+                ));
+            }
+            None => apply_theme(&terminal, &Theme::default_theme(), &config.terminal),
+        }
         terminal.connect_child_exited(glib::clone!(
             #[weak(rename_to = view)]
             self,
@@ -455,10 +473,9 @@ fn rgba(color: Color) -> gdk::RGBA {
     )
 }
 
-/// Colores del tema predeterminado; con la tarea 7.5 vendrán del tema
-/// activo y se actualizarán al cambiarlo.
-fn apply_palette(terminal: &vte::Terminal) {
-    let colors = Theme::default_theme().terminal;
+/// Colores, cursor, selección y fuente de `theme` (`docs/THEMES.md` §5.3).
+fn apply_theme(terminal: &vte::Terminal, theme: &Theme, settings: &config::Terminal) {
+    let colors = &theme.terminal;
     let palette: Vec<gdk::RGBA> = colors.palette.iter().map(|c| rgba(*c)).collect();
     let refs: Vec<&gdk::RGBA> = palette.iter().collect();
     terminal.set_colors(
@@ -466,4 +483,15 @@ fn apply_palette(terminal: &vte::Terminal) {
         Some(&rgba(colors.background)),
         &refs,
     );
+    terminal.set_color_cursor(Some(&rgba(colors.cursor)));
+    terminal.set_color_cursor_foreground(Some(&rgba(colors.cursor_text)));
+    terminal.set_color_highlight(Some(&rgba(colors.selection_bg)));
+    terminal.set_color_highlight_foreground(Some(&rgba(colors.selection_fg)));
+
+    // `from_string` acepta familia o descripción completa («Iosevka 12»);
+    // el tamaño de la config manda.
+    let mut font =
+        pango::FontDescription::from_string(settings.font_family(&theme.style.font_mono));
+    font.set_size((settings.font_size() * f64::from(pango::SCALE)).round() as i32);
+    terminal.set_font(Some(&font));
 }

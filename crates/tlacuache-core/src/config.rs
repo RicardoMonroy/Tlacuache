@@ -106,7 +106,11 @@ impl Default for Preview {
 pub struct Terminal {
     /// Vacío = usar `$SHELL` (con `/bin/bash` como respaldo).
     pub shell: String,
+    /// Familia (o descripción de Pango) de la fuente. Vacío = `font_mono`
+    /// del tema activo.
     pub font: String,
+    /// Tamaño en puntos; manda sobre un tamaño escrito en `font`.
+    pub font_size: f64,
     pub sync_panel_to_terminal: bool,
     pub sync_terminal_to_panel: bool,
     /// Integración automática del shell (OSC 7) para seguir los `cd` de la
@@ -118,10 +122,35 @@ impl Default for Terminal {
     fn default() -> Self {
         Self {
             shell: String::new(),
-            font: "JetBrains Mono 11".to_owned(),
+            font: String::new(),
+            font_size: DEFAULT_FONT_SIZE,
             sync_panel_to_terminal: true,
             sync_terminal_to_panel: true,
             shell_integration: true,
+        }
+    }
+}
+
+const DEFAULT_FONT_SIZE: f64 = 11.0;
+const FONT_SIZE_RANGE: std::ops::RangeInclusive<f64> = 6.0..=72.0;
+
+impl Terminal {
+    /// Fuente a usar: la de la config o, si está vacía, la del tema.
+    pub fn font_family<'a>(&'a self, theme_mono: &'a str) -> &'a str {
+        match self.font.trim() {
+            "" => theme_mono,
+            font => font,
+        }
+    }
+
+    /// Tamaño en puntos dentro de un rango legible (un valor absurdo o no
+    /// finito vuelve al predeterminado).
+    pub fn font_size(&self) -> f64 {
+        if self.font_size.is_finite() {
+            self.font_size
+                .clamp(*FONT_SIZE_RANGE.start(), *FONT_SIZE_RANGE.end())
+        } else {
+            DEFAULT_FONT_SIZE
         }
     }
 }
@@ -286,7 +315,8 @@ mod tests {
         assert_eq!(c.preview.position, PreviewPosition::Bottom);
         assert_eq!(c.preview.max_text_bytes, 1_048_576);
         assert_eq!(c.terminal.shell, "");
-        assert_eq!(c.terminal.font, "JetBrains Mono 11");
+        assert_eq!(c.terminal.font, "");
+        assert_eq!(c.terminal.font_size(), 11.0);
         assert!(c.terminal.sync_panel_to_terminal);
         assert!(c.terminal.sync_terminal_to_panel);
         assert!(c.terminal.shell_integration);
@@ -361,6 +391,7 @@ mod tests {
         assert_eq!(c.preview.position, PreviewPosition::Right);
         assert_eq!(c.preview.max_text_bytes, 2048);
         assert_eq!(c.terminal.shell, "/usr/bin/zsh");
+        assert_eq!(c.terminal.font_family("JetBrains Mono"), "Iosevka 12");
         assert!(c.theme.follow_system);
         assert_eq!(c.theme.resolve(false), "talavera");
         assert_eq!(c.theme.resolve(true), "nord");
@@ -380,6 +411,23 @@ mod tests {
             assert_eq!(ViewMode::from_id(mode.id()), Some(mode));
         }
         assert_eq!(ViewMode::from_id("icons"), None);
+    }
+
+    #[test]
+    fn terminal_font_comes_from_theme_unless_configured() {
+        let mut t = Terminal::default();
+        assert_eq!(t.font_family("JetBrains Mono"), "JetBrains Mono");
+        t.font = "  ".to_owned();
+        assert_eq!(t.font_family("Fira Code"), "Fira Code");
+        t.font = "Iosevka".to_owned();
+        assert_eq!(t.font_family("Fira Code"), "Iosevka");
+
+        for (size, expected) in [(13.5, 13.5), (2.0, 6.0), (500.0, 72.0), (f64::NAN, 11.0)] {
+            t.font_size = size;
+            assert_eq!(t.font_size(), expected);
+        }
+        let c = Config::from_toml("[terminal]\nfont_size = 14\n").unwrap();
+        assert_eq!(c.terminal.font_size(), 14.0);
     }
 
     #[test]
