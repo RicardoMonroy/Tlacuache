@@ -52,6 +52,8 @@ mod imp {
         pub right_side: gtk::Box,
         pub pane_actions: PaneActions,
         pub config: OnceCell<Rc<Config>>,
+        /// Botón de doble panel (su ícono refleja el modo).
+        pub dual_button: OnceCell<gtk::ToggleButton>,
         /// Cola de operaciones de archivo de la ventana.
         pub ops: OpsManager,
         /// Ya se guardó la sesión: el siguiente cierre es definitivo.
@@ -200,7 +202,7 @@ mod imp {
             obj.set_title(Some(strings::APP_NAME));
 
             let dual = gtk::ToggleButton::builder()
-                .icon_name("view-dual-symbolic")
+                .icon_name("tl-pane-dual-symbolic")
                 .tooltip_text(strings::DUAL_PANE)
                 .action_name("panes.dual")
                 .focusable(false)
@@ -214,6 +216,7 @@ mod imp {
             let header = adw::HeaderBar::new();
             header.pack_start(&sidebar_toggle);
             header.pack_end(&dual);
+            let _ = self.dual_button.set(dual);
             header.pack_end(&OpsIndicator::new(&self.ops));
             obj.install_conflict_resolver();
             self.ops.connect_finished(glib::clone!(
@@ -631,6 +634,13 @@ impl TlacuacheWindow {
     fn apply_dual_pane(&self) {
         let dual = self.dual_pane();
         self.imp().right_side.set_visible(dual);
+        if let Some(button) = self.imp().dual_button.get() {
+            button.set_icon_name(if dual {
+                "tl-pane-dual-symbolic"
+            } else {
+                "tl-pane-single-symbolic"
+            });
+        }
         if !dual && self.imp().active.get() == 1 {
             if let Some(left) = self.pane(0) {
                 left.focus_current();

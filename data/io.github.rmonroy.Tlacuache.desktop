@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Tlacuache Browser
+GenericName=Gestor de archivos
+Comment=Gestor de archivos con columnas Miller, doble panel y terminal integrada
+Exec=tlacuache %U
+Icon=io.github.rmonroy.Tlacuache
+Terminal=false
+StartupNotify=true
+StartupWMClass=io.github.rmonroy.Tlacuache
+Categories=GTK;Utility;FileTools;FileManager;
+MimeType=inode/directory;
+Keywords=archivos;carpetas;explorador;terminal;files;folders;explorer;

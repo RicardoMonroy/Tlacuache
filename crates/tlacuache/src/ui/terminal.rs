@@ -200,7 +200,14 @@ impl TerminalView {
     /// Pastilla «Carpeta desincronizada · Sincronizar» (arriba a la derecha).
     fn build_desync_indicator(&self) -> gtk::Revealer {
         let label = gtk::Label::new(Some(strings::TERMINAL_DESYNC));
-        let sync = gtk::Button::with_label(strings::TERMINAL_SYNC);
+        let sync = gtk::Button::builder()
+            .child(
+                &adw::ButtonContent::builder()
+                    .icon_name("tl-terminal-sync-symbolic")
+                    .label(strings::TERMINAL_SYNC)
+                    .build(),
+            )
+            .build();
         sync.add_css_class("flat");
         sync.set_focusable(false);
         sync.connect_clicked(glib::clone!(
@@ -214,7 +221,7 @@ impl TerminalView {
         ));
         let pill = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         pill.add_css_class("terminal-desync");
-        pill.append(&gtk::Image::from_icon_name("dialog-warning-symbolic"));
+        pill.append(&gtk::Image::from_icon_name("tl-terminal-desync-symbolic"));
         pill.append(&label);
         pill.append(&sync);
 

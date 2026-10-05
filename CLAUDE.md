@@ -39,6 +39,7 @@ cargo fmt --all                 # formato
 cargo clippy --workspace --all-targets -- -D warnings
 scripts/check.sh                # fmt --check + clippy + tests (--fix aplica fmt)
 python scripts/check-theme-contrast.py crates/tlacuache/resources/themes   # contraste de los temas
+scripts/install-local.sh        # instala binario, .desktop e ícono en ~/.local
 ```
 
 Definición de "terminado" para cualquier tarea: compila, `cargo fmt` limpio, `clippy` sin warnings, pruebas en verde y criterio de aceptación de la tarea en `ROADMAP.md` cumplido. Marca la casilla `[x]` en el roadmap al terminar.

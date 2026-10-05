@@ -83,6 +83,9 @@ pub fn build() -> adw::Application {
 
     let scheme = adw_color_scheme(config.theme.color_scheme);
     app.connect_startup(move |_| {
+        // Ícono de las ventanas (incluido en el gresource: funciona aunque
+        // la app no esté instalada).
+        gtk::Window::set_default_icon_name(APP_ID);
         adw::StyleManager::default().set_color_scheme(scheme);
     });
 

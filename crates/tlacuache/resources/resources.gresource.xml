@@ -3,7 +3,27 @@
   <!-- adw::Application carga style.css de esta ruta base. -->
   <gresource prefix="/io/github/rmonroy/Tlacuache">
     <file>style.css</file>
-    <!-- Iconos propios: GtkApplication añade <ruta base>/icons al tema. -->
-    <file>icons/scalable/actions/view-columns-symbolic.svg</file>
+    <!-- Íconos (docs/BRAND.md §5): GtkApplication añade <ruta base>/icons al
+         tema de íconos, así que se usan por nombre. -->
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tl-pane-dual-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tl-pane-single-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tl-preview-toggle-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tl-terminal-desync-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tl-terminal-sync-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tl-terminal-toggle-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/actions/tl-view-miller-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/apps/io.github.rmonroy.Tlacuache.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-archive-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-audio-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-code-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-document-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-executable-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-image-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-other-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-pdf-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-spreadsheet-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-text-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-video-symbolic.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-folder-symbolic.svg</file>
   </gresource>
 </gresources>

@@ -264,7 +264,7 @@ impl TabPage {
         nav.append(&view_switcher());
         // Alterna la terminal del panel (acción del `Pane`, como F4).
         let terminal = gtk::ToggleButton::builder()
-            .icon_name("utilities-terminal-symbolic")
+            .icon_name("tl-terminal-toggle-symbolic")
             .tooltip_text(strings::TOGGLE_TERMINAL)
             .action_name("pane.terminal")
             .focusable(false)
@@ -543,7 +543,7 @@ fn view_switcher() -> gtk::Box {
     switcher.add_css_class("linked");
     for mode in ViewMode::ALL {
         let (icon, tooltip) = match mode {
-            ViewMode::Columns => ("view-columns-symbolic", strings::VIEW_COLUMNS),
+            ViewMode::Columns => ("tl-view-miller-symbolic", strings::VIEW_COLUMNS),
             ViewMode::Details => ("view-list-symbolic", strings::VIEW_DETAILS),
         };
         let button = gtk::ToggleButton::builder()

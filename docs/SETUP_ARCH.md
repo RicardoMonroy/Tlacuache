@@ -35,3 +35,12 @@ Se puede desactivar con `shell_integration = false` en `[terminal]`.
 RUST_LOG=tlacuache=debug cargo run -p tlacuache
 GTK_DEBUG=interactive cargo run -p tlacuache   # inspector de GTK
 ```
+
+## Instalar en el usuario (lanzador e ícono)
+
+```bash
+scripts/install-local.sh              # compila en release e instala en ~/.local
+scripts/install-local.sh --uninstall  # lo quita
+```
+
+Instala el binario en `~/.local/bin/tlacuache`, el `.desktop` en `~/.local/share/applications/` y el ícono de la app (scalable y symbolic) en `~/.local/share/icons/hicolor/`. El `.desktop` declara `MimeType=inode/directory`: Tlacuache aparece como opción para abrir carpetas, pero no cambia el gestor predeterminado.
