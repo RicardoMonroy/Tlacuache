@@ -101,6 +101,7 @@ pub const PROP_ERROR: &str = "Error";
 pub const PROP_AGE: &str = "Edad";
 pub const PROP_DIMENSIONS: &str = "Dimensiones";
 pub const PROP_PAGES: &str = "Páginas";
+pub const PROP_DURATION: &str = "Duración";
 pub const PDF_PREVIOUS: &str = "Página anterior";
 pub const PDF_NEXT: &str = "Página siguiente";
 pub const PREVIEW_IMAGE_HINT: &str = "Rueda: zoom · Arrastrar: mover · Doble clic: encajar";

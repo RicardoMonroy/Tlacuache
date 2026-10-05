@@ -36,6 +36,10 @@ pub enum PreviewKind {
     Text,
     /// PDF (poppler), página por página.
     Pdf,
+    /// Video (`gtk::Video`).
+    Video,
+    /// Audio (controles de reproducción).
+    Audio,
     Folder,
     /// Ícono grande y detalles.
     Other,
@@ -48,6 +52,8 @@ pub fn kind(content_type: Option<&str>, name: &str, is_dir: bool) -> PreviewKind
         FileCategory::Image => PreviewKind::Image,
         FileCategory::Code | FileCategory::Text => PreviewKind::Text,
         FileCategory::Pdf => PreviewKind::Pdf,
+        FileCategory::Video => PreviewKind::Video,
+        FileCategory::Audio => PreviewKind::Audio,
         _ => PreviewKind::Other,
     }
 }
@@ -79,6 +85,21 @@ pub fn scale_to_side(width: i32, height: i32, side: i32) -> (i32, i32) {
     let scale = f64::from(side) / f64::from(width.max(height));
     let px = |v: i32| ((f64::from(v) * scale).round() as i32).max(1);
     (px(width), px(height))
+}
+
+/// Duración legible: `m:ss`, o `h:mm:ss` desde una hora (`micros` en
+/// microsegundos, como `gtk::MediaStream`). `None` si es desconocida (≤ 0).
+pub fn format_duration(micros: i64) -> Option<String> {
+    if micros <= 0 {
+        return None;
+    }
+    let total = micros / 1_000_000;
+    let (h, m, s) = (total / 3600, (total / 60) % 60, total % 60);
+    Some(if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    })
 }
 
 /// Lado mayor (px) de una página de PDF renderizada.
@@ -187,6 +208,16 @@ mod tests {
     }
 
     #[test]
+    fn duration_format() {
+        assert_eq!(format_duration(0), None);
+        assert_eq!(format_duration(-5), None);
+        assert_eq!(format_duration(999_999).as_deref(), Some("0:00"));
+        assert_eq!(format_duration(65_000_000).as_deref(), Some("1:05"));
+        assert_eq!(format_duration(3_600_000_000).as_deref(), Some("1:00:00"));
+        assert_eq!(format_duration(4_000_000_000).as_deref(), Some("1:06:40"));
+    }
+
+    #[test]
     fn pdf_scale_and_page_steps() {
         // Carta (612×792 pt) a 1600 px de alto.
         assert!((pdf_scale(612.0, 792.0, 1600.0) - 1600.0 / 792.0).abs() < 1e-9);
@@ -261,7 +292,15 @@ mod tests {
             (None, "src", true, PreviewKind::Folder),
             (Some("application/pdf"), "a.pdf", false, PreviewKind::Pdf),
             (Some("application/zip"), "a.zip", false, PreviewKind::Other),
-            (Some("video/mp4"), "a.mp4", false, PreviewKind::Other),
+            (Some("video/mp4"), "a.mp4", false, PreviewKind::Video),
+            (Some("video/webm"), "a.webm", false, PreviewKind::Video),
+            (Some("audio/mpeg"), "a.mp3", false, PreviewKind::Audio),
+            (
+                Some("audio/x-vorbis+ogg"),
+                "a.oga",
+                false,
+                PreviewKind::Audio,
+            ),
             (
                 Some("application/octet-stream"),
                 "a.bin",

@@ -26,8 +26,8 @@ use tlacuache_core::entry::FileEntry;
 use tlacuache_core::filetype::{FileCategory, classify};
 use tlacuache_core::perms;
 use tlacuache_core::preview::{
-    DEBOUNCE_MS, MAX_DECODE_SIDE, PreviewKind, Target, decode_size, kind, scale_to_side,
-    text_excerpt,
+    DEBOUNCE_MS, MAX_DECODE_SIDE, PreviewKind, Target, decode_size, format_duration, kind,
+    scale_to_side, text_excerpt,
 };
 use tlacuache_core::summary::SelectionSummary;
 
@@ -37,6 +37,7 @@ use crate::fs::listing::ATTRIBUTES;
 use crate::fs::size::{self, Measure};
 use crate::strings;
 use crate::ui::image_preview::ImagePreview;
+use crate::ui::media_preview::MediaPreview;
 use crate::ui::pdf_preview::PdfPreview;
 use crate::ui::set_category_icon;
 use crate::ui::text_preview::TextPreview;
@@ -51,6 +52,7 @@ const PAGE_ICON: &str = "icon";
 const PAGE_IMAGE: &str = "image";
 const PAGE_TEXT: &str = "text";
 const PAGE_PDF: &str = "pdf";
+const PAGE_MEDIA: &str = "media";
 /// Límite de texto si la config no dice otro.
 const DEFAULT_MAX_TEXT_BYTES: u64 = 1 << 20;
 
@@ -68,6 +70,7 @@ mod imp {
         pub image: ImagePreview,
         pub text: TextPreview,
         pub pdf: PdfPreview,
+        pub media: MediaPreview,
         /// `[preview] max_text_bytes`.
         pub max_text_bytes: Cell<u64>,
         /// Carga pendiente del debounce.
@@ -143,6 +146,7 @@ impl PreviewPane {
         imp.stack.add_named(&imp.image, Some(PAGE_IMAGE));
         imp.stack.add_named(&imp.text, Some(PAGE_TEXT));
         imp.stack.add_named(&imp.pdf, Some(PAGE_PDF));
+        imp.stack.add_named(&imp.media, Some(PAGE_MEDIA));
         imp.max_text_bytes.set(DEFAULT_MAX_TEXT_BYTES);
         self.append(&imp.stack);
         self.append(scroll);
@@ -203,6 +207,8 @@ impl PreviewPane {
         if let Some(cancellable) = imp.measuring.take() {
             cancellable.cancel();
         }
+        // Nada sigue sonando al cambiar de selección o cerrar la vista previa.
+        imp.media.stop();
     }
 
     fn load(&self, target: Target<SelectedInfo>, dir: Option<gio::File>) {
@@ -250,6 +256,8 @@ impl PreviewPane {
                         self.load_text(path, &name, content_type.as_deref()).await;
                     }
                     (PreviewKind::Pdf, Some(path)) => self.load_pdf(path).await,
+                    (PreviewKind::Video, _) => self.load_media(file, true),
+                    (PreviewKind::Audio, _) => self.load_media(file, false),
                     (PreviewKind::Folder, _) => self.measure_folder(file).await,
                     _ => {}
                 }
@@ -261,6 +269,40 @@ impl PreviewPane {
             }
         }
         self.imp().task.take();
+    }
+
+    /// Video o audio listo para reproducir (sin empezar). La duración se
+    /// añade cuando GStreamer termina de prepararlo.
+    fn load_media(&self, file: &gio::File, video: bool) {
+        let imp = self.imp();
+        let stream = imp.media.open(file, video);
+        imp.stack.set_visible_child_name(PAGE_MEDIA);
+        stream.connect_prepared_notify(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            move |stream| {
+                let media = &pane.imp().media;
+                if stream.is_prepared()
+                    && media.is_current(stream)
+                    && let Some(text) = format_duration(stream.duration())
+                {
+                    pane.add_row(strings::PROP_DURATION, &text);
+                }
+            }
+        ));
+        stream.connect_error_notify(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            move |stream| {
+                if let Some(err) = stream.error()
+                    && pane.imp().media.is_current(stream)
+                {
+                    tracing::debug!("vista previa multimedia: {err}");
+                    pane.imp().stack.set_visible_child_name(PAGE_ICON);
+                    pane.add_row(strings::PROP_ERROR, err.message());
+                }
+            }
+        ));
     }
 
     /// Primera página del PDF y fila con el número de páginas. Si no se
@@ -441,6 +483,7 @@ impl PreviewPane {
         imp.image.set_texture(None);
         imp.text.clear();
         imp.pdf.clear();
+        imp.media.stop();
         imp.icon.set_icon_name(None);
         imp.title.set_text("");
     }
