@@ -91,6 +91,7 @@ tlacuache/
 - `ui/preview.rs` recibe el `FileEntry` seleccionado (con debounce de ~120 ms) y elige un renderer por tipo MIME (`gio::content_type_guess` o el atributo `standard::content-type`):
   - `image/*` → `gtk::Picture` cargando `gdk::Texture` en segundo plano (escalar imágenes grandes).
   - texto/código → `sourceview5::Buffer` + `LanguageManager::guess_language`; lectura limitada a 1 MB en hilo de trabajo.
+  - Markdown → `core::markdown` (pulldown-cmark, sin HTML) produce tramos con estilos y `ui/markdown_view.rs` los pinta en un `TextView` con etiquetas cuyos colores y fuente salen del tema. Selector «Vista / Código»; los enlaces http(s) y mailto se abren con un clic.
   - `video/*`, `audio/*` → `ui/media_preview.rs`: `gtk::MediaFile` (backend GStreamer de GTK) sin reproducción automática; `gtk::Video` para video y `gtk::MediaControls` para audio. Se detiene al cambiar de selección o cerrar la vista previa.
   - `application/pdf` → `ui/pdf_preview.rs`: `poppler` abre el documento y renderiza una página a una superficie de cairo en un hilo de trabajo; los bytes vuelven al hilo de GTK como `MemoryTexture` y se muestran con el visor de imágenes (zoom). Botones ‹ › para cambiar de página.
   - carpetas → conteo/tamaño en segundo plano.

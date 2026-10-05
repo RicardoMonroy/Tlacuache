@@ -8,6 +8,7 @@ pub mod file_name_cell;
 pub mod filter_indicator;
 pub mod image_preview;
 pub mod list_view;
+pub mod markdown_view;
 pub mod media_preview;
 pub mod miller_view;
 pub mod ops_indicator;
@@ -92,4 +93,14 @@ pub fn set_category_icon(image: &gtk::Image, category: tlacuache_core::filetype:
     }
     image.set_icon_name(Some(category.icon_name()));
     image.add_css_class(category.css_class());
+}
+
+/// Color del tema como `gdk::RGBA` (terminal, Markdown).
+pub fn rgba(color: tlacuache_core::theme::Color) -> gtk::gdk::RGBA {
+    gtk::gdk::RGBA::new(
+        f32::from(color.r) / 255.0,
+        f32::from(color.g) / 255.0,
+        f32::from(color.b) / 255.0,
+        1.0,
+    )
 }

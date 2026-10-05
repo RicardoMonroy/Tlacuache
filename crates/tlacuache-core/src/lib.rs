@@ -12,6 +12,7 @@ pub mod filetype;
 pub mod filter;
 pub mod history;
 pub mod keymap;
+pub mod markdown;
 pub mod names;
 pub mod ops;
 pub mod path_input;
