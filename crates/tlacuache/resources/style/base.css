@@ -196,6 +196,9 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
 .tl-pane row:selected .tl-chevron,
 .tl-pane row:selected .tl-file-name { color: inherit; }
 
+/* Cortado (Ctrl+X) pendiente de pegar. */
+.tl-cut { opacity: 0.5; }
+
 /* `icon_style = "glyph"`: glifo monoespaciado (su color sale de .tl-ft-*). */
 .tl-glyph { font-family: var(--tl-font-mono); }
 

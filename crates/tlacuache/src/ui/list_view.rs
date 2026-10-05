@@ -555,7 +555,7 @@ fn bind_cell(id: ColumnId, item: &FileItem, child: &gtk::Widget) {
     match id {
         ColumnId::Name => {
             if let Some(cell) = child.downcast_ref::<FileNameCell>() {
-                cell.set_entry(&entry);
+                cell.set_entry(&entry, item.file().map(|f| f.uri().to_string()));
             }
         }
         ColumnId::Extension => set_label(child, entry.extension().unwrap_or("")),

@@ -1,7 +1,8 @@
 //! Celda de nombre de las vistas: ícono `tl-*` coloreado y nombre, o con
 //! `icon_style = "glyph"` un glifo monoespaciado y el nombre coloreado por
 //! tipo (las carpetas con `/`), al estilo `LS_COLORS` (`docs/THEMES.md`).
-//! Se vuelve a pintar sola al cambiar de tema.
+//! Se vuelve a pintar sola al cambiar de tema, y se atenúa si el archivo
+//! está cortado (Ctrl+X) pendiente de pegar.
 
 use std::cell::RefCell;
 
@@ -12,6 +13,7 @@ use tlacuache_core::entry::FileEntry;
 use tlacuache_core::filetype::{FileCategory, classify};
 use tlacuache_core::theme::{GlyphKind, Theme};
 
+use crate::fs::cut_marks;
 use crate::ui::{set_category_icon, theme_manager};
 
 mod imp {
@@ -24,7 +26,10 @@ mod imp {
         pub name: gtk::Label,
         /// Última entrada mostrada (para repintar al cambiar de tema).
         pub entry: RefCell<Option<FileEntry>>,
+        /// URI del archivo (para saber si está cortado).
+        pub uri: RefCell<Option<String>>,
         pub theme_handler: RefCell<Option<glib::SignalHandlerId>>,
+        pub cut_handler: RefCell<Option<glib::SignalHandlerId>>,
     }
 
     #[glib::object_subclass]
@@ -43,6 +48,9 @@ mod imp {
         fn dispose(&self) {
             if let (Some(themes), Some(id)) = (theme_manager::get(), self.theme_handler.take()) {
                 themes.disconnect(id);
+            }
+            if let Some(id) = self.cut_handler.take() {
+                cut_marks::get().disconnect(id);
             }
         }
     }
@@ -87,10 +95,34 @@ impl FileNameCell {
             ));
             imp.theme_handler.replace(Some(id));
         }
+        let id = cut_marks::get().connect_changed(glib::clone!(
+            #[weak(rename_to = cell)]
+            self,
+            move |_| cell.update_cut()
+        ));
+        imp.cut_handler.replace(Some(id));
     }
 
-    pub fn set_entry(&self, entry: &FileEntry) {
+    /// Atenuada si su archivo está cortado.
+    fn update_cut(&self) {
+        let cut = self
+            .imp()
+            .uri
+            .borrow()
+            .as_deref()
+            .is_some_and(|uri| cut_marks::get().contains(uri));
+        if cut {
+            self.add_css_class("tl-cut");
+        } else {
+            self.remove_css_class("tl-cut");
+        }
+    }
+
+    /// Muestra `entry`; `uri` es la del archivo (para las marcas de cortado).
+    pub fn set_entry(&self, entry: &FileEntry, uri: Option<String>) {
         self.imp().entry.replace(Some(entry.clone()));
+        self.imp().uri.replace(uri);
+        self.update_cut();
         let theme = theme_manager::get().map_or_else(Theme::default_theme, |t| t.theme());
         self.render(&theme);
     }

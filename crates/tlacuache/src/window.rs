@@ -15,6 +15,7 @@ use tlacuache_core::ops::{ConflictAction, OpId, OpKind, OpState};
 use tlacuache_core::session::{self, Session, WindowSession};
 use tlacuache_core::theme_catalog::ThemeCatalog;
 
+use crate::fs::cut_marks;
 use crate::fs::ops_runner::{Conflict, ConflictDecision, OpsManager, Resolver};
 use crate::strings;
 use crate::ui::ops_indicator::OpsIndicator;
@@ -258,6 +259,30 @@ mod imp {
                 move |_, key, _, mods| window.on_key(key, mods)
             ));
             obj.add_controller(keys);
+
+            // Burbuja: Esc que nadie usó (p. ej. sin filtro activo) cancela
+            // el cortar pendiente.
+            let escape = gtk::EventControllerKey::new();
+            escape.connect_key_pressed(|controller, key, _, mods| {
+                if key == gdk::Key::Escape && mods.is_empty() && cut_marks::get().clear() {
+                    // Sin vaciarlo, pegar seguiría moviendo los archivos.
+                    if let Some(widget) = controller.widget() {
+                        crate::fs::clipboard::clear(&WidgetExt::display(&widget));
+                    }
+                    return glib::Propagation::Stop;
+                }
+                glib::Propagation::Proceed
+            });
+            obj.add_controller(escape);
+
+            // Si otra app cambia el portapapeles, lo cortado ya no se pega.
+            WidgetExt::display(&*obj)
+                .clipboard()
+                .connect_changed(|clipboard| {
+                    if !clipboard.is_local() {
+                        cut_marks::get().clear();
+                    }
+                });
         }
     }
 
@@ -922,7 +947,15 @@ impl TlacuacheWindow {
             return;
         }
         match crate::fs::clipboard::set_files(&WidgetExt::display(self), &files, cut) {
-            Ok(()) => self.show_toast(&strings::clipboard_copied(files.len(), cut)),
+            Ok(()) => {
+                let marks = cut_marks::get();
+                if cut {
+                    marks.set(files.iter().map(|f| f.uri().to_string()));
+                } else {
+                    marks.clear();
+                }
+                self.show_toast(&strings::clipboard_copied(files.len(), cut));
+            }
             Err(err) => {
                 tracing::warn!("no se pudo usar el portapapeles: {err}");
                 self.show_toast(strings::CLIPBOARD_FAILED);
@@ -965,6 +998,7 @@ impl TlacuacheWindow {
                 // Lo cortado ya se movió: no se puede volver a pegar.
                 if files.cut {
                     crate::fs::clipboard::clear(&display);
+                    cut_marks::get().clear();
                 }
             }
         ));

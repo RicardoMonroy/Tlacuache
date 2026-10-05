@@ -723,7 +723,7 @@ fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
         let chevron = row.last_child();
         let entry = item.entry();
         if let Some(cell) = cell {
-            cell.set_entry(&entry);
+            cell.set_entry(&entry, item.file().map(|f| f.uri().to_string()));
         }
         if let Some(chevron) = chevron {
             chevron.set_visible(entry.is_dir);
