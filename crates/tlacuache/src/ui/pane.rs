@@ -256,10 +256,18 @@ impl Pane {
     /// F4: muestra la terminal (creándola la primera vez, en la carpeta
     /// actual) u oculta la que hay, devolviendo el foco a la vista.
     pub fn toggle_terminal(&self) {
-        let imp = self.imp();
-        let visible = imp.split.end_child().is_some_and(|c| c.is_visible());
+        let visible = self.imp().split.end_child().is_some_and(|c| c.is_visible());
         if visible {
             self.hide_terminal();
+        } else {
+            self.show_terminal(true);
+        }
+    }
+
+    /// Muestra la terminal (creándola si hace falta, en la carpeta actual).
+    fn show_terminal(&self, take_focus: bool) {
+        let imp = self.imp();
+        if imp.split.end_child().is_some_and(|c| c.is_visible()) {
             return;
         }
         let existing = imp.terminal.borrow().clone();
@@ -298,12 +306,13 @@ impl Pane {
         terminal.set_visible(true);
         self.set_terminal_state(true);
         // Posición recordada o dos tercios para las pestañas.
-        let position = imp
-            .split_position
-            .get()
-            .unwrap_or(imp.split.height() * 2 / 3);
-        imp.split.set_position(position.max(1));
-        terminal.grab_focus();
+        match imp.split_position.get() {
+            Some(position) => imp.split.set_position(position.max(1)),
+            None => place_at_two_thirds(&imp.split),
+        }
+        if take_focus {
+            terminal.grab_focus();
+        }
     }
 
     fn refresh_tab_titles(&self) {
@@ -507,6 +516,13 @@ impl Pane {
         if session.preview && !imp.preview.is_visible() {
             self.toggle_preview();
         }
+        if session.terminal_position.is_some() {
+            imp.split_position.set(session.terminal_position);
+        }
+        // Un shell nuevo en la carpeta del panel; el foco se queda en la vista.
+        if session.terminal {
+            self.show_terminal(false);
+        }
         !session.tabs.is_empty()
     }
 
@@ -534,11 +550,19 @@ impl Pane {
         } else {
             imp.preview_position.get()
         };
+        let terminal = imp.split.end_child().is_some_and(|c| c.is_visible());
+        let terminal_position = if terminal {
+            Some(imp.split.position())
+        } else {
+            imp.split_position.get()
+        };
         PaneSession {
             selected,
             tabs,
             preview,
             preview_position,
+            terminal,
+            terminal_position,
             preview_right: imp.preview_split.orientation() == gtk::Orientation::Horizontal,
         }
     }

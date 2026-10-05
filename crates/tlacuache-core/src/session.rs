@@ -82,6 +82,10 @@ pub struct PaneSession {
     /// si la vista previa estaba a la derecha (`preview_right`).
     pub preview_position: Option<i32>,
     pub preview_right: bool,
+    /// Terminal visible (al restaurar se abre un shell nuevo).
+    pub terminal: bool,
+    /// Alto (px) de la zona sobre la terminal.
+    pub terminal_position: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -173,6 +177,7 @@ impl Session {
                 pane.selected = 0;
             }
             pane.preview_position = pane.preview_position.filter(|p| *p > 0);
+            pane.terminal_position = pane.terminal_position.filter(|p| *p > 0);
         }
         self
     }
@@ -216,6 +221,8 @@ mod tests {
                     preview: true,
                     preview_position: Some(420),
                     preview_right: true,
+                    terminal: true,
+                    terminal_position: Some(520),
                 },
                 PaneSession {
                     selected: 0,
@@ -257,6 +264,7 @@ mod tests {
         session.window.active_pane = 7;
         session.panes[0].selected = 9;
         session.panes[0].preview_position = Some(0);
+        session.panes[0].terminal_position = Some(-5);
         session.panes[1].tabs.push(tab("   "));
         session.panes.push(PaneSession::default());
 
@@ -269,6 +277,7 @@ mod tests {
         assert_eq!(s.panes.len(), 2);
         assert_eq!(s.panes[0].selected, 0);
         assert_eq!(s.panes[0].preview_position, None);
+        assert_eq!(s.panes[0].terminal_position, None);
         assert_eq!(s.panes[1].tabs.len(), 1);
     }
 
