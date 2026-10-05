@@ -100,6 +100,10 @@ position = "bottom"      # bottom | right
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y [`docs/DECISIONS.md`](docs/DECISIONS.md): cómo está hecho y por qué.
 - [`docs/BRAND.md`](docs/BRAND.md): logo, paleta e íconos.
 
+## Contribuir
+
+Issues, temas y pull requests son bienvenidos. Lee [`CONTRIBUTING.md`](CONTRIBUTING.md): para fusionar un PR hay que firmar una vez el [CLA](CLA.md).
+
 ## Licencia
 
 Tlacuache Browser es software libre y gratuito bajo la [GNU General Public License v3.0 o posterior](LICENSE) (`GPL-3.0-or-later`): puedes usarlo, estudiarlo, modificarlo y compartirlo; si distribuyes una versión modificada, también debe ser libre.
