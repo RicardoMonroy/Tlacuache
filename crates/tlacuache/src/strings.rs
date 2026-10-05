@@ -256,6 +256,36 @@ pub fn group_remove_confirm(name: &str, count: usize) -> String {
     format!("¿Eliminar el grupo «{name}»?\n\nTiene {count} {favorites}. Las carpetas no se borran.")
 }
 
+pub fn theme_load_failed(path: &std::path::Path, detail: &str) -> String {
+    let file = path.file_name().map_or_else(
+        || path.display().to_string(),
+        |n| n.to_string_lossy().into_owned(),
+    );
+    format!("No se pudo cargar el tema {file}: {detail}")
+}
+
+pub fn theme_missing(id: &str) -> String {
+    format!("El tema «{id}» no existe; se usa Nord")
+}
+
+/// Pares de contraste que no cumple un tema de usuario (los tres primeros).
+pub fn theme_contrast(name: &str, issues: &[tlacuache_core::theme::ContrastIssue]) -> String {
+    const SHOWN: usize = 3;
+    let list = issues
+        .iter()
+        .take(SHOWN)
+        .map(|i| format!("{} {:.1} de {}", i.pair, i.ratio, i.minimum))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let more = issues.len().saturating_sub(SHOWN);
+    let more = if more > 0 {
+        format!(" y {more} más")
+    } else {
+        String::new()
+    };
+    format!("El tema «{name}» tiene poco contraste: {list}{more}")
+}
+
 pub fn theme_save_failed(detail: &str) -> String {
     format!("No se pudo guardar el tema en la configuración: {detail}")
 }
@@ -402,4 +432,26 @@ pub fn prop_measured(bytes: u64, files: u64, dirs: u64) -> String {
 
 pub fn terminal_spawn_failed(detail: &str) -> String {
     format!("No se pudo iniciar la terminal: {detail}")
+}
+
+#[cfg(test)]
+mod tests {
+    use tlacuache_core::theme::ContrastIssue;
+
+    use super::*;
+
+    #[test]
+    fn theme_contrast_lists_three_pairs() {
+        let issue = |pair: &str| ContrastIssue {
+            pair: pair.into(),
+            ratio: 3.08,
+            minimum: 4.5,
+        };
+        let text = theme_contrast("Mío", &[issue("a"), issue("b"), issue("c"), issue("d")]);
+        assert_eq!(
+            text,
+            "El tema «Mío» tiene poco contraste: a 3.1 de 4.5, b 3.1 de 4.5, c 3.1 de 4.5 y 1 más"
+        );
+        assert!(!theme_contrast("X", &[issue("a")]).contains("más"));
+    }
 }

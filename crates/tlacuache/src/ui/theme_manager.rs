@@ -20,11 +20,14 @@ use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config;
+use tlacuache_core::theme_catalog::ThemeCatalog;
 
 use crate::fs::config_file;
 use crate::{strings, window};
 use tlacuache_core::theme::{AgeStyle, IconStyle, SelectionStyle, Theme, Variant};
 
+/// Respaldo si el tema elegido no existe.
+const DEFAULT_ID: &str = "nord";
 const BASE_CSS: &str = "/io/github/rmonroy/Tlacuache/style/base.css";
 
 /// Clases de la ventana que corresponden a flags de `[style]`.
@@ -47,6 +50,9 @@ mod imp {
         pub variables: gtk::CssProvider,
         pub settings: RefCell<config::Theme>,
         pub current: RefCell<Option<Theme>>,
+        pub catalog: RefCell<ThemeCatalog>,
+        /// Avisos para mostrar cuando haya ventana.
+        pub pending: RefCell<Vec<String>>,
     }
 
     #[glib::object_subclass]
@@ -84,8 +90,16 @@ pub fn get() -> Option<ThemeManager> {
 
 /// Crea el gestor, registra los estilos en `display` y aplica el tema de
 /// la config. Llamar una vez, en `startup`.
-pub fn init(settings: config::Theme, display: &gdk::Display) -> ThemeManager {
+pub fn init(
+    settings: config::Theme,
+    catalog: ThemeCatalog,
+    display: &gdk::Display,
+) -> ThemeManager {
     let manager: ThemeManager = glib::Object::new();
+    for error in catalog.errors() {
+        manager.notify_user(strings::theme_load_failed(&error.path, &error.message));
+    }
+    manager.imp().catalog.replace(catalog);
     manager.install(settings, display);
     MANAGER.with(|m| {
         let _ = m.set(manager.clone());
@@ -113,6 +127,28 @@ impl ThemeManager {
     /// Esquema de GtkSourceView del tema aplicado, si ya está escrito.
     pub fn source_scheme(&self) -> Option<sourceview5::StyleScheme> {
         sourceview5::StyleSchemeManager::default().scheme(&self.theme().source_scheme_id())
+    }
+
+    /// Temas disponibles (incluidos y de usuario), en orden de presentación.
+    pub fn themes(&self) -> Vec<Theme> {
+        self.imp().catalog.borrow().themes().to_vec()
+    }
+
+    /// Avisa con un toast en la ventana activa; si aún no hay ventana (al
+    /// arrancar), queda pendiente para `take_pending_notices`.
+    fn notify_user(&self, text: String) {
+        let window = gio::Application::default()
+            .and_downcast::<gtk::Application>()
+            .and_then(|app| app.active_window());
+        match window {
+            Some(window) => window::show_toast_from(&window, &text),
+            None => self.imp().pending.borrow_mut().push(text),
+        }
+    }
+
+    /// Avisos generados antes de que existiera la ventana.
+    pub fn take_pending_notices(&self) -> Vec<String> {
+        self.imp().pending.take()
     }
 
     /// `[theme]` actual.
@@ -194,10 +230,28 @@ impl ThemeManager {
             style.set_color_scheme(adw::ColorScheme::Default);
         }
         let id = settings.resolve(style.is_dark()).to_owned();
-        let theme = Theme::builtin(&id).unwrap_or_else(|| {
-            tracing::warn!("tema desconocido «{id}»; se usa el predeterminado");
-            Theme::default_theme()
-        });
+        let catalog = imp.catalog.borrow();
+        let theme = match catalog.get(&id) {
+            Some(theme) => theme.clone(),
+            None => {
+                tracing::warn!("tema desconocido «{id}»; se usa el predeterminado");
+                self.notify_user(strings::theme_missing(&id));
+                catalog
+                    .get(DEFAULT_ID)
+                    .cloned()
+                    .unwrap_or_else(Theme::default_theme)
+            }
+        };
+        // Un tema de usuario se aplica aunque no pase la validación, pero se
+        // avisa (una vez cada vez que pasa a ser el activo).
+        let previous = imp.current.borrow().as_ref().map(|t| t.meta.id.clone());
+        if catalog.is_user(&theme.meta.id) && previous.as_deref() != Some(theme.meta.id.as_str()) {
+            let issues = theme.validate();
+            if !issues.is_empty() {
+                self.notify_user(strings::theme_contrast(&theme.meta.name, &issues));
+            }
+        }
+        drop(catalog);
         if !settings.follow_system {
             style.set_color_scheme(match theme.meta.variant {
                 Variant::Dark => adw::ColorScheme::ForceDark,

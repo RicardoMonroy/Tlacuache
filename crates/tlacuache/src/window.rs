@@ -13,7 +13,7 @@ use tlacuache_core::config::Config;
 use tlacuache_core::names;
 use tlacuache_core::ops::{ConflictAction, OpId, OpKind, OpState};
 use tlacuache_core::session::{self, Session, WindowSession};
-use tlacuache_core::theme::Theme;
+use tlacuache_core::theme_catalog::ThemeCatalog;
 
 use crate::fs::ops_runner::{Conflict, ConflictDecision, OpsManager, Resolver};
 use crate::strings;
@@ -1261,7 +1261,11 @@ impl TlacuacheWindow {
 /// Menú principal: tema (radio) y Preferencias.
 fn main_menu_button() -> gtk::MenuButton {
     let themes = gio::Menu::new();
-    for theme in Theme::builtin_ids().filter_map(Theme::builtin) {
+    let available = crate::ui::theme_manager::get().map_or_else(
+        || ThemeCatalog::builtin().themes().to_vec(),
+        |themes| themes.themes(),
+    );
+    for theme in available {
         let item = gio::MenuItem::new(Some(&theme.meta.name), None);
         item.set_action_and_target_value(Some("app.theme"), Some(&theme.meta.id.to_variant()));
         themes.append_item(&item);

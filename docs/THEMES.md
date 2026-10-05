@@ -128,7 +128,12 @@ dark = "nord"
 
 1. Copiar `crates/tlacuache-core/themes/nord.toml` a `~/.config/tlacuache/themes/mitema.toml` y cambiar `id` y `name`.
 2. Ajustar los colores y ejecutar `python scripts/check-theme-contrast.py ~/.config/tlacuache/themes`.
-3. Seleccionarlo en Preferencias; se aplica al instante.
+3. Reiniciar Tlacuache (los temas de usuario se leen al arrancar) y seleccionarlo en Preferencias o en el menú principal; se aplica al instante.
+
+Notas:
+- Un tema con el mismo `id` que uno incluido lo reemplaza (sirve para retocar Nord).
+- Si un archivo no se puede leer o tiene un error de sintaxis, no aparece en la lista y se avisa con un toast («roto.toml: … (línea N)»). Si el tema elegido no existe, se usa Nord.
+- Un tema que no pasa el contraste se aplica igual, con un toast que lista los pares fallidos.
 
 ## 7. Ideas futuras (fuera del MVP)
 

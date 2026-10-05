@@ -9,14 +9,18 @@ use adw::subclass::prelude::*;
 use gtk::glib;
 use tlacuache_core::config;
 use tlacuache_core::theme::{Theme, Variant};
+use tlacuache_core::theme_catalog::ThemeCatalog;
 
 use crate::strings;
 use crate::ui::theme_manager;
 use crate::ui::theme_thumbnail::ThemeThumbnail;
 
-/// Temas incluidos, en el orden de `Theme::builtin_ids`.
+/// Temas disponibles (incluidos y de usuario).
 fn themes() -> Vec<Theme> {
-    Theme::builtin_ids().filter_map(Theme::builtin).collect()
+    theme_manager::get().map_or_else(
+        || ThemeCatalog::builtin().themes().to_vec(),
+        |themes| themes.themes(),
+    )
 }
 
 mod imp {

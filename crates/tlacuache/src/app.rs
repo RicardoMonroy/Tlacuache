@@ -10,6 +10,7 @@ use gtk::{gio, glib};
 use tlacuache_core::APP_ID;
 use tlacuache_core::config::{self, Config};
 use tlacuache_core::session::{self, Session};
+use tlacuache_core::theme_catalog::{self, ThemeCatalog};
 
 use crate::strings;
 use crate::ui::preferences_dialog::PreferencesDialog;
@@ -116,6 +117,12 @@ pub fn build() -> adw::Application {
         .build();
 
     let theme_settings = config.theme.clone();
+    // Temas de usuario: se leen aquí, antes del bucle de GTK, como la config.
+    let catalog = ThemeCatalog::load(
+        &glib::user_config_dir()
+            .join("tlacuache")
+            .join(theme_catalog::USER_DIR),
+    );
     app.connect_startup(move |app| {
         // Ícono de las ventanas (incluido en el gresource: funciona aunque
         // la app no esté instalada).
@@ -123,7 +130,7 @@ pub fn build() -> adw::Application {
         sourceview5::init();
         match gtk::gdk::Display::default() {
             Some(display) => {
-                crate::ui::theme_manager::init(theme_settings.clone(), &display);
+                crate::ui::theme_manager::init(theme_settings.clone(), catalog.clone(), &display);
             }
             None => tracing::warn!("sin display: no se aplica el tema"),
         }
@@ -145,6 +152,11 @@ pub fn build() -> adw::Application {
         window.present();
         for warning in warnings.iter() {
             window.show_toast(warning);
+        }
+        if let Some(themes) = theme_manager::get() {
+            for notice in themes.take_pending_notices() {
+                window.show_toast(&notice);
+            }
         }
     };
     let present = Rc::new(present);
