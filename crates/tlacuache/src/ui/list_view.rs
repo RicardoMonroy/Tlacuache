@@ -12,7 +12,7 @@ use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::age::Age;
-use tlacuache_core::filter;
+use tlacuache_core::filter::{self, FilterKey};
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 use tlacuache_core::summary::{SelectionSummary, ViewStatus};
 
@@ -340,6 +340,11 @@ impl FileListView {
         match filter::apply_key(&current, filter_key) {
             Some(query) => {
                 self.set_query(query);
+                glib::Propagation::Stop
+            }
+            // Espacio sin filtro: alterna la vista previa (ADR-006).
+            None if filter_key == FilterKey::Char(' ') => {
+                let _ = self.activate_action("pane.preview", None);
                 glib::Propagation::Stop
             }
             None => glib::Propagation::Proceed,

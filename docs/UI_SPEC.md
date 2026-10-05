@@ -44,6 +44,8 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 - Carpeta: número de elementos y tamaño (calculado en segundo plano, cancelable).
 - Detalles: nombre, tipo MIME, tamaño, creado, modificado, edad, permisos, propietario; dimensiones para imágenes.
 - La vista previa se actualiza con debounce (~120 ms) al mover la selección.
+- Qué se muestra: un elemento seleccionado → su vista previa y detalles; varios → resumen (cantidad, carpetas/archivos y tamaño de los archivos); ninguno → la carpeta actual.
+- Se alterna con Espacio (sin filtro activo, ADR-006) o con el botón de la barra del panel. La visibilidad y la altura de cada panel se guardan en la sesión.
 
 ## 4. Terminal por panel
 

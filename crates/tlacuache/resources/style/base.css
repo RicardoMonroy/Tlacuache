@@ -267,6 +267,12 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
   border-top: var(--tl-border-width) solid var(--tl-border);
 }
 
+/* Vista previa: visual a la izquierda, detalles a la derecha. */
+.tl-preview-visual { padding: 12px; }
+.tl-preview-title { font-weight: bold; }
+.tl-preview-details { padding: 12px; }
+.tl-detail-key { color: var(--tl-fg-muted); }
+
 /* Foco: la línea superior pasa a 3px. El padding compensa el grosor para
  * que la terminal no se mueva (VTE pinta encima de un box-shadow inset). */
 .tl-terminal-frame { padding-top: 2px; }

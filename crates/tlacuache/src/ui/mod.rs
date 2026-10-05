@@ -11,6 +11,7 @@ pub mod ops_indicator;
 pub mod pane;
 pub mod pane_actions;
 pub mod path_bar;
+pub mod preview;
 pub mod properties_dialog;
 pub mod sidebar;
 pub mod status_bar;
@@ -76,7 +77,7 @@ fn normalize(key: gtk::gdk::Key) -> gtk::gdk::Key {
 /// Ícono de la categoría del archivo (`tl-*`) con su clase `tl-ft-*`, que
 /// el tema colorea. Quita la clase anterior: las filas se reciclan.
 pub fn set_file_icon(image: &gtk::Image, entry: &tlacuache_core::entry::FileEntry) {
-    use tlacuache_core::filetype::{FileCategory, classify};
+    use tlacuache_core::filetype::classify;
 
     let category = classify(
         entry.content_type.as_deref(),
@@ -84,6 +85,13 @@ pub fn set_file_icon(image: &gtk::Image, entry: &tlacuache_core::entry::FileEntr
         entry.is_dir,
         entry.is_executable,
     );
+    set_category_icon(image, category);
+}
+
+/// Ícono `tl-*` de `category`, coloreado por el tema con su clase.
+pub fn set_category_icon(image: &gtk::Image, category: tlacuache_core::filetype::FileCategory) {
+    use tlacuache_core::filetype::FileCategory;
+
     for other in FileCategory::ALL {
         image.remove_css_class(other.css_class());
     }

@@ -262,6 +262,15 @@ impl TabPage {
         imp.path_bar.set_hexpand(true);
         nav.append(&imp.path_bar);
         nav.append(&view_switcher());
+        // Alterna la vista previa del panel (acción del `Pane`, como Espacio).
+        let preview = gtk::ToggleButton::builder()
+            .icon_name("tl-preview-toggle-symbolic")
+            .tooltip_text(strings::TOGGLE_PREVIEW)
+            .action_name("pane.preview")
+            .focusable(false)
+            .build();
+        preview.add_css_class("flat");
+        nav.append(&preview);
         // Alterna la terminal del panel (acción del `Pane`, como F4).
         let terminal = gtk::ToggleButton::builder()
             .icon_name("tl-terminal-toggle-symbolic")
@@ -331,8 +340,13 @@ impl TabPage {
         self.update_status();
     }
 
+    /// Elementos visibles y selección de la vista.
+    pub fn status(&self) -> ViewStatus {
+        self.view().map(|v| v.status()).unwrap_or_default()
+    }
+
     fn update_status(&self) {
-        let status = self.view().map(|v| v.status()).unwrap_or_default();
+        let status = self.status();
         self.imp().status_bar.set_status(&status);
         self.emit_by_name::<()>("status-changed", &[]);
     }

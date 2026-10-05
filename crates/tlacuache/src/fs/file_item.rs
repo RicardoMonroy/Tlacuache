@@ -77,7 +77,7 @@ impl SelectedInfo {
     }
 }
 
-fn entry_from_info(info: &gio::FileInfo) -> FileEntry {
+pub(crate) fn entry_from_info(info: &gio::FileInfo) -> FileEntry {
     let name = info.display_name().to_string();
     let mut entry = FileEntry::new(name, info.file_type() == gio::FileType::Directory);
     entry.is_hidden |= info.is_hidden();

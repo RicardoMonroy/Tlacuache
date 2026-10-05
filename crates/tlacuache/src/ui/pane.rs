@@ -1,5 +1,6 @@
 //! Panel: pestañas (`adw::TabBar` + `adw::TabView`) con un `TabPage` cada
-//! una. Más adelante también tendrá vista previa y terminal.
+//! una, vista previa (Espacio) y terminal (F4), cada una en un `gtk::Paned`
+//! vertical: pestañas / vista previa / terminal.
 //!
 //! `adw::TabView` ya trae Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+RePág/AvPág y
 //! Alt+1…9; aquí se añaden Ctrl+T y Ctrl+W, con alcance de panel para que en
@@ -13,11 +14,13 @@ use adw::subclass::prelude::*;
 use gtk::{gdk, gio, glib};
 use tlacuache_core::config::{Config, ViewMode};
 use tlacuache_core::keymap::Action;
+use tlacuache_core::preview;
 use tlacuache_core::session::{PaneSession, TabSession};
 
 use crate::fs::display::{display_name, display_path};
 use crate::strings;
 use crate::ui::Accel;
+use crate::ui::preview::PreviewPane;
 use crate::ui::tab_page::TabPage;
 use crate::ui::terminal::TerminalView;
 
@@ -31,11 +34,19 @@ mod imp {
         /// conmutable (`pane.terminal`) al botón de la barra.
         #[property(get, set = Self::set_terminal_visible)]
         pub terminal_visible: std::cell::Cell<bool>,
+        /// Vista previa visible (acción `pane.preview`).
+        #[property(get, set = Self::set_preview_visible)]
+        pub preview_visible: std::cell::Cell<bool>,
         pub tab_view: adw::TabView,
         pub tab_bar: adw::TabBar,
         pub config: OnceCell<Rc<Config>>,
-        /// Pestañas | terminal.
+        /// (Pestañas | vista previa) | terminal.
         pub split: gtk::Paned,
+        /// Pestañas | vista previa.
+        pub preview_split: gtk::Paned,
+        pub preview: PreviewPane,
+        /// Alto de las pestañas recordado al ocultar la vista previa.
+        pub preview_position: std::cell::Cell<Option<i32>>,
         /// Terminal del panel: se crea en el primer F4.
         pub terminal: std::cell::RefCell<Option<TerminalView>>,
         /// Es el panel activo de la ventana.
@@ -58,6 +69,7 @@ mod imp {
             klass.install_action("pane.new-tab", None, |pane, _, _| pane.new_tab());
             klass.install_action("pane.close-tab", None, |pane, _, _| pane.close_tab());
             klass.install_property_action("pane.terminal", "terminal-visible");
+            klass.install_property_action("pane.preview", "preview-visible");
 
             let ctrl = gdk::ModifierType::CONTROL_MASK;
             klass.add_binding_action(gdk::Key::t, ctrl, "pane.new-tab");
@@ -66,6 +78,12 @@ mod imp {
     }
 
     impl Pane {
+        fn set_preview_visible(&self, visible: bool) {
+            if self.preview_visible.get() != visible {
+                self.obj().toggle_preview();
+            }
+        }
+
         fn set_terminal_visible(&self, visible: bool) {
             if self.terminal_visible.get() != visible {
                 self.obj().toggle_terminal();
@@ -137,12 +155,23 @@ impl Pane {
                 }
                 pane.emit_by_name::<()>("selection-changed", &[]);
                 pane.sync_terminal();
+                pane.update_preview();
             }
         ));
 
-        // Pestañas arriba, terminal abajo (oculta hasta el primer F4).
+        // Pestañas arriba, vista previa debajo (oculta hasta Espacio).
+        imp.preview_split
+            .set_orientation(gtk::Orientation::Vertical);
+        imp.preview_split.set_start_child(Some(&imp.tab_view));
+        imp.preview_split.set_end_child(Some(&imp.preview));
+        imp.preview_split.set_resize_end_child(false);
+        imp.preview_split.set_shrink_start_child(false);
+        imp.preview_split.set_shrink_end_child(false);
+        imp.preview.set_visible(false);
+
+        // Y la terminal al fondo (oculta hasta el primer F4).
         imp.split.set_orientation(gtk::Orientation::Vertical);
-        imp.split.set_start_child(Some(&imp.tab_view));
+        imp.split.set_start_child(Some(&imp.preview_split));
         imp.split.set_resize_end_child(false);
         imp.split.set_shrink_start_child(false);
         imp.split.set_shrink_end_child(false);
@@ -263,6 +292,41 @@ impl Pane {
         terminal.grab_focus();
     }
 
+    /// Espacio: muestra u oculta la vista previa, recordando su altura.
+    pub fn toggle_preview(&self) {
+        let imp = self.imp();
+        let visible = !imp.preview.is_visible();
+        if visible {
+            imp.preview.set_visible(true);
+            match imp.preview_position.get() {
+                Some(position) => imp.preview_split.set_position(position.max(1)),
+                None => place_at_two_thirds(&imp.preview_split),
+            }
+        } else {
+            imp.preview_position.set(Some(imp.preview_split.position()));
+            imp.preview.cancel();
+            imp.preview.set_visible(false);
+        }
+        if imp.preview_visible.replace(visible) != visible {
+            self.notify_preview_visible();
+        }
+        self.update_preview();
+    }
+
+    /// Pide a la vista previa (si está visible) la selección actual: un
+    /// elemento, el resumen de varios o la carpeta si no hay selección.
+    fn update_preview(&self) {
+        let imp = self.imp();
+        if !imp.preview.is_visible() {
+            return;
+        }
+        let Some(page) = self.current_page() else {
+            return;
+        };
+        let target = preview::target(page.selected_infos(), page.status().selection);
+        imp.preview.request(target, page.directory());
+    }
+
     /// Panel → terminal: lleva la terminal a la carpeta de la pestaña
     /// actual (si existe y está activada la opción en la config).
     fn sync_terminal(&self) {
@@ -352,6 +416,7 @@ impl Pane {
             move |page| {
                 if pane.current_page().as_ref() == Some(page) {
                     pane.emit_by_name::<()>("selection-changed", &[]);
+                    pane.update_preview();
                 }
             }
         ));
@@ -386,6 +451,13 @@ impl Pane {
         {
             view.set_selected_page(&view.nth_page(selected));
         }
+        let imp = self.imp();
+        if session.preview_position.is_some() {
+            imp.preview_position.set(session.preview_position);
+        }
+        if session.preview && !imp.preview.is_visible() {
+            self.toggle_preview();
+        }
         !session.tabs.is_empty()
     }
 
@@ -406,7 +478,19 @@ impl Pane {
             .selected_page()
             .and_then(|page| usize::try_from(view.page_position(&page)).ok())
             .unwrap_or(0);
-        PaneSession { selected, tabs }
+        let imp = self.imp();
+        let preview = imp.preview.is_visible();
+        let preview_position = if preview {
+            Some(imp.preview_split.position())
+        } else {
+            imp.preview_position.get()
+        };
+        PaneSession {
+            selected,
+            tabs,
+            preview,
+            preview_position,
+        }
     }
 
     /// Navega la pestaña seleccionada a `dir` y le da el foco.
@@ -481,6 +565,23 @@ impl Pane {
             view.close_page(&page);
         }
     }
+}
+
+/// Dos tercios para las pestañas. Si el `Paned` aún no tiene tamaño (al
+/// restaurar la sesión), espera al primer cuadro con altura.
+fn place_at_two_thirds(paned: &gtk::Paned) {
+    if paned.height() > 0 {
+        paned.set_position(paned.height() * 2 / 3);
+        return;
+    }
+    paned.add_tick_callback(|paned, _| {
+        let height = paned.height();
+        if height == 0 {
+            return glib::ControlFlow::Continue;
+        }
+        paned.set_position(height * 2 / 3);
+        glib::ControlFlow::Break
+    });
 }
 
 fn update_tab_title(tab: &adw::TabPage, dir: &gio::File) {

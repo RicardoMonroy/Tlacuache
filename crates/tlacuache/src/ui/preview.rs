@@ -1,0 +1,293 @@
+//! Vista previa y detalles de un panel (`docs/UI_SPEC.md` §3): a la
+//! izquierda la vista previa (por ahora el ícono grande del tipo; las
+//! imágenes y el texto llegan en 6.2 y 6.3), a la derecha los detalles.
+//!
+//! `request` espera `preview::DEBOUNCE_MS` desde el último cambio de
+//! selección; cada carga nueva aborta la anterior (su consulta de gio se
+//! cancela al soltar el future).
+
+use std::cell::{Cell, RefCell};
+use std::time::{Duration, SystemTime};
+
+use adw::subclass::prelude::*;
+use gtk::prelude::*;
+use gtk::{gio, glib, pango};
+use tlacuache_core::age::Age;
+use tlacuache_core::entry::FileEntry;
+use tlacuache_core::filetype::{FileCategory, classify};
+use tlacuache_core::perms;
+use tlacuache_core::preview::{DEBOUNCE_MS, Target};
+use tlacuache_core::summary::SelectionSummary;
+
+use crate::fs::display::display_name;
+use crate::fs::file_item::{SelectedInfo, entry_from_info};
+use crate::fs::listing::ATTRIBUTES;
+use crate::strings;
+use crate::ui::set_category_icon;
+
+/// Tamaño del ícono de la vista previa genérica.
+const ICON_SIZE: i32 = 96;
+
+mod imp {
+    use super::*;
+
+    #[derive(Default)]
+    pub struct PreviewPane {
+        pub icon: gtk::Image,
+        pub title: gtk::Label,
+        pub details: gtk::Grid,
+        /// Carga pendiente del debounce.
+        pub timer: RefCell<Option<glib::SourceId>>,
+        /// Carga en curso (se aborta al pedir otra).
+        pub task: RefCell<Option<glib::JoinHandle<()>>>,
+        /// Filas usadas en `details`.
+        pub rows: Cell<i32>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for PreviewPane {
+        const NAME: &'static str = "TlacuachePreviewPane";
+        type Type = super::PreviewPane;
+        type ParentType = gtk::Box;
+    }
+
+    impl ObjectImpl for PreviewPane {
+        fn constructed(&self) {
+            self.parent_constructed();
+            self.obj().build();
+        }
+
+        fn dispose(&self) {
+            self.obj().cancel();
+        }
+    }
+    impl WidgetImpl for PreviewPane {}
+    impl BoxImpl for PreviewPane {}
+}
+
+glib::wrapper! {
+    pub struct PreviewPane(ObjectSubclass<imp::PreviewPane>)
+        @extends gtk::Box, gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget, gtk::Orientable;
+}
+
+impl Default for PreviewPane {
+    fn default() -> Self {
+        glib::Object::new()
+    }
+}
+
+impl PreviewPane {
+    fn build(&self) {
+        let imp = self.imp();
+        self.set_orientation(gtk::Orientation::Horizontal);
+        self.add_css_class("tl-preview");
+
+        imp.icon.set_pixel_size(ICON_SIZE);
+        imp.title.add_css_class("tl-preview-title");
+        imp.title.set_wrap(true);
+        imp.title.set_wrap_mode(pango::WrapMode::WordChar);
+        imp.title.set_justify(gtk::Justification::Center);
+        imp.title.set_max_width_chars(30);
+        let visual = gtk::Box::new(gtk::Orientation::Vertical, 8);
+        visual.add_css_class("tl-preview-visual");
+        visual.set_hexpand(true);
+        visual.set_valign(gtk::Align::Center);
+        visual.append(&imp.icon);
+        visual.append(&imp.title);
+
+        imp.details.add_css_class("tl-preview-details");
+        imp.details.set_column_spacing(12);
+        imp.details.set_row_spacing(4);
+        imp.details.set_valign(gtk::Align::Start);
+        let scroll = gtk::ScrolledWindow::builder()
+            .hscrollbar_policy(gtk::PolicyType::Never)
+            .child(&imp.details)
+            .build();
+        scroll.set_hexpand(true);
+
+        self.append(&visual);
+        self.append(&scroll);
+    }
+
+    /// Muestra `target` tras el debounce; `dir` es la carpeta actual (para
+    /// `Target::Directory`).
+    pub fn request(&self, target: Target<SelectedInfo>, dir: Option<gio::File>) {
+        self.cancel();
+        let id = glib::timeout_add_local_once(
+            Duration::from_millis(DEBOUNCE_MS),
+            glib::clone!(
+                #[weak(rename_to = pane)]
+                self,
+                move || {
+                    pane.imp().timer.take();
+                    pane.load(target, dir);
+                }
+            ),
+        );
+        self.imp().timer.replace(Some(id));
+    }
+
+    /// Descarta la carga pendiente o en curso (al ocultar o cambiar).
+    pub fn cancel(&self) {
+        let imp = self.imp();
+        if let Some(id) = imp.timer.take() {
+            id.remove();
+        }
+        if let Some(task) = imp.task.take() {
+            task.abort();
+        }
+    }
+
+    fn load(&self, target: Target<SelectedInfo>, dir: Option<gio::File>) {
+        let file = match target {
+            Target::Many(summary) => {
+                self.show_many(summary);
+                return;
+            }
+            Target::Single(info) => info.file,
+            Target::Directory => match dir {
+                Some(dir) => dir,
+                None => {
+                    self.clear();
+                    return;
+                }
+            },
+        };
+        let task = glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            async move { pane.load_file(&file).await }
+        ));
+        self.imp().task.replace(Some(task));
+    }
+
+    async fn load_file(&self, file: &gio::File) {
+        let attributes = format!("{ATTRIBUTES},unix::mode,owner::user,owner::group");
+        let info = file
+            .query_info_future(
+                &attributes,
+                gio::FileQueryInfoFlags::NONE,
+                glib::Priority::DEFAULT,
+            )
+            .await;
+        self.imp().task.take();
+        match info {
+            Ok(info) => self.show_file(file, &info),
+            Err(err) => {
+                self.clear();
+                self.imp().title.set_text(&display_name(file));
+                self.add_row(strings::PROP_ERROR, err.message());
+            }
+        }
+    }
+
+    fn show_file(&self, file: &gio::File, info: &gio::FileInfo) {
+        let entry = entry_from_info(info);
+        self.clear();
+        let imp = self.imp();
+        set_category_icon(
+            &imp.icon,
+            classify(
+                entry.content_type.as_deref(),
+                &entry.name,
+                entry.is_dir,
+                entry.is_executable,
+            ),
+        );
+        imp.title.set_text(&display_name(file));
+
+        self.add_row(strings::PROP_TYPE, &type_text(&entry));
+        if !entry.is_dir {
+            self.add_row(strings::PROP_SIZE, &strings::prop_size(entry.size));
+        }
+        if let Some(modified) = entry.modified {
+            self.add_row(strings::PROP_MODIFIED, &date_text(modified));
+            let age = Age::between(modified, SystemTime::now());
+            self.add_row(strings::PROP_AGE, &strings::age(&age));
+        }
+        if let Some(created) = entry.created {
+            self.add_row(strings::PROP_CREATED, &date_text(created));
+        }
+        if info.has_attribute(gio::FILE_ATTRIBUTE_UNIX_MODE) {
+            let mode = info.attribute_uint32(gio::FILE_ATTRIBUTE_UNIX_MODE);
+            let text = format!("{} ({})", perms::mode_string(mode), perms::mode_octal(mode));
+            self.add_row(strings::PROP_PERMISSIONS, &text);
+        }
+        let owner = info.attribute_string(gio::FILE_ATTRIBUTE_OWNER_USER);
+        let group = info.attribute_string(gio::FILE_ATTRIBUTE_OWNER_GROUP);
+        if let (Some(owner), Some(group)) = (owner, group) {
+            self.add_row(strings::PROP_OWNER, &format!("{owner}:{group}"));
+        }
+    }
+
+    fn show_many(&self, summary: SelectionSummary) {
+        self.clear();
+        let imp = self.imp();
+        let category = if summary.files == 0 {
+            FileCategory::Folder
+        } else {
+            FileCategory::Other
+        };
+        set_category_icon(&imp.icon, category);
+        imp.title
+            .set_text(&strings::items_count(summary.count() as usize));
+        if summary.dirs > 0 {
+            self.add_row(strings::PROP_FOLDERS, &summary.dirs.to_string());
+        }
+        if summary.files > 0 {
+            self.add_row(strings::PROP_FILES, &summary.files.to_string());
+            self.add_row(strings::PROP_SIZE, &strings::prop_size(summary.bytes));
+        }
+    }
+
+    fn clear(&self) {
+        let imp = self.imp();
+        while let Some(child) = imp.details.first_child() {
+            imp.details.remove(&child);
+        }
+        imp.rows.set(0);
+        imp.icon.set_icon_name(None);
+        imp.title.set_text("");
+    }
+
+    fn add_row(&self, key: &str, value: &str) {
+        let imp = self.imp();
+        let row = imp.rows.get();
+        let key = gtk::Label::builder()
+            .label(key)
+            .xalign(1.0)
+            .yalign(0.0)
+            .css_classes(["tl-detail-key"])
+            .build();
+        let value = gtk::Label::builder()
+            .label(value)
+            .xalign(0.0)
+            .wrap(true)
+            .wrap_mode(pango::WrapMode::WordChar)
+            .selectable(true)
+            .hexpand(true)
+            .css_classes(["tl-detail-value"])
+            .build();
+        imp.details.attach(&key, 0, row, 1, 1);
+        imp.details.attach(&value, 1, row, 1, 1);
+        imp.rows.set(row + 1);
+    }
+}
+
+fn type_text(entry: &FileEntry) -> String {
+    match &entry.content_type {
+        Some(mime) => format!("{} ({mime})", gio::content_type_get_description(mime)),
+        None => String::new(),
+    }
+}
+
+fn date_text(time: SystemTime) -> String {
+    time.duration_since(SystemTime::UNIX_EPOCH)
+        .ok()
+        .and_then(|d| i64::try_from(d.as_secs()).ok())
+        .and_then(|secs| glib::DateTime::from_unix_local(secs).ok())
+        .and_then(|dt| dt.format("%Y-%m-%d %H:%M").ok())
+        .map(|text| text.to_string())
+        .unwrap_or_default()
+}

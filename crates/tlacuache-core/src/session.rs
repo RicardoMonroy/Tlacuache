@@ -60,6 +60,10 @@ impl Default for WindowSession {
 pub struct PaneSession {
     pub selected: usize,
     pub tabs: Vec<TabSession>,
+    /// Vista previa visible.
+    pub preview: bool,
+    /// Alto (px) de la zona de pestañas sobre la vista previa.
+    pub preview_position: Option<i32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -147,6 +151,7 @@ impl Session {
             if pane.selected >= pane.tabs.len() {
                 pane.selected = 0;
             }
+            pane.preview_position = pane.preview_position.filter(|p| *p > 0);
         }
         self
     }
@@ -187,10 +192,13 @@ mod tests {
                             show_hidden: true,
                         },
                     ],
+                    preview: true,
+                    preview_position: Some(420),
                 },
                 PaneSession {
                     selected: 0,
                     tabs: vec![tab("sftp://servidor/srv")],
+                    ..PaneSession::default()
                 },
             ],
         }
@@ -226,6 +234,7 @@ mod tests {
         session.window.panes_position = Some(-3);
         session.window.active_pane = 7;
         session.panes[0].selected = 9;
+        session.panes[0].preview_position = Some(0);
         session.panes[1].tabs.push(tab("   "));
         session.panes.push(PaneSession::default());
 
@@ -237,6 +246,7 @@ mod tests {
         assert_eq!(s.window.active_pane, 0);
         assert_eq!(s.panes.len(), 2);
         assert_eq!(s.panes[0].selected, 0);
+        assert_eq!(s.panes[0].preview_position, None);
         assert_eq!(s.panes[1].tabs.len(), 1);
     }
 
