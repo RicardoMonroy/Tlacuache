@@ -69,7 +69,7 @@ Orden acordado: **7.1–7.5 antes del Hito 6** (la vista previa nace usando los 
 - [x] **7.7 Selector de temas**: Preferencias (`adw::PreferencesDialog`) con lista de temas, cambio en vivo y `follow_system` con temas light/dark. Persistencia en config.
 - [x] **7.8 Temas de usuario**: cargar `~/.config/tlacuache/themes/*.toml`; toast con los pares de contraste fallidos; respaldo a `nord` si hay error de parseo.
 - [x] **7.9 Decor Talavera**: franja `talavera-strip.svg` en el pie de la sidebar cuando el tema define `[decor]`.
-- [ ] **7.10 README**: lockup, captura de cada tema y créditos (paleta Nord MIT, JetBrains Mono OFL).
+- [x] **7.10 README**: lockup, captura de cada tema y créditos (paleta Nord MIT, JetBrains Mono OFL).
 
 **→ Release v0.1 (MVP).** Checklist: usar 3 días seguidos como gestor principal y registrar fallos en `docs/BUGS.md`.
 
