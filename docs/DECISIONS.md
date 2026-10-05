@@ -56,3 +56,8 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
 - **Contexto**: la vista previa de código usa GtkSourceView, que toma sus colores de un *style scheme* (XML en disco). Con los esquemas incluidos (Adwaita) los colores no coinciden con el tema y se rompería la regla 9.
 - **Decisión**: `Theme::source_scheme()` genera el esquema `tlacuache-<id>`: texto, fondo y selección de `[colors]`/`[terminal]`; la sintaxis, de la paleta ANSI de `[terminal]` (palabras clave = azul, tipos = cian brillante, funciones = cian, cadenas = verde, números y constantes = magenta, preprocesador = amarillo, errores = rojo) y los comentarios en `fg_muted`. El `ThemeManager` lo escribe en `~/.cache/tlacuache/styles/` en un hilo de trabajo, añade esa carpeta a la ruta de búsqueda de `StyleSchemeManager` y emite `source-scheme-changed`.
 - **Consecuencias**: el código se ve con los colores de la terminal y cambia con el tema. Una prueba exige contraste ≥ 3:1 de esos colores sobre el fondo en los temas incluidos; los temas de usuario (7.8) deberán validarlo también.
+
+## ADR-012 — Licencia GPL-3.0-or-later
+- **Contexto**: el proyecto es gratuito, con el código en GitHub. Hay que elegir licencia antes de publicarlo.
+- **Decisión**: `GPL-3.0-or-later` para todo el repositorio (código, íconos y logo propios). Texto en `LICENSE` (SPDX) y `license` en los `Cargo.toml`.
+- **Consecuencias**: las versiones modificadas que se distribuyan deben publicar su código con la misma licencia. Es la licencia habitual de las apps de escritorio GTK/GNOME, compatible con las dependencias (GTK, libadwaita, VTE y GtkSourceView son LGPL; los crates, MIT/Apache) y aceptada en AUR y Flathub. Se descartó MIT porque permitiría forks cerrados.

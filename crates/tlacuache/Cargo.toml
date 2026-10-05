@@ -4,6 +4,7 @@ description = "Gestor de archivos con columnas Miller, doble panel y terminal in
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
+license.workspace = true
 
 [dependencies]
 tlacuache-core.workspace = true
