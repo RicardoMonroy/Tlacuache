@@ -250,6 +250,11 @@ impl OpsManager {
                     (OpKind::Mkdir, _) => create_items(&sources, true).await,
                     (OpKind::CreateFile, _) => create_items(&sources, false).await,
                     (OpKind::Rename, Some(dest)) => rename(&sources, &dest).await,
+                    (OpKind::RenameMany, _) => {
+                        let targets: Vec<gio::File> =
+                            op.targets.iter().map(|u| gio::File::for_uri(u)).collect();
+                        rename_many(&sources, &targets).await
+                    }
                     (OpKind::Restore, _) => {
                         let targets: Vec<gio::File> =
                             op.targets.iter().map(|u| gio::File::for_uri(u)).collect();
@@ -879,6 +884,90 @@ async fn rename(sources: &[gio::File], dest: &gio::File) -> Result<Journal, glib
         pairs: vec![(source.uri().to_string(), renamed.uri().to_string())],
         ..Journal::default()
     })
+}
+
+/// Renombrado masivo: cada origen toma el nombre de su destino (misma
+/// carpeta). Si algún destino es el nombre actual de otro origen (cadenas o
+/// intercambios), primero pasan todos por nombres temporales. Si algo
+/// falla, lo ya hecho se revierte en lo posible y se devuelve el error.
+async fn rename_many(sources: &[gio::File], targets: &[gio::File]) -> Result<Journal, glib::Error> {
+    if sources.len() != targets.len() {
+        return Err(error(
+            gio::IOErrorEnum::InvalidArgument,
+            strings::OP_NO_NAME,
+        ));
+    }
+    let names = targets
+        .iter()
+        .map(|t| {
+            t.basename()
+                .map(|n| n.to_string_lossy().into_owned())
+                .ok_or_else(|| error(gio::IOErrorEnum::InvalidFilename, strings::OP_NO_NAME))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let source_uris: std::collections::HashSet<String> =
+        sources.iter().map(|s| s.uri().to_string()).collect();
+    let staging = targets
+        .iter()
+        .any(|t| source_uris.contains(t.uri().as_str()));
+
+    // Fase 1 (si hace falta): a nombres temporales ocultos.
+    let mut current: Vec<gio::File> = sources.to_vec();
+    if staging {
+        let pid = std::process::id();
+        for i in 0..current.len() {
+            let temp = tlacuache_core::bulk_rename::temp_name(i, pid);
+            match current[i]
+                .set_display_name_future(&temp, glib::Priority::DEFAULT)
+                .await
+            {
+                Ok(moved) => current[i] = moved,
+                Err(err) => {
+                    revert(&current[..i], &sources[..i]).await;
+                    return Err(err);
+                }
+            }
+        }
+    }
+
+    // Fase 2: a los nombres finales.
+    let mut journal = Journal::default();
+    for (i, name) in names.iter().enumerate() {
+        match current[i]
+            .set_display_name_future(name, glib::Priority::DEFAULT)
+            .await
+        {
+            Ok(renamed) => {
+                journal
+                    .pairs
+                    .push((sources[i].uri().to_string(), renamed.uri().to_string()));
+                current[i] = renamed;
+            }
+            Err(err) => {
+                // Lo pendiente (temporal) vuelve a su nombre original; lo ya
+                // renombrado se queda (se puede deshacer a mano).
+                if staging {
+                    revert(&current[i..], &sources[i..]).await;
+                }
+                return Err(err);
+            }
+        }
+    }
+    Ok(journal)
+}
+
+/// Devuelve cada archivo de `current` al nombre de su `original` (mejor
+/// esfuerzo, para deshacer un renombrado a medias).
+async fn revert(current: &[gio::File], originals: &[gio::File]) {
+    for (file, original) in current.iter().zip(originals) {
+        if let Some(name) = original.basename()
+            && let Err(err) = file
+                .set_display_name_future(&name.to_string_lossy(), glib::Priority::DEFAULT)
+                .await
+        {
+            tracing::warn!("no se pudo revertir {}: {err}", file.uri());
+        }
+    }
 }
 
 /// Devuelve cada origen a su ruta exacta (deshacer mover). No pisa nada:
@@ -1538,6 +1627,64 @@ mod tests {
         let dest = gio::File::for_uri(undo.dest.as_deref().unwrap());
         block_on(rename(&[source], &dest)).unwrap();
         assert_eq!(fs::read_to_string(&old).unwrap(), "contenido");
+    }
+
+    #[test]
+    fn rename_many_swaps_through_temporary_names_and_undoes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let a = tmp.path().join("a.txt");
+        let b = tmp.path().join("b.txt");
+        fs::write(&a, "A").unwrap();
+        fs::write(&b, "B").unwrap();
+        // Intercambio: a→b y b→a.
+        let journal = block_on(rename_many(&[file(&a), file(&b)], &[file(&b), file(&a)])).unwrap();
+        assert_eq!(fs::read_to_string(&a).unwrap(), "B");
+        assert_eq!(fs::read_to_string(&b).unwrap(), "A");
+        assert_eq!(journal.pairs.len(), 2);
+        // Ningún temporal se quedó.
+        let leftovers: Vec<_> = fs::read_dir(tmp.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().starts_with(".tlacuache"))
+            .collect();
+        assert!(leftovers.is_empty());
+
+        // Deshacer lo devuelve.
+        let undo = undo_request(OpKind::RenameMany, &journal).unwrap();
+        let sources: Vec<_> = undo.sources.iter().map(|u| gio::File::for_uri(u)).collect();
+        let targets: Vec<_> = undo.targets.iter().map(|u| gio::File::for_uri(u)).collect();
+        block_on(rename_many(&sources, &targets)).unwrap();
+        assert_eq!(fs::read_to_string(&a).unwrap(), "A");
+        assert_eq!(fs::read_to_string(&b).unwrap(), "B");
+    }
+
+    #[test]
+    fn rename_many_direct_and_failure_reverts() {
+        let tmp = tempfile::tempdir().unwrap();
+        let one = tmp.path().join("IMG_1.jpg");
+        let two = tmp.path().join("IMG_2.jpg");
+        fs::write(&one, "1").unwrap();
+        fs::write(&two, "2").unwrap();
+        let journal = block_on(rename_many(
+            &[file(&one), file(&two)],
+            &[
+                file(&tmp.path().join("foto-1.jpg")),
+                file(&tmp.path().join("foto-2.jpg")),
+            ],
+        ))
+        .unwrap();
+        assert_eq!(journal.pairs.len(), 2);
+        assert!(tmp.path().join("foto-2.jpg").exists() && !two.exists());
+
+        // Un origen que ya no existe: falla y no deja temporales.
+        let ghost = tmp.path().join("no-existe.jpg");
+        let x = tmp.path().join("foto-1.jpg");
+        let result = block_on(rename_many(
+            &[file(&x), file(&ghost)],
+            &[file(&ghost), file(&x)],
+        ));
+        assert!(result.is_err());
+        assert!(x.exists(), "se revirtió el primero");
     }
 
     #[test]

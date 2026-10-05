@@ -4,6 +4,7 @@
 //! cola de operaciones) vive aquí.
 
 pub mod age;
+pub mod bulk_rename;
 pub mod clipboard;
 pub mod config;
 pub mod entry;

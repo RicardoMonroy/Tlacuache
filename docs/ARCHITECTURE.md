@@ -104,6 +104,12 @@ tlacuache/
 - `core::search`: recorrido en profundidad por nombre (sin seguir enlaces, ocultos opcionales, tope de resultados, cancelable con un `AtomicBool`), con subcadena o comodines `*`/`?` sin mayúsculas ni acentos.
 - `ui/search_page.rs`: pestaña propia dentro del `adw::TabView` del panel. Un hilo de trabajo recorre y manda lotes por `async-channel`; cada búsqueda tiene un número de generación para ignorar mensajes de una anterior. El panel trata su selección como la de una `TabPage` (copiar, mover, papelera, vista previa); no se guarda en la sesión.
 
+## 6c. Renombrado masivo (8.7)
+
+- `core::bulk_rename`: regla (regex con `$1`, contador `{n}`/`{n:3}`, buscar vacío = nombre completo, extensión opcional) y plan por elemento con su estado (sin cambio, renombrar, inválido, duplicado, ya existe), considerando los nombres que el propio lote deja libres.
+- `OpKind::RenameMany` (`fs/ops_runner.rs`): si algún destino es el nombre actual de otro origen, primero pasa todo por nombres temporales ocultos; si algo falla revierte lo posible. Se deshace con otra `RenameMany` al revés.
+- `ui/bulk_rename_dialog.rs`: F2 con varios seleccionados; vista previa en vivo y «Renombrar» solo sin conflictos.
+
 ## 7. Configuración
 
 `~/.config/tlacuache/config.toml` (ruta vía `glib::user_config_dir()`):

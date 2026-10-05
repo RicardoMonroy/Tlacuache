@@ -80,7 +80,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Nuevo archivo vacío | Ctrl+Alt+N |
 | Papelera | Supr |
 | Borrado permanente | Shift+Supr (con confirmación) |
-| Renombrar | F2 |
+| Renombrar (con varios seleccionados: renombrado masivo con regex y vista previa) | F2 |
 | Copiar / cortar / pegar archivos | Ctrl+C / Ctrl+X / Ctrl+V |
 | Deshacer la última operación | Ctrl+Z |
 | Vista previa | Espacio (alternar) |

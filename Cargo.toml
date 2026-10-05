@@ -32,6 +32,8 @@ toml = "1.1.6"
 # Reescribe [[favorites]] conservando comentarios y formato de config.toml.
 toml_edit = "0.25.15"
 tracing = "0.1.44"
+# Renombrado masivo (8.7).
+regex = "1.13.1"
 # Markdown renderizado en la vista previa (8.3); sin HTML.
 pulldown-cmark = { version = "0.13.4", default-features = false }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

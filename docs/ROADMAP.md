@@ -92,6 +92,6 @@ Orden acordado: completar la vista previa, luego vistas, búsqueda, renombrado, 
 - [x] **8.4 Vista de íconos** (`gtk::GridView`) como tercera opción del selector (Ctrl+3). CA: navegación, selección, arrastrar y soltar y menú contextual como en las otras vistas.
 - [x] **8.5 Miniaturas freedesktop** (caché compartida `~/.cache/thumbnails`), generadas en segundo plano. CA: las imágenes muestran miniatura en la vista de íconos y no se regeneran si ya existen.
 - [x] **8.6 Búsqueda recursiva** (Ctrl+F) en segundo plano y cancelable, con resultados en una pestaña. CA: buscar en `~` no traba la app; Esc cancela.
-- [ ] **8.7 Renombrado masivo** con regex y vista previa del resultado. CA: detecta conflictos antes de aplicar y se deshace con Ctrl+Z.
+- [x] **8.7 Renombrado masivo** con regex y vista previa del resultado. CA: detecta conflictos antes de aplicar y se deshace con Ctrl+Z.
 - [ ] **8.8 Notas por carpeta** (decidir antes si se guardan en un archivo oculto de la carpeta o en un almacén central).
 - [ ] **8.9 PKGBUILD para AUR** (el `.desktop` y el ícono existen desde la 7.1). CA: `makepkg -si` instala y la app aparece en el lanzador; la publicación en AUR la hace el autor.

@@ -43,6 +43,13 @@ pub fn undo_request(kind: OpKind, journal: &Journal) -> Option<OpRequest> {
             let (from, to) = journal.pairs.first()?;
             OpRequest::new(OpKind::Rename, vec![to.clone()], Some(from.clone()))
         }
+        // Al revés, también en dos fases si hace falta (intercambios).
+        OpKind::RenameMany if !journal.pairs.is_empty() => OpRequest {
+            kind: OpKind::RenameMany,
+            sources: finals(),
+            dest: None,
+            targets: journal.pairs.iter().map(|(from, _)| from.clone()).collect(),
+        },
         OpKind::Trash if !journal.trashed.is_empty() => {
             OpRequest::new(OpKind::Untrash, journal.trashed.clone(), None)
         }
@@ -66,6 +73,19 @@ mod tests {
                 .collect(),
             ..Journal::default()
         }
+    }
+
+    #[test]
+    fn bulk_rename_undo_swaps_back() {
+        let j = pairs(&[
+            ("file:///d/a", "file:///d/b"),
+            ("file:///d/b", "file:///d/a"),
+        ]);
+        let undo = undo_request(OpKind::RenameMany, &j).unwrap();
+        assert_eq!(undo.kind, OpKind::RenameMany);
+        assert_eq!(undo.sources, ["file:///d/b", "file:///d/a"]);
+        assert_eq!(undo.targets, ["file:///d/a", "file:///d/b"]);
+        assert!(undo_request(OpKind::RenameMany, &Journal::default()).is_none());
     }
 
     #[test]

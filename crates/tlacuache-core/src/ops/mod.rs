@@ -25,6 +25,9 @@ pub enum OpKind {
     /// Crear un archivo vacío.
     CreateFile,
     Rename,
+    /// Renombrado masivo: cada origen pasa al nombre de su elemento en
+    /// `targets` (misma carpeta), por nombres temporales si hay cadenas.
+    RenameMany,
     /// Devolver cada origen a su ruta exacta en `targets` (deshacer mover).
     Restore,
     /// Sacar de la papelera los elementos cuyas rutas originales son

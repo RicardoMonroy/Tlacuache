@@ -1009,13 +1009,42 @@ impl TlacuacheWindow {
         ));
     }
 
+    /// F2 con varios: renombrado masivo con vista previa (8.7).
+    fn bulk_rename(&self) {
+        let Some(pane) = self.pane(self.imp().active.get()) else {
+            return;
+        };
+        let files = pane
+            .selected_infos()
+            .into_iter()
+            .map(|info| (info.file, info.is_dir))
+            .collect();
+        let on_apply: crate::ui::bulk_rename_dialog::OnApply = Rc::new(glib::clone!(
+            #[weak(rename_to = window)]
+            self,
+            move |sources: Vec<gio::File>, targets: Vec<gio::File>| {
+                window
+                    .imp()
+                    .ops
+                    .enqueue_request(tlacuache_core::ops::OpRequest {
+                        kind: OpKind::RenameMany,
+                        sources: sources.iter().map(|f| f.uri().to_string()).collect(),
+                        dest: None,
+                        targets: targets.iter().map(|f| f.uri().to_string()).collect(),
+                    });
+            }
+        ));
+        crate::ui::bulk_rename_dialog::BulkRenameDialog::new(files, on_apply).present(Some(self));
+    }
+
     /// F2: renombra el elemento seleccionado (uno solo).
     fn rename_selection(&self) {
         let (files, _) = self.active_selection();
+        if files.len() > 1 {
+            self.bulk_rename();
+            return;
+        }
         let [file] = files.as_slice() else {
-            if !files.is_empty() {
-                self.show_toast(strings::RENAME_SINGLE_ONLY);
-            }
             return;
         };
         let (Some(parent), Some(name)) = (file.parent(), file.basename()) else {
@@ -1435,7 +1464,7 @@ fn done_verb(kind: OpKind) -> &'static str {
         OpKind::Trash => strings::OP_TRASHED,
         OpKind::Delete => strings::OP_DELETED,
         OpKind::Mkdir | OpKind::CreateFile => strings::OP_CREATED,
-        OpKind::Rename => strings::OP_RENAMED,
+        OpKind::Rename | OpKind::RenameMany => strings::OP_RENAMED,
         OpKind::Restore | OpKind::Untrash => strings::OP_RESTORED,
     }
 }

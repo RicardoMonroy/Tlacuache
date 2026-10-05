@@ -44,8 +44,13 @@ pub const NEW_FILE_NAME: &str = "Nuevo archivo";
 pub const NEW_FOLDER_TITLE: &str = "Nueva carpeta";
 pub const NEW_FILE_TITLE: &str = "Nuevo archivo";
 pub const RENAME_TITLE: &str = "Renombrar";
-pub const RENAME_SINGLE_ONLY: &str =
-    "Selecciona un solo elemento para renombrar (el renombrado masivo llegará en la v0.2)";
+pub const BULK_FIND: &str = "Buscar (expresión regular)";
+pub const BULK_REPLACE: &str = "Reemplazar por";
+pub const BULK_INCLUDE_EXTENSION: &str = "Incluir la extensión";
+pub const BULK_CASE_SENSITIVE: &str = "Distinguir mayúsculas";
+pub const BULK_HINT: &str =
+    "Buscar vacío reemplaza el nombre completo. Usa $1 para los grupos y {n} o {n:3} para numerar.";
+pub const BULK_APPLY: &str = "Renombrar";
 pub const CONFLICT_FILES: &str = "Ya hay un archivo con ese nombre en el destino.";
 pub const CONFLICT_FOLDERS: &str = "Ya hay una carpeta con ese nombre. «Combinar» copia el contenido dentro y pregunta por cada archivo que coincida.";
 pub const CONFLICT_TYPES: &str =
@@ -410,6 +415,7 @@ pub fn op_title(kind: OpKind, what: &str, dest: Option<&str>) -> String {
             Some(dest) => format!("Renombrar {what} → «{dest}»"),
             None => format!("Renombrar {what}"),
         },
+        OpKind::RenameMany => format!("Renombrar {what}"),
         OpKind::Trash => format!("Papelera: {what}"),
         OpKind::Delete => format!("Eliminar {what}"),
         OpKind::Mkdir => format!("Crear carpeta {what}"),
@@ -443,6 +449,42 @@ pub fn preview_truncated(bytes: u64) -> String {
         "Vista previa recortada: se muestran los primeros {}",
         glib::format_size(bytes)
     )
+}
+
+pub fn bulk_rename_title(count: usize) -> String {
+    format!("Renombrar {}", items_count(count))
+}
+
+pub fn bulk_bad_regex(detail: &str) -> String {
+    let first = detail.lines().last().unwrap_or(detail);
+    format!("Expresión regular no válida: {first}")
+}
+
+/// «3 cambios · 1 conflicto» (y cuántos no caben en la vista previa).
+pub fn bulk_summary(changes: usize, conflicts: usize, hidden: usize) -> String {
+    let changes_text = match changes {
+        1 => "1 cambio".to_owned(),
+        n => format!("{n} cambios"),
+    };
+    let mut text = match conflicts {
+        0 => changes_text,
+        1 => format!("{changes_text} · 1 conflicto (corrígelo para continuar)"),
+        n => format!("{changes_text} · {n} conflictos (corrígelos para continuar)"),
+    };
+    if hidden > 0 {
+        text.push_str(&format!(" · {hidden} más sin mostrar"));
+    }
+    text
+}
+
+pub fn bulk_conflict(status: tlacuache_core::bulk_rename::Status) -> String {
+    use tlacuache_core::bulk_rename::Status;
+    match status {
+        Status::Invalid(err) => format!("Nombre no válido: {err}"),
+        Status::Duplicate => "Otro elemento quedaría con el mismo nombre".to_owned(),
+        Status::Exists => "Ya existe un elemento con ese nombre en la carpeta".to_owned(),
+        Status::Unchanged | Status::Renamed => String::new(),
+    }
 }
 
 pub fn search_placeholder(root: &str) -> String {

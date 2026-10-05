@@ -1,5 +1,6 @@
 //! Widgets propios (un archivo por widget).
 
+pub mod bulk_rename_dialog;
 pub mod context_menu;
 pub mod dnd;
 pub mod drive_row;

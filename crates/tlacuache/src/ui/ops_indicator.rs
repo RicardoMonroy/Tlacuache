@@ -330,7 +330,7 @@ fn verb(kind: OpKind) -> &'static str {
         OpKind::Delete => strings::OP_DELETING,
         OpKind::Mkdir => strings::OP_CREATING_FOLDER,
         OpKind::CreateFile => strings::OP_CREATING_FILE,
-        OpKind::Rename => strings::OP_RENAMING,
+        OpKind::Rename | OpKind::RenameMany => strings::OP_RENAMING,
         OpKind::Restore | OpKind::Untrash => strings::OP_RESTORING,
     }
 }
