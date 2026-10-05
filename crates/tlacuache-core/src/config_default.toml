@@ -17,7 +17,7 @@ font = ""                  # vacío = font_mono del tema
 font_size = 11
 sync_panel_to_terminal = true
 sync_terminal_to_panel = true
-shell_integration = true   # OSC 7 automático (bash) para que el panel siga los cd
+shell_integration = true   # OSC 7 automático (bash y zsh) para que el panel siga los cd
 
 [theme]
 name = "nord"              # nord | consola | claro | cyberpunk | talavera

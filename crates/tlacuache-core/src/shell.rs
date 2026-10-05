@@ -105,6 +105,45 @@ else
 fi
 "#;
 
+/// Variable con el `ZDOTDIR` original del usuario (vacía = `$HOME`).
+pub const ZSH_USER_ZDOTDIR_VAR: &str = "TLACUACHE_USER_ZDOTDIR";
+
+/// `.zshenv` de integración para zsh (ADR-008). Tlacuache lanza zsh con
+/// `ZDOTDIR` apuntando a la carpeta de este archivo: aquí se restaura el
+/// `ZDOTDIR` del usuario y se carga su `.zshenv`, así que zsh sigue con su
+/// `.zprofile`/`.zshrc` de siempre. En shells interactivos se añade un
+/// gancho `precmd` que emite OSC 7 (conserva `$?`).
+pub const ZSH_INTEGRATION_ZSHENV: &str = r#"# Generado por Tlacuache. Restaura tu ZDOTDIR, carga tu configuración de
+# zsh y añade OSC 7 (avisa a la terminal la carpeta actual).
+if [[ -n "${TLACUACHE_USER_ZDOTDIR-}" ]]; then
+    ZDOTDIR="$TLACUACHE_USER_ZDOTDIR"
+else
+    unset ZDOTDIR
+fi
+unset TLACUACHE_USER_ZDOTDIR
+[[ -f "${ZDOTDIR:-$HOME}/.zshenv" ]] && source "${ZDOTDIR:-$HOME}/.zshenv"
+
+if [[ -o interactive ]]; then
+    __tlacuache_osc7() {
+        local ret=$?
+        emulate -L zsh
+        setopt no_multibyte
+        local LC_ALL=C out="" c
+        for c in ${(s::)PWD}; do
+            if [[ "$c" == [a-zA-Z0-9/._~-] ]]; then
+                out+="$c"
+            else
+                out+=$(printf '%%%02X' "'$c")
+            fi
+        done
+        printf '\e]7;file://%s%s\e\\' "${HOST:-localhost}" "$out"
+        return $ret
+    }
+    autoload -Uz add-zsh-hook
+    add-zsh-hook precmd __tlacuache_osc7
+fi
+"#;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,6 +305,64 @@ mod tests {
             all.contains("GANCHO-USUARIO"),
             "se perdió el gancho del usuario: {all:?}"
         );
+    }
+
+    #[test]
+    fn zsh_integration_emits_osc7_and_loads_user_config() {
+        use std::process::{Command, Stdio};
+
+        let (Ok(home), Ok(ours)) = (tempfile::tempdir(), tempfile::tempdir()) else {
+            return;
+        };
+        std::fs::write(ours.path().join(".zshenv"), ZSH_INTEGRATION_ZSHENV).unwrap();
+        // La config del usuario vive en su propio ZDOTDIR.
+        let user_dir = home.path().join("zdot");
+        std::fs::create_dir(&user_dir).unwrap();
+        std::fs::write(user_dir.join(".zshenv"), "echo ENV-USUARIO\n").unwrap();
+        std::fs::write(
+            user_dir.join(".zshrc"),
+            "echo RC-USUARIO\nautoload -Uz add-zsh-hook\n__mio() { echo GANCHO-USUARIO }\nadd-zsh-hook precmd __mio\n",
+        )
+        .unwrap();
+        let target = home.path().join("con espacio ñ");
+        std::fs::create_dir(&target).unwrap();
+
+        let script = format!("cd {}\nexit\n", quote(&target.to_string_lossy(), POSIX));
+        let child = Command::new("zsh")
+            .args(["-i"])
+            .env("HOME", home.path())
+            .env("HOST", "equipo")
+            .env("ZDOTDIR", ours.path())
+            .env(ZSH_USER_ZDOTDIR_VAR, &user_dir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn();
+        let Ok(mut child) = child else {
+            return; // sin zsh
+        };
+        {
+            use std::io::Write;
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(script.as_bytes()).unwrap();
+        }
+        let output = child.wait_with_output().unwrap();
+        let all = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let encoded = target
+            .to_string_lossy()
+            .replace(' ', "%20")
+            .replace('ñ', "%C3%B1");
+        assert!(
+            all.contains(&format!("\u{1b}]7;file://equipo{encoded}\u{1b}\\")),
+            "sin OSC 7 de la carpeta: {all:?}"
+        );
+        for expected in ["ENV-USUARIO", "RC-USUARIO", "GANCHO-USUARIO"] {
+            assert!(all.contains(expected), "falta {expected}: {all:?}");
+        }
     }
 
     #[test]

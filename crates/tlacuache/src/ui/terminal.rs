@@ -333,37 +333,55 @@ impl TerminalView {
             .current_dir
             .replace(Some(gio::File::for_path(&cwd_path)));
         let cwd = cwd_path.to_string_lossy().into_owned();
-        let integrate = config.terminal.shell_integration && is_bash(&shell);
+        let integration = if config.terminal.shell_integration {
+            shell_name(&shell)
+        } else {
+            None
+        };
 
         glib::spawn_future_local(glib::clone!(
             #[weak(rename_to = view)]
             self,
             async move {
                 let mut argv = vec![shell.clone()];
-                if integrate {
-                    // El rcfile se escribe fuera del hilo de GTK. Si falla, se
-                    // lanza bash normal (sin seguir sus `cd`).
-                    match gio::spawn_blocking(write_bash_rc).await {
+                let mut env = Vec::new();
+                // Los archivos de integración se escriben fuera del hilo de
+                // GTK. Si falla, se lanza el shell normal (sin seguir sus `cd`).
+                match integration {
+                    Some("bash") => match gio::spawn_blocking(write_bash_rc).await {
                         Ok(Ok(rc)) => argv.extend(["--rcfile".to_owned(), rc]),
                         Ok(Err(err)) => tracing::warn!("sin integración de bash: {err}"),
                         Err(_) => tracing::warn!("sin integración de bash: falló el hilo"),
-                    }
+                    },
+                    Some("zsh") => match gio::spawn_blocking(write_zsh_env).await {
+                        Ok(Ok(dir)) => {
+                            // El ZDOTDIR del usuario se restaura en nuestro .zshenv.
+                            let user = std::env::var("ZDOTDIR").unwrap_or_default();
+                            env.push(format!("{}={user}", shell::ZSH_USER_ZDOTDIR_VAR));
+                            env.push(format!("ZDOTDIR={dir}"));
+                        }
+                        Ok(Err(err)) => tracing::warn!("sin integración de zsh: {err}"),
+                        Err(_) => tracing::warn!("sin integración de zsh: falló el hilo"),
+                    },
+                    _ => {}
                 }
-                view.launch(&cwd, &argv);
+                view.launch(&cwd, &argv, &env);
             }
         ));
     }
 
-    fn launch(&self, cwd: &str, argv: &[String]) {
+    /// `env`: variables que se añaden al entorno heredado.
+    fn launch(&self, cwd: &str, argv: &[String], env: &[String]) {
         let Some(terminal) = self.terminal() else {
             return;
         };
         let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
+        let env: Vec<&str> = env.iter().map(String::as_str).collect();
         terminal.spawn_async(
             vte::PtyFlags::DEFAULT,
             Some(cwd),
             &argv,
-            &[],
+            &env,
             glib::SpawnFlags::DEFAULT,
             || {},
             -1,
@@ -438,8 +456,14 @@ impl TerminalView {
     }
 }
 
-fn is_bash(shell: &str) -> bool {
-    Path::new(shell).file_name().and_then(|n| n.to_str()) == Some("bash")
+/// `bash` o `zsh` si el shell tiene integración propia (fish emite OSC 7
+/// por sí mismo).
+fn shell_name(shell: &str) -> Option<&'static str> {
+    match Path::new(shell).file_name().and_then(|n| n.to_str()) {
+        Some("bash") => Some("bash"),
+        Some("zsh") => Some("zsh"),
+        _ => None,
+    }
 }
 
 /// Escribe el rcfile de integración en `$XDG_RUNTIME_DIR/tlacuache/` y
@@ -450,6 +474,16 @@ fn write_bash_rc() -> std::io::Result<String> {
     let path = dir.join("bash-integration.rc");
     std::fs::write(&path, shell::BASH_INTEGRATION_RC)?;
     Ok(path.to_string_lossy().into_owned())
+}
+
+/// Escribe el `.zshenv` de integración en `$XDG_RUNTIME_DIR/tlacuache/zsh/`
+/// y devuelve esa carpeta (el `ZDOTDIR` con el que se lanza zsh). E/S
+/// bloqueante: se llama desde un hilo de trabajo.
+fn write_zsh_env() -> std::io::Result<String> {
+    let dir = glib::user_runtime_dir().join("tlacuache").join("zsh");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join(".zshenv"), shell::ZSH_INTEGRATION_ZSHENV)?;
+    Ok(dir.to_string_lossy().into_owned())
 }
 
 /// Shell de la config, si no `$SHELL`, si no `/bin/bash`.

@@ -114,7 +114,7 @@ pub struct Terminal {
     pub sync_panel_to_terminal: bool,
     pub sync_terminal_to_panel: bool,
     /// Integración automática del shell (OSC 7) para seguir los `cd` de la
-    /// terminal. Hoy bash; fish lo hace solo.
+    /// terminal: bash y zsh; fish lo hace solo.
     pub shell_integration: bool,
 }
 
