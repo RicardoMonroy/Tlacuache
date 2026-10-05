@@ -297,6 +297,15 @@ impl OpsManager {
             let mut queue = self.imp().queue.borrow_mut();
             let outcome = match result {
                 Ok(journal) => {
+                    // Las notas siguen a las carpetas movidas o renombradas.
+                    if queue.get(id).is_some_and(|op| {
+                        matches!(
+                            op.kind,
+                            OpKind::Move | OpKind::Rename | OpKind::RenameMany | OpKind::Restore
+                        )
+                    }) {
+                        crate::fs::notes::get().relocate(journal.pairs.clone());
+                    }
                     let undo = queue.get(id).and_then(|op| undo_request(op.kind, &journal));
                     queue.complete_with_undo(id, undo)
                 }

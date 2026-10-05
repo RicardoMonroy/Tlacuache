@@ -93,5 +93,5 @@ Orden acordado: completar la vista previa, luego vistas, búsqueda, renombrado, 
 - [x] **8.5 Miniaturas freedesktop** (caché compartida `~/.cache/thumbnails`), generadas en segundo plano. CA: las imágenes muestran miniatura en la vista de íconos y no se regeneran si ya existen.
 - [x] **8.6 Búsqueda recursiva** (Ctrl+F) en segundo plano y cancelable, con resultados en una pestaña. CA: buscar en `~` no traba la app; Esc cancela.
 - [x] **8.7 Renombrado masivo** con regex y vista previa del resultado. CA: detecta conflictos antes de aplicar y se deshace con Ctrl+Z.
-- [ ] **8.8 Notas por carpeta** (decidir antes si se guardan en un archivo oculto de la carpeta o en un almacén central).
+- [x] **8.8 Notas por carpeta**: almacén central (ADR-014), editor en la vista previa de la carpeta con guardado automático e indicador en la barra de estado; las notas siguen a las carpetas movidas o renombradas desde Tlacuache. CA: escribir una nota, cambiar de carpeta, reiniciar y verla igual; renombrar la carpeta y que la nota la siga.
 - [ ] **8.9 PKGBUILD para AUR** (el `.desktop` y el ícono existen desde la 7.1). CA: `makepkg -si` instala y la app aparece en el lanzador; la publicación en AUR la hace el autor.

@@ -15,6 +15,8 @@ mod imp {
     pub struct StatusBar {
         pub items: gtk::Label,
         pub free_space: gtk::Label,
+        /// La carpeta tiene notas (8.8).
+        pub notes: gtk::Image,
     }
 
     #[glib::object_subclass]
@@ -36,10 +38,14 @@ mod imp {
             self.items.set_hexpand(true);
             self.items.set_ellipsize(pango::EllipsizeMode::End);
             self.free_space.set_xalign(1.0);
-            for label in [&self.items, &self.free_space] {
-                label.add_css_class("numeric");
-                obj.append(label);
-            }
+            self.notes.set_icon_name(Some("document-edit-symbolic"));
+            self.notes.set_tooltip_text(Some(strings::NOTES_INDICATOR));
+            self.notes.set_visible(false);
+            self.items.add_css_class("numeric");
+            self.free_space.add_css_class("numeric");
+            obj.append(&self.items);
+            obj.append(&self.notes);
+            obj.append(&self.free_space);
         }
     }
 
@@ -62,6 +68,10 @@ impl Default for StatusBar {
 impl StatusBar {
     pub fn set_status(&self, status: &ViewStatus) {
         self.imp().items.set_text(&strings::status_items(status));
+    }
+
+    pub fn set_has_notes(&self, has_notes: bool) {
+        self.imp().notes.set_visible(has_notes);
     }
 
     /// `(libre, total)` en bytes, o `None` si el sistema de archivos no lo

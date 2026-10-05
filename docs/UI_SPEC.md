@@ -42,7 +42,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 
 - Imagen: `gtk::Picture` con ajuste a contenedor y zoom con rueda.
 - Texto/código: `sourceview5::View` solo lectura, lenguaje detectado por tipo MIME; límite de 1 MB (mostrar primeras N líneas si excede).
-- Carpeta: número de elementos y tamaño (calculado en segundo plano, cancelable).
+- Carpeta: número de elementos y tamaño (calculado en segundo plano, cancelable). En lugar del ícono, el editor de **notas** de la carpeta (guardado automático; ADR-014). La barra de estado muestra un ícono si la carpeta actual tiene nota.
 - Detalles: nombre, tipo MIME, tamaño, creado, modificado, edad, permisos, propietario; dimensiones para imágenes.
 - La vista previa se actualiza con debounce (~120 ms) al mover la selección.
 - Qué se muestra: un elemento seleccionado → su vista previa y detalles; varios → resumen (cantidad, carpetas/archivos y tamaño de los archivos); ninguno → la carpeta actual.

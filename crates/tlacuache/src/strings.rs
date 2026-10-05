@@ -190,6 +190,8 @@ pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";
 pub const VIEW_DETAILS: &str = "Detalles (Ctrl+2)";
 pub const VIEW_ICONS: &str = "Íconos (Ctrl+3)";
 pub const SEARCH_TAB: &str = "Buscar";
+pub const NOTES_PLACEHOLDER: &str = "Escribe una nota para esta carpeta…";
+pub const NOTES_INDICATOR: &str = "Esta carpeta tiene notas (vista previa sin selección)";
 pub const SEARCH_LOCAL_ONLY: &str = "La búsqueda solo funciona en carpetas locales";
 pub const SEARCH_STOP: &str = "Detener la búsqueda (Esc)";
 pub const SEARCH_HINT: &str = "Escribe un nombre y pulsa Enter. Puedes usar * y ? como comodines.";
@@ -485,6 +487,10 @@ pub fn bulk_conflict(status: tlacuache_core::bulk_rename::Status) -> String {
         Status::Exists => "Ya existe un elemento con ese nombre en la carpeta".to_owned(),
         Status::Unchanged | Status::Renamed => String::new(),
     }
+}
+
+pub fn notes_title(folder: &str) -> String {
+    format!("Notas de «{folder}»")
 }
 
 pub fn search_placeholder(root: &str) -> String {

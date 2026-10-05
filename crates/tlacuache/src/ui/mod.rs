@@ -13,6 +13,7 @@ pub mod list_view;
 pub mod markdown_view;
 pub mod media_preview;
 pub mod miller_view;
+pub mod notes_view;
 pub mod ops_indicator;
 pub mod pane;
 pub mod pane_actions;

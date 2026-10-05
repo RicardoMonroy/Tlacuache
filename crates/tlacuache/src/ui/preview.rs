@@ -38,6 +38,7 @@ use crate::fs::size::{self, Measure};
 use crate::strings;
 use crate::ui::image_preview::ImagePreview;
 use crate::ui::media_preview::MediaPreview;
+use crate::ui::notes_view::NotesView;
 use crate::ui::pdf_preview::PdfPreview;
 use crate::ui::set_category_icon;
 use crate::ui::text_preview::TextPreview;
@@ -53,6 +54,7 @@ const PAGE_IMAGE: &str = "image";
 const PAGE_TEXT: &str = "text";
 const PAGE_PDF: &str = "pdf";
 const PAGE_MEDIA: &str = "media";
+const PAGE_NOTES: &str = "notes";
 /// Límite de texto si la config no dice otro.
 const DEFAULT_MAX_TEXT_BYTES: u64 = 1 << 20;
 
@@ -71,6 +73,7 @@ mod imp {
         pub text: TextPreview,
         pub pdf: PdfPreview,
         pub media: MediaPreview,
+        pub notes: NotesView,
         /// `[preview] max_text_bytes`.
         pub max_text_bytes: Cell<u64>,
         /// Carga pendiente del debounce.
@@ -147,6 +150,7 @@ impl PreviewPane {
         imp.stack.add_named(&imp.text, Some(PAGE_TEXT));
         imp.stack.add_named(&imp.pdf, Some(PAGE_PDF));
         imp.stack.add_named(&imp.media, Some(PAGE_MEDIA));
+        imp.stack.add_named(&imp.notes, Some(PAGE_NOTES));
         imp.max_text_bytes.set(DEFAULT_MAX_TEXT_BYTES);
         self.append(&imp.stack);
         self.append(scroll);
@@ -207,8 +211,10 @@ impl PreviewPane {
         if let Some(cancellable) = imp.measuring.take() {
             cancellable.cancel();
         }
-        // Nada sigue sonando al cambiar de selección o cerrar la vista previa.
+        // Nada sigue sonando al cambiar de selección o cerrar la vista previa,
+        // y la nota que se estaba escribiendo se guarda.
         imp.media.stop();
+        imp.notes.flush();
     }
 
     fn load(&self, target: Target<SelectedInfo>, dir: Option<gio::File>) {
@@ -258,7 +264,14 @@ impl PreviewPane {
                     (PreviewKind::Pdf, Some(path)) => self.load_pdf(path).await,
                     (PreviewKind::Video, _) => self.load_media(file, true),
                     (PreviewKind::Audio, _) => self.load_media(file, false),
-                    (PreviewKind::Folder, _) => self.measure_folder(file).await,
+                    (PreviewKind::Folder, _) => {
+                        // Las carpetas muestran su nota (editable) y se miden.
+                        let imp = self.imp();
+                        imp.notes
+                            .set_folder(Some((file.uri().to_string(), display_name(file))));
+                        imp.stack.set_visible_child_name(PAGE_NOTES);
+                        self.measure_folder(file).await;
+                    }
                     _ => {}
                 }
             }
@@ -484,6 +497,7 @@ impl PreviewPane {
         imp.text.clear();
         imp.pdf.clear();
         imp.media.stop();
+        imp.notes.set_folder(None);
         imp.icon.set_icon_name(None);
         imp.title.set_text("");
     }

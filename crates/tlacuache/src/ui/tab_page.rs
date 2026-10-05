@@ -158,6 +158,8 @@ mod imp {
         /// Señales conectadas por el panel que la contiene (se desconectan
         /// si la pestaña pasa al otro panel).
         pub pane_handlers: RefCell<Vec<glib::SignalHandlerId>>,
+        /// Aviso de cambios en las notas (se suelta al cerrar la pestaña).
+        pub notes_handler: RefCell<Option<glib::SignalHandlerId>>,
     }
 
     impl TabPage {
@@ -241,6 +243,9 @@ mod imp {
         fn dispose(&self) {
             if let Some(menu) = self.context_menu.get() {
                 menu.unparent();
+            }
+            if let Some(id) = self.notes_handler.take() {
+                crate::fs::notes::get().disconnect(id);
             }
         }
     }
@@ -339,6 +344,36 @@ impl TabPage {
         self.install_view(PageView::new(mode, dir, show_hidden));
         self.update_nav_actions();
         self.refresh_free_space(dir);
+        self.refresh_notes();
+        // La nota de esta carpeta pudo cambiar (vista previa, reubicación).
+        let id = crate::fs::notes::get().connect_changed(glib::clone!(
+            #[weak(rename_to = page)]
+            self,
+            move |_, uri| {
+                if page.directory().is_some_and(|d| d.uri() == uri) {
+                    page.refresh_notes();
+                }
+            }
+        ));
+        imp.notes_handler.replace(Some(id));
+    }
+
+    /// Muestra en la barra de estado si la carpeta actual tiene nota.
+    fn refresh_notes(&self) {
+        let Some(dir) = self.directory() else {
+            return;
+        };
+        let uri = dir.uri().to_string();
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = page)]
+            self,
+            async move {
+                let has_notes = crate::fs::notes::get().exists(&uri).await;
+                if page.directory().is_some_and(|d| d.uri() == uri) {
+                    page.imp().status_bar.set_has_notes(has_notes);
+                }
+            }
+        ));
     }
 
     fn view(&self) -> Option<PageView> {
@@ -568,6 +603,7 @@ impl TabPage {
         self.notify_directory();
         self.update_nav_actions();
         self.refresh_free_space(dir);
+        self.refresh_notes();
     }
 
     fn update_nav_actions(&self) {

@@ -15,6 +15,7 @@ pub mod history;
 pub mod keymap;
 pub mod markdown;
 pub mod names;
+pub mod notes;
 pub mod ops;
 pub mod path_input;
 pub mod perms;
