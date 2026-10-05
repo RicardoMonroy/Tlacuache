@@ -208,6 +208,29 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
   color: var(--tl-selection-fg);
 }
 
+/* Vista de íconos (8.4): mosaicos con los mismos estados que las filas. */
+.tl-pane gridview {
+  background-color: var(--tl-pane-bg);
+  color: var(--tl-fg);
+  padding: 6px;
+}
+.tl-pane gridview > child {
+  padding: 8px 4px;
+  margin: 2px;
+  border-radius: var(--tl-radius);
+}
+.tl-pane gridview > child:hover { background-color: var(--tl-hover-bg); }
+.tl-pane gridview > child:selected {
+  background-color: var(--tl-selection-inactive-bg);
+  color: var(--tl-fg);
+}
+.tl-pane.active gridview > child:selected {
+  background-color: var(--tl-selection-bg);
+  color: var(--tl-selection-fg);
+}
+.tl-tile { min-width: 96px; }
+.tl-tile .tl-glyph { font-size: 2.6em; }
+
 .tl-pane .tl-size,
 .tl-pane .tl-date,
 .tl-pane .tl-chevron { color: var(--tl-fg-muted); }
@@ -363,7 +386,8 @@ link, .tl-link { color: var(--tl-link); }
 
 .tl-flat * { box-shadow: none; }
 
-.tl-select-invert .tl-pane.active listview > row:selected {
+.tl-select-invert .tl-pane.active listview > row:selected,
+.tl-select-invert .tl-pane.active gridview > child:selected {
   background-color: var(--tl-selection-bg);
   color: var(--tl-selection-fg);
   font-weight: 600;

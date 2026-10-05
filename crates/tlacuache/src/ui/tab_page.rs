@@ -13,6 +13,7 @@ use tlacuache_core::summary::ViewStatus;
 
 use crate::fs::file_item::SelectedInfo;
 use crate::strings;
+use crate::ui::icon_view::IconView;
 use crate::ui::list_view::FileListView;
 use crate::ui::miller_view::MillerView;
 use crate::ui::path_bar::PathBar;
@@ -28,6 +29,7 @@ const MOUSE_BUTTON_FORWARD: u32 = 9;
 enum PageView {
     Columns(MillerView),
     Details(FileListView),
+    Icons(IconView),
 }
 
 impl PageView {
@@ -35,6 +37,7 @@ impl PageView {
         match mode {
             ViewMode::Columns => Self::Columns(MillerView::new(dir, show_hidden)),
             ViewMode::Details => Self::Details(FileListView::new(dir, show_hidden)),
+            ViewMode::Icons => Self::Icons(IconView::new(dir, show_hidden)),
         }
     }
 
@@ -42,6 +45,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.clone().upcast(),
             Self::Details(view) => view.clone().upcast(),
+            Self::Icons(view) => view.clone().upcast(),
         }
     }
 
@@ -49,6 +53,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.directory(),
             Self::Details(view) => view.directory(),
+            Self::Icons(view) => view.directory(),
         }
     }
 
@@ -56,6 +61,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.show_directory(dir),
             Self::Details(view) => view.show_directory(dir),
+            Self::Icons(view) => view.show_directory(dir),
         }
     }
 
@@ -63,6 +69,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.focus_list(),
             Self::Details(view) => view.focus_list(),
+            Self::Icons(view) => view.focus_list(),
         }
     }
 
@@ -70,6 +77,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.set_show_hidden(show),
             Self::Details(view) => view.set_show_hidden(show),
+            Self::Icons(view) => view.set_show_hidden(show),
         }
     }
 
@@ -77,6 +85,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.select_when_present(file),
             Self::Details(view) => view.select_when_present(file),
+            Self::Icons(view) => view.select_when_present(file),
         }
     }
 
@@ -84,6 +93,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.selected_infos(),
             Self::Details(view) => view.selected_infos(),
+            Self::Icons(view) => view.selected_infos(),
         }
     }
 
@@ -91,6 +101,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.selected_files(),
             Self::Details(view) => view.selected_files(),
+            Self::Icons(view) => view.selected_files(),
         }
     }
 
@@ -98,6 +109,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.status(),
             Self::Details(view) => view.status(),
+            Self::Icons(view) => view.status(),
         }
     }
 
@@ -105,6 +117,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.connect_status_changed(move |_| f()),
             Self::Details(view) => view.connect_status_changed(move |_| f()),
+            Self::Icons(view) => view.connect_status_changed(move |_| f()),
         }
     }
 
@@ -112,6 +125,7 @@ impl PageView {
         match self {
             Self::Columns(view) => view.connect_directory_activated(move |_, dir| f(dir)),
             Self::Details(view) => view.connect_directory_activated(move |_, dir| f(dir)),
+            Self::Icons(view) => view.connect_directory_activated(move |_, dir| f(dir)),
         }
     }
 }
@@ -204,6 +218,10 @@ mod imp {
             });
             klass.add_binding(gdk::Key::_2, ctrl, |page| {
                 page.set_view_mode(ViewMode::Details.id());
+                glib::Propagation::Stop
+            });
+            klass.add_binding(gdk::Key::_3, ctrl, |page| {
+                page.set_view_mode(ViewMode::Icons.id());
                 glib::Propagation::Stop
             });
         }
@@ -574,6 +592,7 @@ fn view_switcher() -> gtk::Box {
         let (icon, tooltip) = match mode {
             ViewMode::Columns => ("tl-view-miller-symbolic", strings::VIEW_COLUMNS),
             ViewMode::Details => ("view-list-symbolic", strings::VIEW_DETAILS),
+            ViewMode::Icons => ("view-grid-symbolic", strings::VIEW_ICONS),
         };
         let button = gtk::ToggleButton::builder()
             .icon_name(icon)

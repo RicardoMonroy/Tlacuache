@@ -107,7 +107,7 @@ tlacuache/
 show_hidden = false
 dual_pane = true
 confirm_trash = false
-default_view = "columns"   # columns (Miller) | details (lista)
+default_view = "columns"   # columns (Miller) | details (lista) | icons (íconos)
 
 [preview]
 position = "bottom"   # bottom | right

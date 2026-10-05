@@ -15,7 +15,7 @@
 
 ## Qué hace
 
-- **Columnas Miller** y **lista detallada** (nombre, extensión, tamaño, fecha y edad con color), por pestaña.
+- **Columnas Miller**, **lista detallada** (nombre, extensión, tamaño, fecha y edad con color) y **cuadrícula de íconos**, por pestaña.
 - **Uno o dos paneles** (F3) con pestañas, historial, barra de ruta editable y filtro rápido escribiendo directamente.
 - **Terminal por panel** (F4): el panel sigue los `cd` de la terminal y la terminal sigue al panel; si hay un programa corriendo, avisa en vez de interrumpirlo.
 - **Vista previa** (Espacio): imágenes con zoom, texto y código con resaltado, tamaño de carpetas en segundo plano y detalles del archivo; abajo o a la derecha.

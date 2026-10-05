@@ -16,6 +16,10 @@ use tlacuache_core::theme::{GlyphKind, Theme};
 use crate::fs::cut_marks;
 use crate::ui::{set_category_icon, theme_manager};
 
+/// Ícono y ancho del nombre en la vista de íconos.
+const TILE_ICON_SIZE: i32 = 48;
+const TILE_CHARS: i32 = 12;
+
 mod imp {
     use super::*;
 
@@ -69,6 +73,26 @@ impl FileNameCell {
     pub fn new(ellipsize: pango::EllipsizeMode) -> Self {
         let cell: Self = glib::Object::new();
         cell.imp().name.set_ellipsize(ellipsize);
+        cell
+    }
+
+    /// Mosaico de la vista de íconos: ícono grande arriba y el nombre
+    /// centrado debajo, en hasta dos líneas.
+    pub fn new_tile() -> Self {
+        let cell: Self = glib::Object::new();
+        let imp = cell.imp();
+        cell.set_orientation(gtk::Orientation::Vertical);
+        cell.add_css_class("tl-tile");
+        imp.icon.set_pixel_size(TILE_ICON_SIZE);
+        imp.name.set_xalign(0.5);
+        imp.name.set_justify(gtk::Justification::Center);
+        imp.name.set_wrap(true);
+        imp.name.set_wrap_mode(pango::WrapMode::WordChar);
+        imp.name.set_lines(2);
+        imp.name.set_ellipsize(pango::EllipsizeMode::Middle);
+        imp.name.set_width_chars(TILE_CHARS);
+        imp.name.set_max_width_chars(TILE_CHARS);
+        imp.name.set_hexpand(false);
         cell
     }
 

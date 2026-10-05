@@ -33,6 +33,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 - **Vistas**:
   - Columnas Miller: cada nivel es una columna; seleccionar carpeta abre la siguiente columna a la derecha y hace scroll automático. La última columna puede mostrarse como lista detallada (como OneCommander).
   - Lista detallada (`gtk::ColumnView`): columnas visibles según ancho del panel.
+  - Íconos (`gtk::GridView`): mosaicos con ícono grande (o miniatura, 8.5) y nombre en dos líneas; mismo comportamiento de selección, arrastre y menú que la lista.
 - **Panel activo**: el que tiene el foco; en modo dual se marca con una línea de acento arriba. Tab cambia de panel activo (salvo escribiendo en un campo de texto, donde autocompleta). Las operaciones F5/F6 usan el otro panel como destino. F3 o el botón de la barra ocultan el panel derecho, que conserva sus pestañas.
 - **Edad relativa**: chip (o texto, según el tema) en la columna "Edad" con formato compacto (`ahora`, `12min`, `2h`, `3d`, `3M`, `1a`); colores por bucket según `docs/THEMES.md` §3.
 - **Barra de estado** del panel: elementos, seleccionados, tamaño seleccionado, espacio libre de la unidad.
@@ -89,7 +90,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Filtro rápido | escribir directamente; Esc limpia |
 | Mostrar ocultos | Ctrl+H |
 | Ruta editable | Ctrl+L |
-| Vista columnas / detalles | Ctrl+1 / Ctrl+2 |
+| Vista columnas / detalles / íconos | Ctrl+1 / Ctrl+2 / Ctrl+3 |
 | Nueva pestaña / cerrar | Ctrl+T / Ctrl+W |
 | Abrir terminal externa aquí | Ctrl+Alt+T |
 

@@ -28,8 +28,8 @@ pub struct Config {
     pub keys: BTreeMap<String, String>,
 }
 
-/// Vista de una pestaña. Al añadir una (p. ej. iconos), el compilador
-/// señala cada lugar que debe manejarla.
+/// Vista de una pestaña. Al añadir una, el compilador señala cada lugar
+/// que debe manejarla.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewMode {
@@ -38,16 +38,19 @@ pub enum ViewMode {
     Columns,
     /// Lista detallada.
     Details,
+    /// Cuadrícula de íconos.
+    Icons,
 }
 
 impl ViewMode {
-    pub const ALL: [Self; 2] = [Self::Columns, Self::Details];
+    pub const ALL: [Self; 3] = [Self::Columns, Self::Details, Self::Icons];
 
     /// Identificador estable (el mismo que en el TOML).
     pub fn id(self) -> &'static str {
         match self {
             Self::Columns => "columns",
             Self::Details => "details",
+            Self::Icons => "icons",
         }
     }
 
@@ -445,7 +448,10 @@ mod tests {
         for mode in ViewMode::ALL {
             assert_eq!(ViewMode::from_id(mode.id()), Some(mode));
         }
-        assert_eq!(ViewMode::from_id("icons"), None);
+        assert_eq!(ViewMode::from_id("icons"), Some(ViewMode::Icons));
+        assert_eq!(ViewMode::from_id("mosaico"), None);
+        let c = Config::from_toml("[general]\ndefault_view = \"icons\"\n").unwrap();
+        assert_eq!(c.general.default_view, ViewMode::Icons);
     }
 
     #[test]

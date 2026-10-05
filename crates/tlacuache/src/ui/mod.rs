@@ -6,6 +6,7 @@ pub mod drive_row;
 pub mod favorites_section;
 pub mod file_name_cell;
 pub mod filter_indicator;
+pub mod icon_view;
 pub mod image_preview;
 pub mod list_view;
 pub mod markdown_view;

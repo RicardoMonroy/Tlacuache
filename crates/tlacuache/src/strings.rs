@@ -183,6 +183,7 @@ pub const TAB_DUPLICATE: &str = "Duplicar pestaña";
 
 pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";
 pub const VIEW_DETAILS: &str = "Detalles (Ctrl+2)";
+pub const VIEW_ICONS: &str = "Íconos (Ctrl+3)";
 
 pub fn config_load_failed(path: &Path) -> String {
     format!(
