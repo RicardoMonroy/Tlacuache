@@ -246,7 +246,7 @@ impl TabPage {
         imp.show_hidden.set(show_hidden);
 
         let nav = gtk::Box::new(gtk::Orientation::Horizontal, 2);
-        nav.add_css_class("nav-bar");
+        nav.add_css_class("tl-pane-header");
         for (icon, action, tooltip) in [
             ("go-previous-symbolic", "nav.back", strings::NAV_BACK),
             ("go-next-symbolic", "nav.forward", strings::NAV_FORWARD),

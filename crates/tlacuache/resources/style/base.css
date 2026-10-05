@@ -1,36 +1,100 @@
 /* Tlacuache Browser — hoja de estilo base.
  *
- * Este archivo NO contiene colores. Todos los valores salen de variables --tl-*
- * que ThemeManager genera a partir del TOML del tema activo (ver docs/THEMES.md §5)
- * y carga en un CssProvider aparte, como un bloque :root { ... }.
+ * Sin colores, radios ni fuentes escritos aquí (regla 9 de CLAUDE.md): todo
+ * sale de las variables --tl-* que ThemeManager genera a partir del TOML
+ * del tema activo (docs/THEMES.md §5) y carga en otro CssProvider.
  *
- * Requiere GTK >= 4.16 (CSS custom properties / var()). Verificar la versión
- * instalada antes de cambiar el enfoque.
+ * Adaptado a los widgets reales de la app (el `base.css` del paquete de
+ * identidad describía una estructura distinta). Requiere GTK >= 4.16.
  *
- * Los flags de estilo del tema se aplican como clases en la ventana:
- *   .tl-mono  .tl-flat  .tl-glow  .tl-uppercase  .tl-select-invert  .tl-age-text
+ * Flags del tema, como clases en la ventana:
+ *   .tl-mono  .tl-flat  .tl-glow  .tl-uppercase  .tl-select-invert
+ *   .tl-age-text  .tl-icons-symbolic
  */
+
+/* ---------- Variables de libadwaita → tokens del tema ----------
+ * Para que los widgets nativos (header bar, popovers, diálogos, botones
+ * sugeridos…) sigan el tema. Nombres verificados en libadwaita 1.9. */
+:root {
+  --window-bg-color: var(--tl-window-bg);
+  --window-fg-color: var(--tl-fg);
+  --view-bg-color: var(--tl-pane-bg);
+  --view-fg-color: var(--tl-fg);
+  --headerbar-bg-color: var(--tl-window-bg);
+  --headerbar-fg-color: var(--tl-header-fg);
+  --headerbar-backdrop-color: var(--tl-window-bg);
+  --headerbar-border-color: var(--tl-border);
+  --sidebar-bg-color: var(--tl-sidebar-bg);
+  --sidebar-fg-color: var(--tl-sidebar-fg);
+  --sidebar-backdrop-color: var(--tl-sidebar-bg);
+  --sidebar-border-color: var(--tl-border);
+  --card-bg-color: var(--tl-header-bg);
+  --card-fg-color: var(--tl-fg);
+  --popover-bg-color: var(--tl-header-bg);
+  --popover-fg-color: var(--tl-fg);
+  --dialog-bg-color: var(--tl-window-bg);
+  --dialog-fg-color: var(--tl-fg);
+  --accent-bg-color: var(--tl-accent);
+  --accent-fg-color: var(--tl-accent-fg);
+  --accent-color: var(--tl-link);
+  --destructive-bg-color: var(--tl-error);
+  --destructive-fg-color: var(--tl-accent-fg);
+  --destructive-color: var(--tl-error);
+  --success-bg-color: var(--tl-success);
+  --success-fg-color: var(--tl-accent-fg);
+  --success-color: var(--tl-success);
+  --warning-bg-color: var(--tl-warning);
+  --warning-fg-color: var(--tl-accent-fg);
+  --warning-color: var(--tl-warning);
+  --error-bg-color: var(--tl-error);
+  --error-fg-color: var(--tl-accent-fg);
+  --error-color: var(--tl-error);
+}
 
 /* ---------- Ventana y estructura ---------- */
 window.tl-window {
   background-color: var(--tl-window-bg);
   color: var(--tl-fg);
+  font-family: var(--tl-font-ui);
 }
 
+/* Sidebar como tarjeta, separada del borde de la ventana. */
 .tl-sidebar {
   background-color: var(--tl-sidebar-bg);
   color: var(--tl-sidebar-fg);
   border-radius: var(--tl-radius);
+  margin: 6px 0 6px 6px;
 }
 
-.tl-sidebar .tl-section-title {
-  color: var(--tl-fg-muted);
-  font-size: 0.85em;
+.tl-sidebar list,
+.tl-sidebar row {
+  background-color: transparent;
+  color: var(--tl-sidebar-fg);
 }
 
 .tl-sidebar row:hover { background-color: var(--tl-hover-bg); }
 
-.tl-sidebar .tl-decor {               /* franja decorativa opcional (Talavera) */
+.tl-sidebar .tl-section-title {
+  color: var(--tl-fg-muted);
+  font-size: 0.85em;
+  margin: 12px 12px 4px;
+}
+
+.tl-sidebar .tl-favorite-group { font-weight: bold; }
+
+.tl-sidebar row:drop(active),
+.tl-sidebar .tl-section-title:drop(active) {
+  box-shadow: inset 0 0 0 2px var(--tl-focus-ring);
+  border-radius: var(--tl-radius);
+}
+
+/* Uso de disco de las unidades. */
+levelbar.tl-usage trough { min-height: 4px; }
+levelbar.tl-usage block.filled { background-color: var(--tl-info); }
+levelbar.tl-usage.warning block.filled { background-color: var(--tl-warning); }
+levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
+
+.tl-sidebar .tl-decor {               /* franja decorativa opcional (Talavera, tarea 7.9) */
   min-height: 24px;
   background-image: var(--tl-decor-image);
   background-repeat: repeat-x;
@@ -41,6 +105,7 @@ window.tl-window {
   background-color: var(--tl-pane-bg);
   border: var(--tl-border-width) solid var(--tl-border);
   border-radius: var(--tl-radius);
+  margin: 6px;
 }
 
 .tl-pane.active { border-color: var(--tl-pane-active-border); }
@@ -49,21 +114,41 @@ window.tl-window {
   box-shadow: 0 0 10px alpha(var(--tl-pane-active-border), 0.4);
 }
 
+/* Pestañas y barra de navegación (‹ › ↑ + ruta) como cabecera del panel. */
+.tl-pane tabbar,
+.tl-pane tabbar > .box,
 .tl-pane-header {
   background-color: var(--tl-header-bg);
   color: var(--tl-header-fg);
-  border-bottom: 1px solid var(--tl-border);
-  padding: 4px 10px;
-  font-weight: 600;
 }
 
-.tl-uppercase .tl-pane-header,
+.tl-pane-header {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--tl-border);
+}
+
+.tl-uppercase .tl-pane tab label,
 .tl-uppercase .tl-section-title {
-  text-transform: uppercase;          /* si la versión de GTK no lo soporta, hacerlo en Rust */
+  text-transform: uppercase;          /* si GTK no lo soporta, se hará en Rust (7.6) */
   letter-spacing: 0.08em;
 }
 
-.tl-pane-header .tl-path { color: var(--tl-header-fg); opacity: 0.75; font-weight: 400; }
+/* Barra de ruta. */
+.tl-path-bar {
+  background-color: var(--tl-pane-bg);
+  border: var(--tl-border-width) solid var(--tl-border);
+  border-radius: var(--tl-radius);
+  min-height: 28px;
+}
+
+.tl-path-bar .tl-crumb {
+  padding: 2px 6px;
+  min-height: 24px;
+  font-weight: normal;
+  color: var(--tl-header-fg);
+}
+
+.tl-path-bar .tl-crumb.current { font-weight: bold; }
 
 /* ---------- Filas de archivos (ColumnView / ListView) ---------- */
 .tl-pane columnview,
@@ -72,28 +157,69 @@ window.tl-window {
   color: var(--tl-fg);
 }
 
-.tl-pane row { min-height: var(--tl-row-height); }
-.tl-pane row:nth-child(even) { background-color: var(--tl-pane-alt-row); }
-.tl-pane row:hover { background-color: var(--tl-hover-bg); }
+.tl-pane columnview > listview > row,
+.tl-pane listview > row {
+  min-height: var(--tl-row-height);
+}
 
-.tl-pane row:selected {
+.tl-pane columnview > listview > row > cell {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.tl-pane listview > row:nth-child(even) { background-color: var(--tl-pane-alt-row); }
+.tl-pane listview > row:hover { background-color: var(--tl-hover-bg); }
+
+.tl-pane listview > row:selected {
   background-color: var(--tl-selection-inactive-bg);
   color: var(--tl-fg);
 }
-.tl-pane.active row:selected {
+
+.tl-pane.active listview > row:selected {
   background-color: var(--tl-selection-bg);
   color: var(--tl-selection-fg);
 }
 
 .tl-pane .tl-size,
-.tl-pane .tl-date { color: var(--tl-fg-muted); }
+.tl-pane .tl-date,
+.tl-pane .tl-chevron { color: var(--tl-fg-muted); }
+
 .tl-pane row:selected .tl-size,
-.tl-pane row:selected .tl-date { color: inherit; }
+.tl-pane row:selected .tl-date,
+.tl-pane row:selected .tl-chevron { color: inherit; }
+
+/* Barra de estado del panel. */
+.tl-status-bar {
+  padding: 3px 10px;
+  font-size: 0.9em;
+  color: var(--tl-fg-muted);
+  border-top: 1px solid var(--tl-border);
+}
+
+/* Indicador flotante del filtro rápido. */
+.tl-filter-indicator {
+  margin: 10px;
+  padding: 4px 12px;
+  border-radius: var(--tl-radius);
+  background-color: var(--tl-pane-bg);
+  color: var(--tl-fg);
+  border: var(--tl-border-width) solid var(--tl-border-strong);
+}
+
+.tl-filter-indicator.no-match {
+  color: var(--tl-error);
+  border-color: var(--tl-error);
+}
+
+/* Franja central de acciones entre paneles. */
+.tl-pane-actions { padding: 0 2px; }
+.tl-pane-actions button { padding: 6px 4px; }
 
 /* ---------- Edad relativa ---------- */
 .tl-age {
   border-radius: 4px;
   padding: 0 6px;
+  min-height: 18px;
   font-size: 0.85em;
   font-weight: 600;
   color: var(--tl-age-chip-fg);
@@ -125,14 +251,43 @@ window.tl-window {
 .tl-ft-executable  { color: var(--tl-ft-executable); }
 .tl-ft-other       { color: var(--tl-ft-other); }
 
+/* `icon_style = "symbolic"`: todos los íconos en fg_muted. */
+.tl-icons-symbolic .tl-ft-folder, .tl-icons-symbolic .tl-ft-code,
+.tl-icons-symbolic .tl-ft-image, .tl-icons-symbolic .tl-ft-video,
+.tl-icons-symbolic .tl-ft-audio, .tl-icons-symbolic .tl-ft-archive,
+.tl-icons-symbolic .tl-ft-document, .tl-icons-symbolic .tl-ft-pdf,
+.tl-icons-symbolic .tl-ft-spreadsheet, .tl-icons-symbolic .tl-ft-text,
+.tl-icons-symbolic .tl-ft-executable, .tl-icons-symbolic .tl-ft-other {
+  color: var(--tl-fg-muted);
+}
+
 /* ---------- Terminal y vista previa ---------- */
 .tl-terminal-frame,
 .tl-preview {
-  border: var(--tl-border-width) solid var(--tl-border);
-  border-radius: var(--tl-radius);
+  border-top: var(--tl-border-width) solid var(--tl-border);
 }
-.tl-terminal-frame:focus-within { border-color: var(--tl-focus-ring); }
-.tl-terminal-frame.desync { border-color: var(--tl-warning); }
+
+/* Foco: la línea superior pasa a 3px. El padding compensa el grosor para
+ * que la terminal no se mueva (VTE pinta encima de un box-shadow inset). */
+.tl-terminal-frame { padding-top: 2px; }
+.tl-terminal-frame:focus-within,
+.tl-terminal-frame.desync {
+  border-top-width: 3px;
+  padding-top: 0;
+}
+.tl-terminal-frame:focus-within { border-top-color: var(--tl-focus-ring); }
+.tl-terminal-frame.desync { border-top-color: var(--tl-warning); }
+
+.tl-desync-pill {
+  margin: 8px;
+  padding: 2px 4px 2px 10px;
+  border-radius: var(--tl-radius);
+  background-color: var(--tl-pane-bg);
+  color: var(--tl-warning);
+  border: var(--tl-border-width) solid var(--tl-warning);
+}
+
+.tl-desync-pill button { color: var(--tl-warning); font-weight: bold; }
 
 /* ---------- Foco y estados ---------- */
 *:focus-visible { outline-color: var(--tl-focus-ring); }
@@ -146,9 +301,8 @@ link, .tl-link { color: var(--tl-link); }
 .tl-mono, .tl-mono * { font-family: var(--tl-font-mono); }
 
 .tl-flat * { box-shadow: none; }
-.tl-flat .tl-glow-keep { box-shadow: inherit; }
 
-.tl-select-invert .tl-pane.active row:selected {
+.tl-select-invert .tl-pane.active listview > row:selected {
   background-color: var(--tl-selection-bg);
   color: var(--tl-selection-fg);
   font-weight: 600;

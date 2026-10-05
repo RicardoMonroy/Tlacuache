@@ -159,7 +159,7 @@ impl FavoritesSection {
             .build();
         heading.add_css_class("heading");
         let header = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        header.add_css_class("sidebar-heading");
+        header.add_css_class("tl-section-title");
         header.append(&heading);
         header.append(&add_group);
         // Soltar sobre el título: al primer grupo.
@@ -642,7 +642,7 @@ fn group_row(name: &str, collapsed: bool) -> gtk::ListBoxRow {
         .xalign(0.0)
         .ellipsize(pango::EllipsizeMode::End)
         .build();
-    label.add_css_class("favorite-group");
+    label.add_css_class("tl-favorite-group");
     let content = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     content.append(&arrow);
     content.append(&label);

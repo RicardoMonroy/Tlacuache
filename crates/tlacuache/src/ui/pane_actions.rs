@@ -53,7 +53,7 @@ impl PaneActions {
         self.set_orientation(gtk::Orientation::Vertical);
         self.set_spacing(8);
         self.set_valign(gtk::Align::Center);
-        self.add_css_class("pane-actions");
+        self.add_css_class("tl-pane-actions");
         // Toda la franja sirve para redimensionar los paneles (ver ventana).
         self.set_cursor_from_name(Some("col-resize"));
 

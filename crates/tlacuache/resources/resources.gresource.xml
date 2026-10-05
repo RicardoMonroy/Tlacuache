@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <!-- adw::Application carga style.css de esta ruta base. -->
   <gresource prefix="/io/github/rmonroy/Tlacuache">
-    <file>style.css</file>
+    <!-- Lo carga ThemeManager (no se usa el style.css automático de adw). -->
+    <file>style/base.css</file>
+    <!-- Franjas decorativas de los temas (--tl-decor-image). -->
+    <file preprocess="xml-stripblanks">decor/talavera-strip.svg</file>
     <!-- Íconos (docs/BRAND.md §5): GtkApplication añade <ruta base>/icons al
          tema de íconos, así que se usan por nombre. -->
     <file preprocess="xml-stripblanks">icons/scalable/actions/tl-pane-dual-symbolic.svg</file>

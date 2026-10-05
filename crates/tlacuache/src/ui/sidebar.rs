@@ -85,7 +85,7 @@ impl Sidebar {
 
     fn build(&self) {
         let imp = self.imp();
-        self.add_css_class("tlacuache-sidebar");
+        self.add_css_class("tl-sidebar");
 
         let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
         content.append(&section_heading(strings::SIDEBAR_PLACES));
@@ -242,7 +242,7 @@ fn place_appearance(kind: PlaceKind) -> (&'static str, &'static str) {
 fn section_heading(text: &str) -> gtk::Label {
     let label = gtk::Label::builder().label(text).xalign(0.0).build();
     label.add_css_class("heading");
-    label.add_css_class("sidebar-heading");
+    label.add_css_class("tl-section-title");
     label
 }
 

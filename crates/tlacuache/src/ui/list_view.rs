@@ -535,11 +535,12 @@ fn cell_widget(id: ColumnId) -> gtk::Widget {
         ColumnId::Size => {
             let label = gtk::Label::builder().xalign(1.0).build();
             label.add_css_class("numeric");
+            label.add_css_class("tl-size");
             label.upcast()
         }
         ColumnId::Age => {
             let chip = gtk::Label::builder().halign(gtk::Align::Start).build();
-            chip.add_css_class("age-chip");
+            chip.add_css_class("tl-age");
             chip.add_css_class("numeric");
             chip.upcast()
         }
@@ -547,6 +548,7 @@ fn cell_widget(id: ColumnId) -> gtk::Widget {
             let label = gtk::Label::builder().xalign(0.0).build();
             if matches!(id, ColumnId::Modified) {
                 label.add_css_class("numeric");
+                label.add_css_class("tl-date");
             }
             label.upcast()
         }
@@ -592,7 +594,7 @@ fn bind_cell(id: ColumnId, item: &FileItem, child: &gtk::Widget) {
     }
 }
 
-const AGE_CLASSES: [&str; 5] = ["age-hour", "age-day", "age-week", "age-month", "age-year"];
+const AGE_CLASSES: [&str; 5] = ["hour", "day", "week", "month", "year"];
 
 fn bind_age_chip(chip: &gtk::Label, modified: Option<SystemTime>) {
     for class in AGE_CLASSES {
@@ -603,7 +605,7 @@ fn bind_age_chip(chip: &gtk::Label, modified: Option<SystemTime>) {
         return;
     };
     let age = Age::between(modified, SystemTime::now());
-    chip.add_css_class(&format!("age-{}", age.bucket.id()));
+    chip.add_css_class(age.bucket.id());
     chip.set_text(&strings::age(&age));
     chip.set_visible(true);
 }

@@ -193,8 +193,19 @@ impl TerminalView {
         let overlay = gtk::Overlay::new();
         overlay.set_child(Some(&terminal));
         overlay.add_overlay(&self.build_desync_indicator());
+        self.add_css_class("tl-terminal-frame");
         self.set_child(Some(&overlay));
         let _ = self.imp().terminal.set(terminal);
+    }
+
+    /// Muestra u oculta la pastilla y marca el marco de la terminal.
+    fn set_desync(&self, desync: bool) {
+        self.imp().desync.set_reveal_child(desync);
+        if desync {
+            self.add_css_class("desync");
+        } else {
+            self.remove_css_class("desync");
+        }
     }
 
     /// Pastilla «Carpeta desincronizada · Sincronizar» (arriba a la derecha).
@@ -220,7 +231,7 @@ impl TerminalView {
             }
         ));
         let pill = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        pill.add_css_class("terminal-desync");
+        pill.add_css_class("tl-desync-pill");
         pill.append(&gtk::Image::from_icon_name("tl-terminal-desync-symbolic"));
         pill.append(&label);
         pill.append(&sync);
@@ -262,12 +273,12 @@ impl TerminalView {
             .is_some_and(|d| d.equal(dir))
         {
             imp.pending_dir.replace(None);
-            imp.desync.set_reveal_child(false);
+            self.set_desync(false);
             return;
         }
         imp.pending_dir.replace(Some(dir.clone()));
         if !self.apply_pending() {
-            imp.desync.set_reveal_child(true);
+            self.set_desync(true);
         }
     }
 
@@ -291,7 +302,7 @@ impl TerminalView {
         terminal.feed_child(line.as_bytes());
         imp.current_dir.replace(Some(dir));
         imp.pending_dir.replace(None);
-        imp.desync.set_reveal_child(false);
+        self.set_desync(false);
         true
     }
 
@@ -373,7 +384,7 @@ impl TerminalView {
         }
         imp.current_dir.replace(Some(dir.clone()));
         imp.pending_dir.replace(None);
-        imp.desync.set_reveal_child(false);
+        self.set_desync(false);
         self.emit_by_name::<()>("directory-changed", &[&dir]);
     }
 

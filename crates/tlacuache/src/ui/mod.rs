@@ -16,6 +16,7 @@ pub mod sidebar;
 pub mod status_bar;
 pub mod tab_page;
 pub mod terminal;
+pub mod theme_manager;
 
 use gtk::prelude::*;
 

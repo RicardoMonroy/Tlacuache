@@ -112,7 +112,7 @@ impl PathBar {
 
     fn setup(&self) {
         let imp = self.imp();
-        self.add_css_class("path-bar");
+        self.add_css_class("tl-path-bar");
 
         imp.crumbs.add_css_class("path-crumbs");
         imp.crumbs_scroll
@@ -263,7 +263,7 @@ impl PathBar {
             }
             let button = gtk::Button::with_label(&display_name(&file));
             button.add_css_class("flat");
-            button.add_css_class("crumb");
+            button.add_css_class("tl-crumb");
             button.set_focusable(false);
             if i == last {
                 button.add_css_class("current");

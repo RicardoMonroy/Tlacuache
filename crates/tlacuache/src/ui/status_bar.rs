@@ -30,7 +30,7 @@ mod imp {
             let obj = self.obj();
             obj.set_orientation(gtk::Orientation::Horizontal);
             obj.set_spacing(12);
-            obj.add_css_class("status-bar");
+            obj.add_css_class("tl-status-bar");
 
             self.items.set_xalign(0.0);
             self.items.set_hexpand(true);

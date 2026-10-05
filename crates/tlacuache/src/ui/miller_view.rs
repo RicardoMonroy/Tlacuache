@@ -700,7 +700,7 @@ fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
             .build();
         let chevron = gtk::Image::from_icon_name("go-next-symbolic");
         chevron.set_pixel_size(12);
-        chevron.add_css_class("miller-chevron");
+        chevron.add_css_class("tl-chevron");
         row.append(&icon);
         row.append(&label);
         row.append(&chevron);

@@ -19,8 +19,10 @@ sync_terminal_to_panel = true
 shell_integration = true   # OSC 7 automático (bash) para que el panel siga los cd
 
 [theme]
-name = "nord"
-color_scheme = "dark"      # dark | light | system
+name = "nord"              # nord | consola | claro | cyberpunk | talavera
+follow_system = false      # true: usa `light`/`dark` según el sistema
+light = "claro"
+dark = "nord"
 
 # Favoritos agrupados (uno o más bloques):
 # [[favorites]]

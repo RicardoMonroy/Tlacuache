@@ -26,7 +26,7 @@ pub enum DriveKind {
     Mount(gio::Mount),
 }
 
-const USAGE_CLASSES: [&str; 2] = ["usage-warning", "usage-critical"];
+const USAGE_CLASSES: [&str; 2] = ["warning", "critical"];
 
 mod imp {
     use super::*;
@@ -118,7 +118,7 @@ impl DriveRow {
         for offset in ["low", "high", "full"] {
             imp.usage.remove_offset_value(Some(offset));
         }
-        imp.usage.add_css_class("drive-usage");
+        imp.usage.add_css_class("tl-usage");
 
         let text = gtk::Box::new(gtk::Orientation::Vertical, 3);
         text.set_hexpand(true);
@@ -257,8 +257,8 @@ impl DriveRow {
                 }
                 match usage_level(fraction) {
                     UsageLevel::Normal => {}
-                    UsageLevel::Warning => usage.add_css_class("usage-warning"),
-                    UsageLevel::Critical => usage.add_css_class("usage-critical"),
+                    UsageLevel::Warning => usage.add_css_class("warning"),
+                    UsageLevel::Critical => usage.add_css_class("critical"),
                 }
                 row.set_tooltip_text(Some(&strings::free_space(free, size)));
             }

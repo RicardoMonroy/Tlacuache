@@ -8,7 +8,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use tlacuache_core::APP_ID;
-use tlacuache_core::config::{self, ColorScheme, Config};
+use tlacuache_core::config::{self, Config};
 use tlacuache_core::session::{self, Session};
 
 use crate::strings;
@@ -56,14 +56,6 @@ fn load_session() -> (Option<Session>, Option<String>) {
     }
 }
 
-fn adw_color_scheme(scheme: ColorScheme) -> adw::ColorScheme {
-    match scheme {
-        ColorScheme::Dark => adw::ColorScheme::ForceDark,
-        ColorScheme::Light => adw::ColorScheme::ForceLight,
-        ColorScheme::System => adw::ColorScheme::Default,
-    }
-}
-
 pub fn build() -> adw::Application {
     let (config, config_warning) = load_config();
     for name in tlacuache_core::keymap::unknown_actions(&config.keys) {
@@ -81,12 +73,17 @@ pub fn build() -> adw::Application {
         .flags(gio::ApplicationFlags::HANDLES_OPEN)
         .build();
 
-    let scheme = adw_color_scheme(config.theme.color_scheme);
+    let theme_settings = config.theme.clone();
     app.connect_startup(move |_| {
         // Ícono de las ventanas (incluido en el gresource: funciona aunque
         // la app no esté instalada).
         gtk::Window::set_default_icon_name(APP_ID);
-        adw::StyleManager::default().set_color_scheme(scheme);
+        match gtk::gdk::Display::default() {
+            Some(display) => {
+                crate::ui::theme_manager::init(theme_settings.clone(), &display);
+            }
+            None => tracing::warn!("sin display: no se aplica el tema"),
+        }
     });
 
     let present = move |app: &adw::Application, dir: Option<&gio::File>| {

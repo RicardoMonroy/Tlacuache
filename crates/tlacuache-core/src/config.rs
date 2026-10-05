@@ -126,28 +126,37 @@ impl Default for Terminal {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ColorScheme {
-    #[default]
-    Dark,
-    Light,
-    /// Seguir la preferencia del sistema.
-    System,
-}
-
+/// `[theme]` (`docs/THEMES.md` §5.4).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Theme {
+    /// Tema fijo (id), si no se sigue al sistema.
     pub name: String,
-    pub color_scheme: ColorScheme,
+    /// Usar `light` o `dark` según la preferencia clara/oscura del sistema.
+    pub follow_system: bool,
+    pub light: String,
+    pub dark: String,
 }
 
 impl Default for Theme {
     fn default() -> Self {
         Self {
             name: "nord".to_owned(),
-            color_scheme: ColorScheme::Dark,
+            follow_system: false,
+            light: "claro".to_owned(),
+            dark: "nord".to_owned(),
+        }
+    }
+}
+
+impl Theme {
+    /// Id del tema a usar según la preferencia del sistema (`system_dark`)
+    /// si `follow_system` está activo; si no, el tema fijo.
+    pub fn resolve(&self, system_dark: bool) -> &str {
+        match (self.follow_system, system_dark) {
+            (false, _) => &self.name,
+            (true, true) => &self.dark,
+            (true, false) => &self.light,
         }
     }
 }
@@ -282,7 +291,11 @@ mod tests {
         assert!(c.terminal.sync_terminal_to_panel);
         assert!(c.terminal.shell_integration);
         assert_eq!(c.theme.name, "nord");
-        assert_eq!(c.theme.color_scheme, ColorScheme::Dark);
+        assert!(!c.theme.follow_system);
+        assert_eq!(
+            (c.theme.light.as_str(), c.theme.dark.as_str()),
+            ("claro", "nord")
+        );
         assert!(c.favorites.is_empty());
         assert!(c.keys.is_empty());
     }
@@ -329,7 +342,8 @@ mod tests {
 
             [theme]
             name = "nord"
-            color_scheme = "system"
+            follow_system = true
+            light = "talavera"
 
             [[favorites]]
             group = "Proyectos"
@@ -347,7 +361,9 @@ mod tests {
         assert_eq!(c.preview.position, PreviewPosition::Right);
         assert_eq!(c.preview.max_text_bytes, 2048);
         assert_eq!(c.terminal.shell, "/usr/bin/zsh");
-        assert_eq!(c.theme.color_scheme, ColorScheme::System);
+        assert!(c.theme.follow_system);
+        assert_eq!(c.theme.resolve(false), "talavera");
+        assert_eq!(c.theme.resolve(true), "nord");
         assert_eq!(c.favorites.len(), 2);
         assert_eq!(c.favorites[0].group, "Proyectos");
         assert_eq!(c.favorites[0].paths, ["~/dev", "~/Documentos/clases"]);
@@ -364,6 +380,19 @@ mod tests {
             assert_eq!(ViewMode::from_id(mode.id()), Some(mode));
         }
         assert_eq!(ViewMode::from_id("icons"), None);
+    }
+
+    #[test]
+    fn theme_resolution() {
+        let fixed = Theme {
+            name: "consola".into(),
+            ..Theme::default()
+        };
+        assert_eq!(fixed.resolve(true), "consola");
+        assert_eq!(fixed.resolve(false), "consola");
+        // Una config vieja con `color_scheme` se ignora sin error.
+        let old = Config::from_toml("[theme]\nname = \"nord\"\ncolor_scheme = \"dark\"\n").unwrap();
+        assert_eq!(old.theme, Theme::default());
     }
 
     #[test]

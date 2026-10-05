@@ -106,7 +106,7 @@ impl Pane {
     fn build(&self) {
         let imp = self.imp();
         self.set_orientation(gtk::Orientation::Vertical);
-        self.add_css_class("pane");
+        self.add_css_class("tl-pane");
 
         let new_tab = gtk::Button::from_icon_name("tab-new-symbolic");
         new_tab.add_css_class("flat");

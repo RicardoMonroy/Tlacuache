@@ -32,7 +32,7 @@ mod imp {
 
             self.pill.set_orientation(gtk::Orientation::Horizontal);
             self.pill.set_spacing(6);
-            self.pill.add_css_class("filter-indicator");
+            self.pill.add_css_class("tl-filter-indicator");
             self.pill
                 .append(&gtk::Image::from_icon_name("edit-find-symbolic"));
             self.pill.append(&self.label);

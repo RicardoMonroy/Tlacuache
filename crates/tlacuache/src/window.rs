@@ -200,6 +200,17 @@ mod imp {
             let obj = self.obj();
 
             obj.set_title(Some(strings::APP_NAME));
+            obj.add_css_class("tl-window");
+            if let Some(themes) = crate::ui::theme_manager::get() {
+                crate::ui::theme_manager::apply_flag_classes(&*obj, &themes.theme());
+                themes.connect_theme_changed(glib::clone!(
+                    #[weak]
+                    obj,
+                    move |themes| {
+                        crate::ui::theme_manager::apply_flag_classes(&obj, &themes.theme())
+                    }
+                ));
+            }
 
             let dual = gtk::ToggleButton::builder()
                 .icon_name("tl-pane-dual-symbolic")
@@ -1143,9 +1154,9 @@ impl TlacuacheWindow {
         for index in 0..2 {
             if let Some(pane) = self.pane(index) {
                 if dual && index == active {
-                    pane.add_css_class("active-pane");
+                    pane.add_css_class("active");
                 } else {
-                    pane.remove_css_class("active-pane");
+                    pane.remove_css_class("active");
                 }
             }
         }
