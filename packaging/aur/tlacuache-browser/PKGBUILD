@@ -1,0 +1,53 @@
+# Maintainer: Ricardo Monroy <rmonroy.rodriguez@gmail.com>
+pkgname=tlacuache-browser
+_appid=io.github.rmonroy.Tlacuache
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Gestor de archivos con columnas Miller, doble panel y una terminal integrada en cada panel (GTK4)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/rmonroy/TlacuacheBrowser"
+license=('GPL-3.0-or-later')
+depends=('gtk4' 'libadwaita' 'vte4' 'gtksourceview5' 'poppler-glib'
+         'gdk-pixbuf2' 'glib2' 'cairo' 'pango' 'gcc-libs' 'glibc')
+makedepends=('cargo')
+optdepends=('gst-plugins-good: reproducir video y audio en la vista previa'
+            'gst-libav: más formatos de video y audio'
+            'ttf-jetbrains-mono: fuente monoespaciada de los temas')
+# El binario de release no lleva símbolos: sin paquete -debug vacío.
+options=('!debug')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# Tras publicar la etiqueta v$pkgver en GitHub: updpkgsums
+sha256sums=('SKIP')
+
+prepare() {
+  cd "TlacuacheBrowser-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "TlacuacheBrowser-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p tlacuache
+}
+
+check() {
+  cd "TlacuacheBrowser-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo test --frozen --workspace
+}
+
+package() {
+  cd "TlacuacheBrowser-$pkgver"
+  install -Dm755 target/release/tlacuache "$pkgdir/usr/bin/tlacuache"
+  install -Dm644 "data/$_appid.desktop" "$pkgdir/usr/share/applications/$_appid.desktop"
+  install -Dm644 "data/icons/hicolor/scalable/apps/$_appid.svg" \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/$_appid.svg"
+  install -Dm644 "data/icons/hicolor/symbolic/apps/$_appid-symbolic.svg" \
+    "$pkgdir/usr/share/icons/hicolor/symbolic/apps/$_appid-symbolic.svg"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 docs/THEMES.md "$pkgdir/usr/share/doc/$pkgname/THEMES.md"
+}

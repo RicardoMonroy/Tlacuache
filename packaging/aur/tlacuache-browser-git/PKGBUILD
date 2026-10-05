@@ -1,0 +1,64 @@
+# Maintainer: Ricardo Monroy <rmonroy.rodriguez@gmail.com>
+pkgname=tlacuache-browser-git
+_pkgname=tlacuache-browser
+_appid=io.github.rmonroy.Tlacuache
+pkgver=0.2.0
+pkgrel=1
+pkgdesc="Gestor de archivos con columnas Miller, doble panel y una terminal integrada en cada panel (GTK4)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/rmonroy/TlacuacheBrowser"
+license=('GPL-3.0-or-later')
+depends=('gtk4' 'libadwaita' 'vte4' 'gtksourceview5' 'poppler-glib'
+         'gdk-pixbuf2' 'glib2' 'cairo' 'pango' 'gcc-libs' 'glibc')
+makedepends=('cargo' 'git')
+optdepends=('gst-plugins-good: reproducir video y audio en la vista previa'
+            'gst-libav: más formatos de video y audio'
+            'ttf-jetbrains-mono: fuente monoespaciada de los temas')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+# El binario de release no lleva símbolos: sin paquete -debug vacío.
+options=('!debug')
+source=("$_pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  # v0.2.0-5-gabc1234 → 0.2.0.r5.gabc1234; sin etiquetas, r<commits>.<hash>.
+  ( set -o pipefail
+    git describe --long --tags --abbrev=7 2>/dev/null | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g' ||
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+  )
+}
+
+prepare() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p tlacuache
+}
+
+check() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo test --frozen --workspace
+}
+
+package() {
+  cd "$_pkgname"
+  install -Dm755 target/release/tlacuache "$pkgdir/usr/bin/tlacuache"
+  install -Dm644 "data/$_appid.desktop" "$pkgdir/usr/share/applications/$_appid.desktop"
+  install -Dm644 "data/icons/hicolor/scalable/apps/$_appid.svg" \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/$_appid.svg"
+  install -Dm644 "data/icons/hicolor/symbolic/apps/$_appid-symbolic.svg" \
+    "$pkgdir/usr/share/icons/hicolor/symbolic/apps/$_appid-symbolic.svg"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 docs/THEMES.md "$pkgdir/usr/share/doc/$pkgname/THEMES.md"
+}

@@ -45,7 +45,16 @@ rustup default stable
 cargo run -p tlacuache
 ```
 
-Para instalar el binario, el `.desktop` y el ícono en `~/.local`:
+Desde AUR (con tu ayudante habitual, como `paru` o `yay`):
+
+```bash
+paru -S tlacuache-browser        # versión publicada
+paru -S tlacuache-browser-git    # lo último de main
+```
+
+O con el PKGBUILD del repositorio: `cd packaging/aur/tlacuache-browser-git && makepkg -si` (ver [`packaging/aur/README.md`](packaging/aur/README.md)).
+
+Para instalar solo para tu usuario, sin paquete, en `~/.local`:
 
 ```bash
 scripts/install-local.sh

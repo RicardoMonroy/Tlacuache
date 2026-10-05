@@ -948,7 +948,7 @@ dependencies = [
 
 [[package]]
 name = "tlacuache"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-channel",
  "gio",
@@ -968,7 +968,7 @@ dependencies = [
 
 [[package]]
 name = "tlacuache-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "pulldown-cmark",
  "regex",
