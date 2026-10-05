@@ -174,18 +174,17 @@ pub fn path_not_found(text: &str) -> String {
     format!("No existe la ruta: {text}")
 }
 
-/// Edad relativa compacta: "ahora", "5 min", "3 h", "2 d", "1 mes", "4 años".
+/// Edad relativa compacta (`docs/THEMES.md` §3): «ahora», «12min», «2h»,
+/// «3d», «3M» (meses), «1a».
 pub fn age(age: &Age) -> String {
     let n = age.amount;
     match age.unit {
         AgeUnit::Now => "ahora".to_owned(),
-        AgeUnit::Minutes => format!("{n} min"),
-        AgeUnit::Hours => format!("{n} h"),
-        AgeUnit::Days => format!("{n} d"),
-        AgeUnit::Months if n == 1 => "1 mes".to_owned(),
-        AgeUnit::Months => format!("{n} meses"),
-        AgeUnit::Years if n == 1 => "1 año".to_owned(),
-        AgeUnit::Years => format!("{n} años"),
+        AgeUnit::Minutes => format!("{n}min"),
+        AgeUnit::Hours => format!("{n}h"),
+        AgeUnit::Days => format!("{n}d"),
+        AgeUnit::Months => format!("{n}M"),
+        AgeUnit::Years => format!("{n}a"),
     }
 }
 

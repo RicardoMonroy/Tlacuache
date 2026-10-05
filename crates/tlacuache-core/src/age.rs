@@ -11,14 +11,28 @@ const WEEK: u64 = 7 * DAY;
 const MONTH_DAYS: u64 = 30;
 const YEAR_DAYS: u64 = 365;
 
-/// Bucket de color: < 1 día, < 7 días, < 30 días, < 1 año, ≥ 1 año.
+/// Bucket de color (`docs/THEMES.md` §3): menos de 24 h, 1–6 días, 7–29
+/// días, 1–11 meses y 1 año o más.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgeBucket {
+    Hour,
     Day,
     Week,
     Month,
     Year,
-    Older,
+}
+
+impl AgeBucket {
+    /// Clave en `[age]` de los temas (y en las clases CSS).
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Hour => "hour",
+            Self::Day => "day",
+            Self::Week => "week",
+            Self::Month => "month",
+            Self::Year => "year",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,11 +66,11 @@ impl Age {
         let days = secs / DAY;
 
         let bucket = match secs {
-            s if s < DAY => AgeBucket::Day,
-            s if s < WEEK => AgeBucket::Week,
-            _ if days < MONTH_DAYS => AgeBucket::Month,
-            _ if days < YEAR_DAYS => AgeBucket::Year,
-            _ => AgeBucket::Older,
+            s if s < DAY => AgeBucket::Hour,
+            s if s < WEEK => AgeBucket::Day,
+            _ if days < MONTH_DAYS => AgeBucket::Week,
+            _ if days < YEAR_DAYS => AgeBucket::Month,
+            _ => AgeBucket::Year,
         };
 
         let (unit, amount) = match secs {
@@ -85,16 +99,31 @@ mod tests {
     }
 
     #[test]
+    fn bucket_ids_match_theme_keys() {
+        let ids: Vec<_> = [
+            AgeBucket::Hour,
+            AgeBucket::Day,
+            AgeBucket::Week,
+            AgeBucket::Month,
+            AgeBucket::Year,
+        ]
+        .iter()
+        .map(|b| b.id())
+        .collect();
+        assert_eq!(ids, ["hour", "day", "week", "month", "year"]);
+    }
+
+    #[test]
     fn bucket_boundaries() {
-        assert_eq!(age(0).bucket, AgeBucket::Day);
-        assert_eq!(age(DAY - 1).bucket, AgeBucket::Day);
-        assert_eq!(age(DAY).bucket, AgeBucket::Week);
-        assert_eq!(age(WEEK - 1).bucket, AgeBucket::Week);
-        assert_eq!(age(WEEK).bucket, AgeBucket::Month);
-        assert_eq!(age(30 * DAY - 1).bucket, AgeBucket::Month);
-        assert_eq!(age(30 * DAY).bucket, AgeBucket::Year);
-        assert_eq!(age(365 * DAY - 1).bucket, AgeBucket::Year);
-        assert_eq!(age(365 * DAY).bucket, AgeBucket::Older);
+        assert_eq!(age(0).bucket, AgeBucket::Hour);
+        assert_eq!(age(DAY - 1).bucket, AgeBucket::Hour);
+        assert_eq!(age(DAY).bucket, AgeBucket::Day);
+        assert_eq!(age(WEEK - 1).bucket, AgeBucket::Day);
+        assert_eq!(age(WEEK).bucket, AgeBucket::Week);
+        assert_eq!(age(30 * DAY - 1).bucket, AgeBucket::Week);
+        assert_eq!(age(30 * DAY).bucket, AgeBucket::Month);
+        assert_eq!(age(365 * DAY - 1).bucket, AgeBucket::Month);
+        assert_eq!(age(365 * DAY).bucket, AgeBucket::Year);
     }
 
     #[test]
@@ -122,7 +151,7 @@ mod tests {
         let future = now + Duration::from_secs(3600);
         let a = Age::between(future, now);
         assert_eq!(a.unit, AgeUnit::Now);
-        assert_eq!(a.bucket, AgeBucket::Day);
+        assert_eq!(a.bucket, AgeBucket::Hour);
     }
 
     #[test]
@@ -132,7 +161,7 @@ mod tests {
         assert_eq!(
             Age::between(modified, now),
             Age {
-                bucket: AgeBucket::Week,
+                bucket: AgeBucket::Day,
                 unit: AgeUnit::Days,
                 amount: 3
             }

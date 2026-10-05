@@ -18,7 +18,7 @@ use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
 use tlacuache_core::config::Config;
 use tlacuache_core::shell::{self, ShellKind, cd_command, paste_paths};
-use tlacuache_core::theme;
+use tlacuache_core::theme::{Color, Theme};
 use vte::prelude::*;
 
 use crate::{strings, window};
@@ -435,16 +435,24 @@ fn resolve_shell(configured: &str) -> String {
         .unwrap_or_else(|| FALLBACK_SHELL.to_owned())
 }
 
-fn rgba(hex: &str) -> gdk::RGBA {
-    gdk::RGBA::parse(hex).unwrap_or(gdk::RGBA::BLACK)
+fn rgba(color: Color) -> gdk::RGBA {
+    gdk::RGBA::new(
+        f32::from(color.r) / 255.0,
+        f32::from(color.g) / 255.0,
+        f32::from(color.b) / 255.0,
+        1.0,
+    )
 }
 
+/// Colores del tema predeterminado; con la tarea 7.5 vendrán del tema
+/// activo y se actualizarán al cambiarlo.
 fn apply_palette(terminal: &vte::Terminal) {
-    let palette: Vec<gdk::RGBA> = theme::TERMINAL_PALETTE.iter().map(|c| rgba(c)).collect();
+    let colors = Theme::default_theme().terminal;
+    let palette: Vec<gdk::RGBA> = colors.palette.iter().map(|c| rgba(*c)).collect();
     let refs: Vec<&gdk::RGBA> = palette.iter().collect();
     terminal.set_colors(
-        Some(&rgba(theme::TERMINAL_FOREGROUND)),
-        Some(&rgba(theme::TERMINAL_BACKGROUND)),
+        Some(&rgba(colors.foreground)),
+        Some(&rgba(colors.background)),
         &refs,
     );
 }

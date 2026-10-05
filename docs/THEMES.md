@@ -16,11 +16,11 @@ Un tema es **un solo archivo TOML** que define colores semánticos, la paleta de
 | `cyberpunk` | Cyberpunk | dark | Neón cian/magenta/amarillo sobre violeta noche, brillo en el panel activo y encabezados en mayúsculas. |
 | `talavera` | Talavera | light | Azul cobalto sobre crema, inspirado en la talavera poblana. Encabezados de panel en cobalto y franja de azulejo opcional en la sidebar. |
 
-Ubicación: `crates/tlacuache/resources/themes/*.toml`, embebidos con `include_str!` o gresource. Los temas del usuario van en `~/.config/tlacuache/themes/*.toml`; si un tema del usuario tiene el mismo `id` que uno incluido, lo reemplaza.
+Ubicación: `crates/tlacuache-core/themes/*.toml`, embebidos con `include_str!` o gresource. Los temas del usuario van en `~/.config/tlacuache/themes/*.toml`; si un tema del usuario tiene el mismo `id` que uno incluido, lo reemplaza.
 
 ## 3. Esquema del archivo
 
-Ver cualquier archivo en `crates/tlacuache/resources/themes/` como referencia completa. Todas las secciones son obligatorias excepto `[glyphs]` (solo si `icon_style = "glyph"`) y `[decor]`.
+Ver cualquier archivo en `crates/tlacuache-core/themes/` como referencia completa. Todas las secciones son obligatorias excepto `[glyphs]` (solo si `icon_style = "glyph"`) y `[decor]`.
 
 | Sección | Claves |
 |---|---|
@@ -53,7 +53,7 @@ Esto **sustituye** la tabla de colores de edad de `UI_SPEC.md` §2.
 
 ## 4. Reglas de contraste (se validan en pruebas)
 
-`scripts/check-theme-contrast.py crates/tlacuache/resources/themes` implementa estas reglas; `core::theme` debe portarlas a Rust como prueba unitaria que recorra todos los temas incluidos.
+`scripts/check-theme-contrast.py crates/tlacuache-core/themes` implementa estas reglas; `core::theme` debe portarlas a Rust como prueba unitaria que recorra todos los temas incluidos.
 
 | Par | Mínimo WCAG |
 |---|---|
@@ -124,7 +124,7 @@ dark = "nord"
 
 ## 6. Añadir un tema nuevo (guía para usuarios y comunidad)
 
-1. Copiar `crates/tlacuache/resources/themes/nord.toml` a `~/.config/tlacuache/themes/mitema.toml` y cambiar `id` y `name`.
+1. Copiar `crates/tlacuache-core/themes/nord.toml` a `~/.config/tlacuache/themes/mitema.toml` y cambiar `id` y `name`.
 2. Ajustar los colores y ejecutar `python scripts/check-theme-contrast.py ~/.config/tlacuache/themes`.
 3. Seleccionarlo en Preferencias; se aplica al instante.
 

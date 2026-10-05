@@ -38,7 +38,7 @@ cargo test --workspace          # pruebas (la lógica vive en tlacuache-core)
 cargo fmt --all                 # formato
 cargo clippy --workspace --all-targets -- -D warnings
 scripts/check.sh                # fmt --check + clippy + tests (--fix aplica fmt)
-python scripts/check-theme-contrast.py crates/tlacuache/resources/themes   # contraste de los temas
+python scripts/check-theme-contrast.py crates/tlacuache-core/themes   # contraste de los temas
 scripts/install-local.sh        # instala binario, .desktop e ícono en ~/.local
 ```
 

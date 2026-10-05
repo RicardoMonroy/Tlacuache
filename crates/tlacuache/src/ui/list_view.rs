@@ -11,7 +11,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
-use tlacuache_core::age::{Age, AgeBucket};
+use tlacuache_core::age::Age;
 use tlacuache_core::filter;
 use tlacuache_core::sort::{SortDirection, SortKey, SortSpec};
 use tlacuache_core::summary::{SelectionSummary, ViewStatus};
@@ -592,7 +592,7 @@ fn bind_cell(id: ColumnId, item: &FileItem, child: &gtk::Widget) {
     }
 }
 
-const AGE_CLASSES: [&str; 5] = ["age-day", "age-week", "age-month", "age-year", "age-older"];
+const AGE_CLASSES: [&str; 5] = ["age-hour", "age-day", "age-week", "age-month", "age-year"];
 
 fn bind_age_chip(chip: &gtk::Label, modified: Option<SystemTime>) {
     for class in AGE_CLASSES {
@@ -603,13 +603,7 @@ fn bind_age_chip(chip: &gtk::Label, modified: Option<SystemTime>) {
         return;
     };
     let age = Age::between(modified, SystemTime::now());
-    chip.add_css_class(match age.bucket {
-        AgeBucket::Day => "age-day",
-        AgeBucket::Week => "age-week",
-        AgeBucket::Month => "age-month",
-        AgeBucket::Year => "age-year",
-        AgeBucket::Older => "age-older",
-    });
+    chip.add_css_class(&format!("age-{}", age.bucket.id()));
     chip.set_text(&strings::age(&age));
     chip.set_visible(true);
 }

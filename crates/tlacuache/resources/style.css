@@ -105,27 +105,27 @@ columnview.file-list > listview > row > cell {
   min-height: 18px;
 }
 
-.age-chip.age-day {
+.age-chip.age-hour {
   background-color: var(--nord14);
   color: var(--nord0);
 }
 
-.age-chip.age-week {
+.age-chip.age-day {
   background-color: var(--nord8);
   color: var(--nord0);
 }
 
-.age-chip.age-month {
+.age-chip.age-week {
   background-color: var(--nord10);
   color: var(--nord6);
 }
 
-.age-chip.age-year {
+.age-chip.age-month {
   background-color: var(--nord3);
   color: var(--nord5);
 }
 
-.age-chip.age-older {
+.age-chip.age-year {
   background-color: alpha(var(--nord3), 0.45);
   color: alpha(var(--nord4), 0.6);
 }

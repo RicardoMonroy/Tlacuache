@@ -18,11 +18,11 @@ tlacuache/
 │   │       ├── age.rs          # edad relativa -> bucket de color
 │   │       ├── ops/            # cola de operaciones (modelo, estados, progreso)
 │   │       ├── shell.rs        # escapado seguro de rutas para shells
-│   │       ├── theme.rs        # Theme (TOML), validación de contraste, variables CSS
+│   │       ├── theme.rs        # Theme (TOML), validación de contraste, variables CSS (temas en tlacuache-core/themes/)
 │   │       └── filetype.rs     # tipo MIME → categoría de ícono
 │   └── tlacuache/             # binario GTK
 │       ├── build.rs            # compila recursos (gresource) si hace falta
-│       ├── resources/          # style/base.css, themes/*.toml, icons/, decor/
+│       ├── resources/          # style/base.css, icons/, decor/
 │       └── src/
 │           ├── main.rs         # adw::Application, app-id
 │           ├── app.rs          # acciones globales, carga de config y CSS
