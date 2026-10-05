@@ -28,7 +28,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 
 ## 2. Panel
 
-- **Pestañas**: `adw::TabBar` + `adw::TabView`. Ctrl+T nueva, Ctrl+W cerrar, Ctrl+Tab siguiente.
+- **Pestañas**: tira propia (`ui/tab_strip.rs`) sobre `adw::TabView`. Pestañas de ancho fijo a la izquierda con el título alineado a la izquierda; se encogen al abrir más y se desplazan si no caben. Arrastrar reordena o pasa la pestaña al otro panel; clic medio cierra; menú contextual: Duplicar, Cerrar, Cerrar las demás. Ctrl+T nueva, Ctrl+W cerrar, Ctrl+Tab siguiente.
 - **Barra de ruta**: breadcrumb clicable; clic en la zona vacía o Ctrl+L la convierte en `gtk::Entry` editable con autocompletado de rutas.
 - **Vistas**:
   - Columnas Miller: cada nivel es una columna; seleccionar carpeta abre la siguiente columna a la derecha y hace scroll automático. La última columna puede mostrarse como lista detallada (como OneCommander).

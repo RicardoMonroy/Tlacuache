@@ -61,3 +61,8 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
 - **Contexto**: el proyecto es gratuito, con el código en GitHub. Hay que elegir licencia antes de publicarlo.
 - **Decisión**: `GPL-3.0-or-later` para todo el repositorio (código, íconos y logo propios). Texto en `LICENSE` (SPDX) y `license` en los `Cargo.toml`.
 - **Consecuencias**: las versiones modificadas que se distribuyan deben publicar su código con la misma licencia. Es la licencia habitual de las apps de escritorio GTK/GNOME, compatible con las dependencias (GTK, libadwaita, VTE y GtkSourceView son LGPL; los crates, MIT/Apache) y aceptada en AUR y Flathub. Se descartó MIT porque permitiría forks cerrados.
+
+## ADR-013 — Tira de pestañas propia sobre `adw::TabView`
+- **Contexto**: `adw::TabBar` centra el título de cada pestaña desde el código de `AdwTab` (sin propiedad ni CSS), y el diseño de la marca lo quiere a la izquierda (P.6).
+- **Decisión**: se conserva `adw::TabView` (páginas, atajos, cierre) y se sustituye solo la barra por `TabStrip` + `TabButton` propios: ancho natural fijo y mínimo pequeño (medida propia), desplazamiento al desbordar, arrastrar para reordenar o `transfer_page` al otro panel, clic medio y menú contextual. Las señales de cada pestaña se conectan con `page-attached`/`page-detached`, así siguen a la pestaña cuando cambia de panel.
+- **Consecuencias**: control total del aspecto con los tokens del tema (hover y selección con `alpha(currentColor)`, válidos sobre cualquier cabecera). A cambio, se mantiene código propio para el arrastre y el desplazamiento.

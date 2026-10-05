@@ -171,6 +171,9 @@ pub const DRIVE_MOUNT: &str = "Montar";
 pub const DRIVE_UNMOUNT: &str = "Desmontar";
 pub const DRIVE_EJECT: &str = "Expulsar";
 pub const TAB_NEW: &str = "Nueva pestaña (Ctrl+T)";
+pub const TAB_CLOSE: &str = "Cerrar pestaña";
+pub const TAB_CLOSE_OTHERS: &str = "Cerrar las demás";
+pub const TAB_DUPLICATE: &str = "Duplicar pestaña";
 
 pub const VIEW_COLUMNS: &str = "Columnas (Ctrl+1)";
 pub const VIEW_DETAILS: &str = "Detalles (Ctrl+2)";

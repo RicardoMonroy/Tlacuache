@@ -1,4 +1,4 @@
-//! Panel: pestañas (`adw::TabBar` + `adw::TabView`) con un `TabPage` cada
+//! Panel: pestañas (`TabStrip` propia + `adw::TabView`) con un `TabPage` cada
 //! una, vista previa (Espacio) y terminal (F4), cada una en un `gtk::Paned`
 //! vertical: pestañas / vista previa / terminal.
 //!
@@ -22,6 +22,7 @@ use crate::strings;
 use crate::ui::Accel;
 use crate::ui::preview::PreviewPane;
 use crate::ui::tab_page::TabPage;
+use crate::ui::tab_strip::TabStrip;
 use crate::ui::terminal::TerminalView;
 use crate::ui::theme_manager;
 
@@ -39,7 +40,7 @@ mod imp {
         #[property(get, set = Self::set_preview_visible)]
         pub preview_visible: std::cell::Cell<bool>,
         pub tab_view: adw::TabView,
-        pub tab_bar: adw::TabBar,
+        pub tab_bar: TabStrip,
         pub config: OnceCell<Rc<Config>>,
         /// (Pestañas | vista previa) | terminal.
         pub split: gtk::Paned,
@@ -132,14 +133,22 @@ impl Pane {
         new_tab.set_action_name(Some("pane.new-tab"));
         new_tab.set_tooltip_text(Some(strings::TAB_NEW));
 
-        imp.tab_bar.set_view(Some(&imp.tab_view));
-        // Siempre visible, también con una sola pestaña (como en la spec).
-        imp.tab_bar.set_autohide(false);
-        // Ancho fijo a la izquierda; se encogen al abrir más pestañas.
-        imp.tab_bar.set_expand_tabs(false);
-        imp.tab_bar.set_end_action_widget(Some(&new_tab));
+        imp.tab_bar.set_view(&imp.tab_view);
+        imp.tab_bar.set_end_widget(&new_tab);
 
         imp.tab_view.set_vexpand(true);
+        // Señales de cada pestaña: se conectan al entrar en este panel (al
+        // crearla o al arrastrarla desde el otro) y se sueltan al salir.
+        imp.tab_view.connect_page_attached(glib::clone!(
+            #[weak(rename_to = pane)]
+            self,
+            move |_, tab, _| pane.attach_tab(tab)
+        ));
+        imp.tab_view.connect_page_detached(|_, tab, _| {
+            if let Ok(page) = tab.child().downcast::<TabPage>() {
+                page.disconnect_pane_handlers();
+            }
+        });
         // La última pestaña no se cierra: el panel nunca queda vacío.
         imp.tab_view.connect_close_page(|view, page| {
             view.close_page_finish(page, view.n_pages() > 1);
@@ -467,7 +476,19 @@ impl Pane {
     fn add_tab_with(&self, dir: &gio::File, mode: ViewMode, show_hidden: bool) {
         let imp = self.imp();
         let page = TabPage::new(dir, show_hidden, mode);
-        page.connect_status_changed(glib::clone!(
+        let tab = imp.tab_view.append(&page);
+        imp.tab_view.set_selected_page(&tab);
+    }
+
+    /// Conecta las señales de una pestaña que entra en este panel.
+    fn attach_tab(&self, tab: &adw::TabPage) {
+        let Ok(page) = tab.child().downcast::<TabPage>() else {
+            return;
+        };
+        if let Some(dir) = page.directory() {
+            update_tab_title(tab, &dir);
+        }
+        let status = page.connect_status_changed(glib::clone!(
             #[weak(rename_to = pane)]
             self,
             move |page| {
@@ -477,9 +498,7 @@ impl Pane {
                 }
             }
         ));
-        let tab = imp.tab_view.append(&page);
-        update_tab_title(&tab, dir);
-        page.connect_directory_notify(glib::clone!(
+        let directory = page.connect_directory_notify(glib::clone!(
             #[weak(rename_to = pane)]
             self,
             #[weak]
@@ -493,7 +512,7 @@ impl Pane {
                 }
             }
         ));
-        imp.tab_view.set_selected_page(&tab);
+        page.set_pane_handlers(vec![status, directory]);
     }
 
     /// Restaura las pestañas de una sesión. Devuelve `false` si no había

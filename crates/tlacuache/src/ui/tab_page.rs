@@ -141,6 +141,9 @@ mod imp {
         pub history: RefCell<Option<History<String>>>,
         /// Ocultos visibles en esta pestaña; sobrevive al cambiar de vista.
         pub show_hidden: Cell<bool>,
+        /// Señales conectadas por el panel que la contiene (se desconectan
+        /// si la pestaña pasa al otro panel).
+        pub pane_handlers: RefCell<Vec<glib::SignalHandlerId>>,
     }
 
     impl TabPage {
@@ -351,12 +354,24 @@ impl TabPage {
         self.emit_by_name::<()>("status-changed", &[]);
     }
 
-    pub fn connect_status_changed<F: Fn(&Self) + 'static>(&self, f: F) {
+    pub fn connect_status_changed<F: Fn(&Self) + 'static>(&self, f: F) -> glib::SignalHandlerId {
         self.connect_closure(
             "status-changed",
             false,
             glib::closure_local!(move |page: &Self| f(page)),
-        );
+        )
+    }
+
+    /// Guarda las señales del panel que la contiene.
+    pub fn set_pane_handlers(&self, handlers: Vec<glib::SignalHandlerId>) {
+        self.imp().pane_handlers.replace(handlers);
+    }
+
+    /// Desconecta las señales del panel (al salir de él).
+    pub fn disconnect_pane_handlers(&self) {
+        for id in self.imp().pane_handlers.take() {
+            self.disconnect(id);
+        }
     }
 
     /// Consulta en segundo plano el espacio libre de la unidad de `dir`.

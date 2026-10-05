@@ -122,8 +122,7 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
 }
 
 /* Pestañas y barra de navegación (‹ › ↑ + ruta) como cabecera del panel. */
-.tl-pane tabbar,
-.tl-pane tabbar > .box,
+.tl-tab-strip,
 .tl-pane-header {
   background-color: var(--tl-header-bg);
   color: var(--tl-header-fg);
@@ -134,7 +133,29 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
   border-bottom: 1px solid var(--tl-border);
 }
 
-.tl-uppercase .tl-pane tab label,
+/* Tira de pestañas propia (ui/tab_strip.rs): hover y selección con el
+ * color del texto de la cabecera, así sirven sobre cualquier fondo. */
+.tl-tab-strip { padding: 4px 6px 0; }
+.tl-tab {
+  min-height: 30px;
+  margin-right: 4px;
+  padding: 0 2px 0 10px;
+  border-radius: var(--tl-radius) var(--tl-radius) 0 0;
+}
+.tl-tab:hover { background-color: alpha(currentColor, 0.07); }
+.tl-tab.selected { background-color: alpha(currentColor, 0.14); }
+.tl-tab.selected .tl-tab-title { font-weight: bold; }
+.tl-tab .tl-tab-close {
+  min-width: 22px;
+  min-height: 22px;
+  padding: 0;
+  opacity: 0;
+}
+.tl-tab:hover .tl-tab-close,
+.tl-tab.selected .tl-tab-close { opacity: 1; }
+.tl-tab-strip:drop(active) { box-shadow: inset 0 -2px var(--tl-focus-ring); }
+
+.tl-uppercase .tl-tab-title,
 .tl-uppercase .tl-section-title {
   text-transform: uppercase;          /* GTK >= 4.6 */
   letter-spacing: 0.08em;
