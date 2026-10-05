@@ -4,6 +4,7 @@ pub mod context_menu;
 pub mod dnd;
 pub mod drive_row;
 pub mod favorites_section;
+pub mod file_name_cell;
 pub mod filter_indicator;
 pub mod image_preview;
 pub mod list_view;
@@ -74,20 +75,6 @@ fn normalize(key: gtk::gdk::Key) -> gtk::gdk::Key {
     } else {
         key.to_lower()
     }
-}
-
-/// Ícono de la categoría del archivo (`tl-*`) con su clase `tl-ft-*`, que
-/// el tema colorea. Quita la clase anterior: las filas se reciclan.
-pub fn set_file_icon(image: &gtk::Image, entry: &tlacuache_core::entry::FileEntry) {
-    use tlacuache_core::filetype::classify;
-
-    let category = classify(
-        entry.content_type.as_deref(),
-        &entry.name,
-        entry.is_dir,
-        entry.is_executable,
-    );
-    set_category_icon(image, category);
 }
 
 /// Ícono `tl-*` de `category`, coloreado por el tema con su clase.

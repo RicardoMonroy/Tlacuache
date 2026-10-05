@@ -1,0 +1,132 @@
+//! Celda de nombre de las vistas: ícono `tl-*` coloreado y nombre, o con
+//! `icon_style = "glyph"` un glifo monoespaciado y el nombre coloreado por
+//! tipo (las carpetas con `/`), al estilo `LS_COLORS` (`docs/THEMES.md`).
+//! Se vuelve a pintar sola al cambiar de tema.
+
+use std::cell::RefCell;
+
+use gtk::prelude::*;
+use gtk::subclass::prelude::*;
+use gtk::{glib, pango};
+use tlacuache_core::entry::FileEntry;
+use tlacuache_core::filetype::{FileCategory, classify};
+use tlacuache_core::theme::{GlyphKind, Theme};
+
+use crate::ui::{set_category_icon, theme_manager};
+
+mod imp {
+    use super::*;
+
+    #[derive(Default)]
+    pub struct FileNameCell {
+        pub icon: gtk::Image,
+        pub glyph: gtk::Label,
+        pub name: gtk::Label,
+        /// Última entrada mostrada (para repintar al cambiar de tema).
+        pub entry: RefCell<Option<FileEntry>>,
+        pub theme_handler: RefCell<Option<glib::SignalHandlerId>>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for FileNameCell {
+        const NAME: &'static str = "TlacuacheFileNameCell";
+        type Type = super::FileNameCell;
+        type ParentType = gtk::Box;
+    }
+
+    impl ObjectImpl for FileNameCell {
+        fn constructed(&self) {
+            self.parent_constructed();
+            self.obj().build();
+        }
+
+        fn dispose(&self) {
+            if let (Some(themes), Some(id)) = (theme_manager::get(), self.theme_handler.take()) {
+                themes.disconnect(id);
+            }
+        }
+    }
+    impl WidgetImpl for FileNameCell {}
+    impl BoxImpl for FileNameCell {}
+}
+
+glib::wrapper! {
+    pub struct FileNameCell(ObjectSubclass<imp::FileNameCell>)
+        @extends gtk::Box, gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget, gtk::Orientable;
+}
+
+impl FileNameCell {
+    /// `ellipsize`: cómo recortar nombres largos.
+    pub fn new(ellipsize: pango::EllipsizeMode) -> Self {
+        let cell: Self = glib::Object::new();
+        cell.imp().name.set_ellipsize(ellipsize);
+        cell
+    }
+
+    fn build(&self) {
+        let imp = self.imp();
+        self.set_orientation(gtk::Orientation::Horizontal);
+        self.set_spacing(6);
+        imp.icon.set_pixel_size(16);
+        imp.glyph.add_css_class("tl-glyph");
+        imp.glyph.set_width_chars(1);
+        imp.glyph.set_visible(false);
+        imp.name.add_css_class("tl-file-name");
+        imp.name.set_xalign(0.0);
+        imp.name.set_hexpand(true);
+        self.append(&imp.icon);
+        self.append(&imp.glyph);
+        self.append(&imp.name);
+
+        if let Some(themes) = theme_manager::get() {
+            let id = themes.connect_theme_changed(glib::clone!(
+                #[weak(rename_to = cell)]
+                self,
+                move |themes| cell.render(&themes.theme())
+            ));
+            imp.theme_handler.replace(Some(id));
+        }
+    }
+
+    pub fn set_entry(&self, entry: &FileEntry) {
+        self.imp().entry.replace(Some(entry.clone()));
+        let theme = theme_manager::get().map_or_else(Theme::default_theme, |t| t.theme());
+        self.render(&theme);
+    }
+
+    fn render(&self, theme: &Theme) {
+        let imp = self.imp();
+        let entry = imp.entry.borrow();
+        let Some(entry) = entry.as_ref() else {
+            return;
+        };
+        let category = classify(
+            entry.content_type.as_deref(),
+            &entry.name,
+            entry.is_dir,
+            entry.is_executable,
+        );
+        let kind = GlyphKind::of(entry.is_dir, entry.is_symlink, entry.is_executable);
+        for other in FileCategory::ALL {
+            imp.glyph.remove_css_class(other.css_class());
+            imp.name.remove_css_class(other.css_class());
+        }
+        match theme.glyph(kind) {
+            Some(glyph) => {
+                imp.glyph.set_text(glyph);
+                imp.glyph.add_css_class(category.css_class());
+                imp.name.add_css_class(category.css_class());
+                imp.glyph.set_visible(true);
+                imp.icon.set_visible(false);
+            }
+            None => {
+                set_category_icon(&imp.icon, category);
+                imp.icon.set_visible(true);
+                imp.glyph.set_visible(false);
+            }
+        }
+        imp.name
+            .set_text(&theme.entry_name(&entry.name, entry.is_dir));
+    }
+}

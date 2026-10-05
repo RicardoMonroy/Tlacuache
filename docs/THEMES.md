@@ -97,7 +97,8 @@ Además, para que los widgets nativos de libadwaita sigan el tema, se sobrescrib
 5. Lo que CSS no puede hacer se hace en Rust:
    - `bracket_titles`: formatear el texto del encabezado como `┤ {título} ├`.
    - `icon_style = "glyph"`: usar un `Label` en lugar de una `Image` en la factory de filas.
-   - `uppercase_headers`: si la versión de GTK no soporta `text-transform`, convertir el texto a mayúsculas.
+   - `uppercase_headers`: GTK >= 4.6 soporta `text-transform`, así que se resuelve en CSS (`.tl-uppercase`).
+   - Las celdas de nombre (`ui/file_name_cell.rs`) y los títulos de pestaña se repintan con `theme-changed`.
 6. Terminal: emitir la señal `theme-changed`. Cada `ui/terminal.rs` aplica:
    - `set_colors(fg, bg, &palette)` con `gdk::RGBA`
    - `set_color_cursor`, `set_color_cursor_foreground`

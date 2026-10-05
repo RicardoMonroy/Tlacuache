@@ -129,7 +129,7 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
 
 .tl-uppercase .tl-pane tab label,
 .tl-uppercase .tl-section-title {
-  text-transform: uppercase;          /* si GTK no lo soporta, se hará en Rust (7.6) */
+  text-transform: uppercase;          /* GTK >= 4.6 */
   letter-spacing: 0.08em;
 }
 
@@ -186,7 +186,11 @@ levelbar.tl-usage.critical block.filled { background-color: var(--tl-error); }
 
 .tl-pane row:selected .tl-size,
 .tl-pane row:selected .tl-date,
-.tl-pane row:selected .tl-chevron { color: inherit; }
+.tl-pane row:selected .tl-chevron,
+.tl-pane row:selected .tl-file-name { color: inherit; }
+
+/* `icon_style = "glyph"`: glifo monoespaciado (su color sale de .tl-ft-*). */
+.tl-glyph { font-family: var(--tl-font-mono); }
 
 /* Barra de estado del panel. */
 .tl-status-bar {
@@ -328,3 +332,7 @@ link, .tl-link { color: var(--tl-link); }
   color: var(--tl-selection-fg);
   font-weight: 600;
 }
+
+/* Video inverso: también la edad en texto toma el color de la selección. */
+.tl-select-invert.tl-age-text .tl-pane.active row:selected .tl-age,
+.tl-select-invert.tl-age-text .tl-pane row:selected .tl-age { color: inherit; }

@@ -20,6 +20,7 @@ use crate::fs::file_item::{FileItem, SelectedInfo};
 use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
+use crate::ui::file_name_cell::FileNameCell;
 use crate::ui::filter_indicator::{FilterIndicator, filter_key};
 use crate::ui::{context_menu, dnd};
 use crate::window;
@@ -525,18 +526,7 @@ fn column(id: ColumnId, selection: &gtk::SelectionModel) -> gtk::ColumnViewColum
 
 fn cell_widget(id: ColumnId) -> gtk::Widget {
     match id {
-        ColumnId::Name => {
-            let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-            let icon = gtk::Image::new();
-            icon.set_pixel_size(16);
-            let label = gtk::Label::builder()
-                .xalign(0.0)
-                .ellipsize(pango::EllipsizeMode::Middle)
-                .build();
-            row.append(&icon);
-            row.append(&label);
-            row.upcast()
-        }
+        ColumnId::Name => FileNameCell::new(pango::EllipsizeMode::Middle).upcast(),
         ColumnId::Size => {
             let label = gtk::Label::builder().xalign(1.0).build();
             label.add_css_class("numeric");
@@ -564,13 +554,8 @@ fn bind_cell(id: ColumnId, item: &FileItem, child: &gtk::Widget) {
     let entry = item.entry();
     match id {
         ColumnId::Name => {
-            let icon = child.first_child().and_downcast::<gtk::Image>();
-            let label = child.last_child().and_downcast::<gtk::Label>();
-            if let Some(icon) = icon {
-                crate::ui::set_file_icon(&icon, &entry);
-            }
-            if let Some(label) = label {
-                label.set_text(&entry.name);
+            if let Some(cell) = child.downcast_ref::<FileNameCell>() {
+                cell.set_entry(&entry);
             }
         }
         ColumnId::Extension => set_label(child, entry.extension().unwrap_or("")),

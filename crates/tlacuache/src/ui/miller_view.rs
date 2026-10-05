@@ -22,6 +22,7 @@ use crate::fs::file_item::{FileItem, SelectedInfo};
 use crate::fs::launch;
 use crate::fs::listing::DirectoryModel;
 use crate::strings;
+use crate::ui::file_name_cell::FileNameCell;
 use crate::ui::filter_indicator::{FilterIndicator, filter_key};
 use crate::ui::{context_menu, dnd};
 use crate::window;
@@ -696,18 +697,12 @@ fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
             return;
         };
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        let icon = gtk::Image::new();
-        icon.set_pixel_size(16);
-        let label = gtk::Label::builder()
-            .xalign(0.0)
-            .hexpand(true)
-            .ellipsize(pango::EllipsizeMode::End)
-            .build();
+        let cell = FileNameCell::new(pango::EllipsizeMode::End);
+        cell.set_hexpand(true);
         let chevron = gtk::Image::from_icon_name("go-next-symbolic");
         chevron.set_pixel_size(12);
         chevron.add_css_class("tl-chevron");
-        row.append(&icon);
-        row.append(&label);
+        row.append(&cell);
         row.append(&chevron);
         dnd::attach_file_drag(&row, list_item, &selection);
         dnd::attach_row_drop(&row, list_item);
@@ -724,18 +719,11 @@ fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
         ) else {
             return;
         };
-        let icon = row.first_child().and_downcast::<gtk::Image>();
-        let label = icon
-            .as_ref()
-            .and_then(|i| i.next_sibling())
-            .and_downcast::<gtk::Label>();
+        let cell = row.first_child().and_downcast::<FileNameCell>();
         let chevron = row.last_child();
         let entry = item.entry();
-        if let Some(icon) = icon {
-            crate::ui::set_file_icon(&icon, &entry);
-        }
-        if let Some(label) = label {
-            label.set_text(&entry.name);
+        if let Some(cell) = cell {
+            cell.set_entry(&entry);
         }
         if let Some(chevron) = chevron {
             chevron.set_visible(entry.is_dir);

@@ -23,6 +23,7 @@ use crate::ui::Accel;
 use crate::ui::preview::PreviewPane;
 use crate::ui::tab_page::TabPage;
 use crate::ui::terminal::TerminalView;
+use crate::ui::theme_manager;
 
 mod imp {
     use super::*;
@@ -134,6 +135,8 @@ impl Pane {
         imp.tab_bar.set_view(Some(&imp.tab_view));
         // Siempre visible, también con una sola pestaña (como en la spec).
         imp.tab_bar.set_autohide(false);
+        // Ancho fijo a la izquierda; se encogen al abrir más pestañas.
+        imp.tab_bar.set_expand_tabs(false);
         imp.tab_bar.set_end_action_widget(Some(&new_tab));
 
         imp.tab_view.set_vexpand(true);
@@ -202,6 +205,15 @@ impl Pane {
 
         self.append(&imp.tab_bar);
         self.append(&imp.split);
+
+        // Con `bracket_titles` cambian los títulos de las pestañas.
+        if let Some(themes) = theme_manager::get() {
+            themes.connect_theme_changed(glib::clone!(
+                #[weak(rename_to = pane)]
+                self,
+                move |_| pane.refresh_tab_titles()
+            ));
+        }
     }
 
     fn on_key(&self, key: gdk::Key, mods: gdk::ModifierType) -> glib::Propagation {
@@ -292,6 +304,21 @@ impl Pane {
             .unwrap_or(imp.split.height() * 2 / 3);
         imp.split.set_position(position.max(1));
         terminal.grab_focus();
+    }
+
+    fn refresh_tab_titles(&self) {
+        let view = &self.imp().tab_view;
+        for i in 0..view.n_pages() {
+            let tab = view.nth_page(i);
+            if let Some(dir) = tab
+                .child()
+                .downcast::<TabPage>()
+                .ok()
+                .and_then(|p| p.directory())
+            {
+                update_tab_title(&tab, &dir);
+            }
+        }
     }
 
     /// Vista previa debajo de las pestañas o a su derecha.
@@ -614,7 +641,14 @@ fn place_at_two_thirds(paned: &gtk::Paned) {
     });
 }
 
+/// Título (con corchetes si el tema usa `bracket_titles`) y ruta completa
+/// en el tooltip.
 fn update_tab_title(tab: &adw::TabPage, dir: &gio::File) {
-    tab.set_title(&display_name(dir));
+    let name = display_name(dir);
+    let title = match theme_manager::get() {
+        Some(themes) => themes.theme().pane_title(&name),
+        None => name,
+    };
+    tab.set_title(&title);
     tab.set_tooltip(&display_path(dir));
 }

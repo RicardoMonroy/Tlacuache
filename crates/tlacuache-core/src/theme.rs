@@ -210,6 +210,27 @@ pub struct FileTypeColors {
     pub other: Color,
 }
 
+/// Qué glifo le toca a una entrada.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlyphKind {
+    Folder,
+    File,
+    Symlink,
+    Executable,
+}
+
+impl GlyphKind {
+    /// El enlace manda sobre el tipo; luego carpeta y ejecutable.
+    pub fn of(is_dir: bool, is_symlink: bool, is_executable: bool) -> Self {
+        match (is_symlink, is_dir, is_executable) {
+            (true, _, _) => Self::Symlink,
+            (false, true, _) => Self::Folder,
+            (false, false, true) => Self::Executable,
+            _ => Self::File,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Glyphs {
@@ -409,6 +430,40 @@ impl Theme {
         ]
     }
 
+    /// Título de una pestaña: `┤ nombre ├` con `bracket_titles`.
+    pub fn pane_title(&self, name: &str) -> String {
+        if self.style.bracket_titles {
+            format!("┤ {name} ├")
+        } else {
+            name.to_owned()
+        }
+    }
+
+    /// Glifo en lugar del ícono (`icon_style = "glyph"`); `None` si el tema
+    /// usa íconos.
+    pub fn glyph(&self, kind: GlyphKind) -> Option<&str> {
+        if self.style.icon_style != IconStyle::Glyph {
+            return None;
+        }
+        let glyphs = self.glyphs.as_ref()?;
+        Some(match kind {
+            GlyphKind::Folder => &glyphs.folder,
+            GlyphKind::File => &glyphs.file,
+            GlyphKind::Symlink => &glyphs.symlink,
+            GlyphKind::Executable => &glyphs.executable,
+        })
+    }
+
+    /// Nombre a mostrar en las filas: con glifos, las carpetas llevan `/`
+    /// al final (como `ls -F`).
+    pub fn entry_name<'a>(&self, name: &'a str, is_dir: bool) -> std::borrow::Cow<'a, str> {
+        if is_dir && self.style.icon_style == IconStyle::Glyph {
+            format!("{name}/").into()
+        } else {
+            name.into()
+        }
+    }
+
     /// Id del esquema de GtkSourceView generado para este tema.
     pub fn source_scheme_id(&self) -> String {
         format!("tlacuache-{}", self.meta.id)
@@ -598,6 +653,31 @@ mod tests {
     }
 
     /// Criterio de aceptación de la tarea 7.3.
+    #[test]
+    fn consola_flags_in_rust() {
+        let consola = Theme::builtin("consola").unwrap();
+        assert_eq!(consola.pane_title("Descargas"), "┤ Descargas ├");
+        assert_eq!(consola.glyph(GlyphKind::Folder), Some("▸"));
+        assert_eq!(consola.glyph(GlyphKind::File), Some("·"));
+        assert_eq!(consola.glyph(GlyphKind::Symlink), Some("↪"));
+        assert_eq!(consola.glyph(GlyphKind::Executable), Some("*"));
+        assert_eq!(consola.entry_name("src", true), "src/");
+        assert_eq!(consola.entry_name("main.rs", false), "main.rs");
+
+        let nord = Theme::default_theme();
+        assert_eq!(nord.pane_title("Descargas"), "Descargas");
+        assert_eq!(nord.glyph(GlyphKind::Folder), None);
+        assert_eq!(nord.entry_name("src", true), "src");
+    }
+
+    #[test]
+    fn glyph_kind_precedence() {
+        assert_eq!(GlyphKind::of(true, true, false), GlyphKind::Symlink);
+        assert_eq!(GlyphKind::of(true, false, true), GlyphKind::Folder);
+        assert_eq!(GlyphKind::of(false, false, true), GlyphKind::Executable);
+        assert_eq!(GlyphKind::of(false, false, false), GlyphKind::File);
+    }
+
     #[test]
     fn source_scheme_uses_theme_colors_and_escapes() {
         let mut theme = Theme::default_theme();

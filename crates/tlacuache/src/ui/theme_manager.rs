@@ -91,12 +91,12 @@ pub fn init(settings: config::Theme, display: &gdk::Display) -> ThemeManager {
 }
 
 impl ThemeManager {
-    pub fn connect_theme_changed<F: Fn(&Self) + 'static>(&self, f: F) {
+    pub fn connect_theme_changed<F: Fn(&Self) + 'static>(&self, f: F) -> glib::SignalHandlerId {
         self.connect_closure(
             "theme-changed",
             false,
             glib::closure_local!(move |manager: &Self| f(manager)),
-        );
+        )
     }
 
     pub fn connect_source_scheme_changed<F: Fn(&Self) + 'static>(&self, f: F) {
