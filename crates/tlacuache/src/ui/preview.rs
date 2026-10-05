@@ -5,7 +5,8 @@
 //! Las imágenes se decodifican y escalan (lado mayor `MAX_DECODE_SIDE`) en
 //! un hilo de trabajo con gdk-pixbuf; la textura se crea en el hilo de GTK.
 //! Del texto se leen como mucho `[preview] max_text_bytes`, también en un
-//! hilo de trabajo.
+//! hilo de trabajo. De las carpetas se cuentan los elementos y se mide el
+//! tamaño (recursivo, con avance en vivo, cancelable).
 //!
 //! `request` espera `preview::DEBOUNCE_MS` desde el último cambio de
 //! selección; cada carga nueva aborta la anterior (su consulta de gio se
@@ -32,6 +33,7 @@ use tlacuache_core::summary::SelectionSummary;
 use crate::fs::display::display_name;
 use crate::fs::file_item::{SelectedInfo, entry_from_info};
 use crate::fs::listing::ATTRIBUTES;
+use crate::fs::size::{self, Measure};
 use crate::strings;
 use crate::ui::image_preview::ImagePreview;
 use crate::ui::set_category_icon;
@@ -65,6 +67,8 @@ mod imp {
         pub timer: RefCell<Option<glib::SourceId>>,
         /// Carga en curso (se aborta al pedir otra).
         pub task: RefCell<Option<glib::JoinHandle<()>>>,
+        /// Medición de carpeta en curso.
+        pub measuring: RefCell<Option<gio::Cancellable>>,
         /// Filas usadas en `details`.
         pub rows: Cell<i32>,
     }
@@ -166,6 +170,9 @@ impl PreviewPane {
         if let Some(task) = imp.task.take() {
             task.abort();
         }
+        if let Some(cancellable) = imp.measuring.take() {
+            cancellable.cancel();
+        }
     }
 
     fn load(&self, target: Target<SelectedInfo>, dir: Option<gio::File>) {
@@ -212,6 +219,7 @@ impl PreviewPane {
                     (PreviewKind::Text, Some(path)) => {
                         self.load_text(path, &name, content_type.as_deref()).await;
                     }
+                    (PreviewKind::Folder, _) => self.measure_folder(file).await,
                     _ => {}
                 }
             }
@@ -222,6 +230,36 @@ impl PreviewPane {
             }
         }
         self.imp().task.take();
+    }
+
+    /// Cuenta los elementos y mide la carpeta, actualizando las filas.
+    async fn measure_folder(&self, dir: &gio::File) {
+        let entries = self.add_row(strings::PROP_ITEMS, strings::PROP_CALCULATING);
+        let total = self.add_row(strings::PROP_SIZE, strings::PROP_CALCULATING);
+        let cancellable = gio::Cancellable::new();
+        self.imp().measuring.replace(Some(cancellable.clone()));
+        let (live_entries, live_total) = (entries.clone(), total.clone());
+        let result = size::measure(
+            std::slice::from_ref(dir),
+            &cancellable,
+            move |m: &Measure| {
+                live_entries.set_text(&strings::items_count(m.entries as usize));
+                live_total.set_text(&strings::prop_measuring(m.bytes, m.files));
+            },
+        )
+        .await;
+        self.imp().measuring.take();
+        match result {
+            Ok(m) => {
+                entries.set_text(&strings::items_count(m.entries as usize));
+                total.set_text(&strings::prop_measured(m.bytes, m.files, m.dirs));
+            }
+            Err(err) if err.matches(gio::IOErrorEnum::Cancelled) => {}
+            Err(err) => {
+                entries.set_text("—");
+                total.set_text(err.message());
+            }
+        }
     }
 
     /// Límite de bytes de texto a leer (`[preview] max_text_bytes`).
@@ -359,7 +397,7 @@ impl PreviewPane {
         imp.title.set_text("");
     }
 
-    fn add_row(&self, key: &str, value: &str) {
+    fn add_row(&self, key: &str, value: &str) -> gtk::Label {
         let imp = self.imp();
         let row = imp.rows.get();
         let key = gtk::Label::builder()
@@ -382,6 +420,7 @@ impl PreviewPane {
         imp.details.attach(&key, 0, row, 1, 1);
         imp.details.attach(&value, 1, row, 1, 1);
         imp.rows.set(row + 1);
+        value
     }
 }
 
