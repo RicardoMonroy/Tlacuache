@@ -73,20 +73,25 @@ Orden acordado: **7.1–7.5 antes del Hito 6** (la vista previa nace usando los 
 
 **→ Release v0.1 (MVP).** Checklist: usar 3 días seguidos como gestor principal y registrar fallos en `docs/BUGS.md`.
 
-## Hito 8 — v0.2
-- [ ] PDF (poppler), video/audio (`gtk::Video`), Markdown renderizado.
-- [ ] Vista de iconos (cuadrícula con `gtk::GridView`) como tercera opción del selector de vista.
-- [ ] Miniaturas freedesktop.
-- [ ] Búsqueda recursiva en segundo plano.
-- [ ] Renombrado masivo con regex y vista previa.
-- [ ] Notas por carpeta.
-- [ ] PKGBUILD, archivo `.desktop` e icono; publicar en AUR.
+## Pendientes del MVP (antes del Hito 8)
+Surgieron al probar. Acordado: atenderlos antes del Hito 8, en este orden.
 
-## Pendientes y mejoras anotadas (sin hito asignado)
-Surgieron al probar; revisar al cerrar el MVP o asignarlas a un hito.
-- [ ] Archivos cortados (Ctrl+X) atenuados en la vista hasta pegarlos.
-- [ ] Diálogo de conflictos con tamaño y fecha de cada versión.
-- [ ] Integración OSC 7 automática para zsh (`ZDOTDIR`); hoy solo bash (fish la trae). Ver ADR-008.
-- [ ] Guardar en la sesión la altura y visibilidad de la terminal de cada panel.
-- [ ] Probar el escapado de rutas con fish real (solo se probó con bash y sh).
-- [ ] Barra de pestañas propia con el título alineado a la izquierda (como en el board): `adw::TabBar` centra el título en el código de `AdwTab`, sin propiedad ni CSS para cambiarlo. Implica reimplementar reordenar arrastrando, desbordamiento con scroll y menú de pestaña.
+- [ ] **P.1 Cortados atenuados**: los archivos cortados con Ctrl+X se ven atenuados en todas las vistas hasta pegarlos o cancelar (copiar otra cosa o Esc). CA: cortar, ver atenuados en ambos paneles; pegar o copiar otra cosa los restaura.
+- [ ] **P.2 Conflictos con detalle**: el diálogo de conflictos muestra tamaño y fecha de modificación de la versión existente y de la nueva, y cuál es más reciente. CA: copiar un archivo sobre otro distinto muestra ambos datos.
+- [ ] **P.3 Terminal en la sesión**: guardar por panel si la terminal estaba visible y su altura. CA: abrir la terminal, ajustar la altura, reiniciar: vuelve igual (con un shell nuevo en la carpeta del panel).
+- [ ] **P.4 OSC 7 para zsh**: integración automática con `ZDOTDIR` propio que carga la config del usuario (ver ADR-008). CA: con zsh, el panel sigue los `cd`. Requiere instalar `zsh` para probar.
+- [ ] **P.5 Escapado con fish**: probar `cd` y pegar rutas con espacios, comillas y `$` en fish real. CA: prueba automática con fish (se omite si no está instalado). Requiere instalar `fish`.
+- [ ] **P.6 Barra de pestañas propia** con el título a la izquierda (como en el board): `adw::TabBar` centra el título en el código de `AdwTab`, sin propiedad ni CSS para cambiarlo. Implica reimplementar reordenar arrastrando, desbordamiento con scroll y menú de pestaña. CA: mismas funciones que hoy, título alineado a la izquierda.
+
+## Hito 8 — v0.2
+Orden acordado: completar la vista previa, luego vistas, búsqueda, renombrado, notas y AUR.
+
+- [ ] **8.1 PDF** en la vista previa con `poppler-rs` (0.26, compatible con glib 0.22): página renderizada en un hilo de trabajo y botones ‹ › para cambiar de página. CA: un PDF de 100+ páginas muestra la página 1 sin trabar la app y el número de páginas.
+- [ ] **8.2 Video y audio** con `gtk::Video` (GStreamer). CA: mp4, webm y mp3 se reproducen en la vista previa y se detienen al cambiar de selección. Requiere `gst-plugins-good` y `gst-libav`.
+- [ ] **8.3 Markdown renderizado** (`pulldown-cmark` → `TextView` con estilos del tema, sin webview), alternable con la vista de código. CA: encabezados, listas, énfasis, código y enlaces con los colores del tema.
+- [ ] **8.4 Vista de íconos** (`gtk::GridView`) como tercera opción del selector (Ctrl+3). CA: navegación, selección, arrastrar y soltar y menú contextual como en las otras vistas.
+- [ ] **8.5 Miniaturas freedesktop** (caché compartida `~/.cache/thumbnails`), generadas en segundo plano. CA: las imágenes muestran miniatura en la vista de íconos y no se regeneran si ya existen.
+- [ ] **8.6 Búsqueda recursiva** (Ctrl+F) en segundo plano y cancelable, con resultados en una pestaña. CA: buscar en `~` no traba la app; Esc cancela.
+- [ ] **8.7 Renombrado masivo** con regex y vista previa del resultado. CA: detecta conflictos antes de aplicar y se deshace con Ctrl+Z.
+- [ ] **8.8 Notas por carpeta** (decidir antes si se guardan en un archivo oculto de la carpeta o en un almacén central).
+- [ ] **8.9 PKGBUILD para AUR** (el `.desktop` y el ícono existen desde la 7.1). CA: `makepkg -si` instala y la app aparece en el lanzador; la publicación en AUR la hace el autor.
