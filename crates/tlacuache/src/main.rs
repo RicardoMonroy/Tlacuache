@@ -4,6 +4,8 @@ mod strings;
 mod ui;
 mod window;
 
+use std::io::IsTerminal;
+
 use adw::prelude::*;
 use gtk::{gio, glib};
 use tracing_subscriber::EnvFilter;
@@ -13,6 +15,8 @@ fn main() -> glib::ExitCode {
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("tlacuache=info")),
         )
+        // Sin colores si la salida va a un archivo o a otra orden.
+        .with_ansi(std::io::stderr().is_terminal())
         .init();
 
     // Sin recursos la app funciona con el tema por defecto de libadwaita.
