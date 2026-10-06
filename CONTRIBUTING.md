@@ -56,6 +56,7 @@ scripts/check.sh            # cargo fmt --check, clippy -D warnings y pruebas
 ```
 
 - Todo en verde. Si cambias la interfaz, describe cómo probarlo a mano.
+- La CI de GitHub repite esas comprobaciones en Arch y compila y prueba con las bibliotecas mínimas de Debian 13 (y Rust 1.92), Ubuntu 26.04 y Fedora 43. Para reproducirla en tu equipo con Docker: `scripts/ci-local.sh [arch|debian|ubuntu|fedora]`.
 - Commits pequeños, uno por cambio, con mensaje en imperativo al estilo `feat(pane): add miller columns view`.
 - Si tomas una decisión de arquitectura nueva, añade un ADR en `docs/DECISIONS.md`.
 - Si completas una tarea del ROADMAP, márcala con `[x]`.

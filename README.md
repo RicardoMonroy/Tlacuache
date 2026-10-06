@@ -11,6 +11,10 @@
   <br>Escrito en Rust con GTK4, libadwaita y VTE.
 </p>
 
+<p align="center">
+  <a href="https://github.com/RicardoMonroy/TlacuacheBrowser/actions/workflows/ci.yml"><img src="https://github.com/RicardoMonroy/TlacuacheBrowser/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
+
 ![Tlacuache con el tema Nord](docs/screenshots/nord.png)
 
 ## Qué hace

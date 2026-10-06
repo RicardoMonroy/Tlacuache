@@ -1,0 +1,60 @@
+# Integración continua (9.2): formato, clippy y pruebas en Arch, y
+# compilación + pruebas con las bibliotecas mínimas de Debian 13 (y Rust
+# 1.92, el `rust-version` del workspace), Ubuntu 26.04 y Fedora 43.
+# Las dependencias las instala `scripts/ci-setup.sh`; `scripts/ci-local.sh`
+# reproduce estos trabajos con Docker.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  arch:
+    name: Arch Linux (formato, clippy y pruebas)
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Dependencias
+        run: bash scripts/ci-setup.sh arch
+      - uses: Swatinem/rust-cache@v2
+      - name: Formato, clippy y pruebas
+        run: bash scripts/check.sh
+      - name: Contraste de los temas
+        run: python scripts/check-theme-contrast.py crates/tlacuache-core/themes
+
+  distros:
+    name: ${{ matrix.name }} (compilación y pruebas)
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Debian 13, distro: debian, image: "debian:trixie" }
+          - { name: Ubuntu 26.04, distro: ubuntu, image: "ubuntu:26.04" }
+          - { name: Fedora 43, distro: fedora, image: "fedora:43" }
+    steps:
+      - uses: actions/checkout@v7
+      - name: Dependencias
+        run: bash scripts/ci-setup.sh ${{ matrix.distro }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.distro }}
+      - name: Compilar
+        run: cargo build --locked --workspace --all-targets
+      - name: Pruebas
+        run: cargo test --locked --workspace
