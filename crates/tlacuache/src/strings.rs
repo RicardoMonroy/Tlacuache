@@ -20,6 +20,7 @@ pub const COLUMN_AGE: &str = "Edad";
 pub const NAV_BACK: &str = "Atrás (Alt+←)";
 pub const NAV_FORWARD: &str = "Adelante (Alt+→)";
 pub const NAV_UP: &str = "Subir (Alt+↑)";
+pub const RELOAD: &str = "Recargar (Ctrl+R)";
 
 pub const DUAL_PANE: &str = "Doble panel (F3)";
 pub const SHOW_SIDEBAR: &str = "Barra lateral (F9)";
@@ -89,6 +90,7 @@ pub const FOLDER_PROPERTIES: &str = "Propiedades de la carpeta";
 pub const NEW_FOLDER_ELLIPSIS: &str = "Nueva carpeta…";
 pub const NEW_FILE_ELLIPSIS: &str = "Nuevo archivo…";
 pub const TOGGLE_HIDDEN: &str = "Mostrar u ocultar archivos ocultos";
+pub const RELOAD_FOLDER: &str = "Recargar";
 pub const PATH_COPIED: &str = "Ruta copiada al portapapeles";
 pub const OPEN_FAILED_APP: &str = "No se pudo abrir con esa aplicación";
 pub const PROP_NAME: &str = "Nombre";

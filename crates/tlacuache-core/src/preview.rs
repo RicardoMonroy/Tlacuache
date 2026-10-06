@@ -19,6 +19,18 @@ pub enum Target<T> {
     Many(SelectionSummary),
 }
 
+impl<T> Target<T> {
+    /// El mismo objetivo con cada elemento convertido por `f` (p. ej. a su
+    /// URI, para comparar objetivos).
+    pub fn map<U>(&self, f: impl FnOnce(&T) -> U) -> Target<U> {
+        match self {
+            Self::Directory => Target::Directory,
+            Self::Single(item) => Target::Single(f(item)),
+            Self::Many(summary) => Target::Many(*summary),
+        }
+    }
+}
+
 /// Objetivo según los elementos seleccionados (`summary` es su resumen).
 pub fn target<T>(mut selected: Vec<T>, summary: SelectionSummary) -> Target<T> {
     match selected.len() {
@@ -169,6 +181,17 @@ pub fn text_excerpt(bytes: &[u8], truncated: bool) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn map_converts_only_the_single_item() {
+        let summary = SelectionSummary::default();
+        assert_eq!(Target::<u8>::Directory.map(|n| n * 2), Target::Directory);
+        assert_eq!(Target::Single(3u8).map(|n| n * 2), Target::Single(6));
+        assert_eq!(
+            Target::<u8>::Many(summary).map(|n| n * 2),
+            Target::Many(summary)
+        );
+    }
 
     #[test]
     fn text_excerpt_cases() {

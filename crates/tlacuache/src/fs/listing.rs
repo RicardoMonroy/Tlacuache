@@ -1,12 +1,7 @@
-//! Modelo de una carpeta: `DirectoryList` → `MapListModel` (FileItem) →
-//! `FilterListModel` (core::filter) → `SortListModel` (core::sort). Cada
-//! vista envuelve el resultado en su propio modelo de selección.
-//! `DirectoryList` lee de forma asíncrona e incremental, así que la UI no se
-//! bloquea mientras llegan las entradas.
-//!
-//! Diagnóstico (R.1): con `RUST_LOG=tlacuache=debug` se registra cada evento
-//! del monitor de la carpeta y cada cambio que `DirectoryList` aplica al
-//! modelo, para comparar lo que avisa el sistema con lo que se muestra.
+//! Modelo de una carpeta: `DirectorySource` (lectura asíncrona por lotes,
+//! monitor y resincronización; ADR-017) → `FilterListModel` (core::filter)
+//! → `SortListModel` (core::sort). Cada vista envuelve el resultado en su
+//! propio modelo de selección.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -16,6 +11,7 @@ use gtk::{gio, glib};
 use tlacuache_core::filter::Filter;
 use tlacuache_core::sort::SortSpec;
 
+use super::directory_source::DirectorySource;
 use super::file_item::FileItem;
 
 /// Atributos que se piden a gio por cada entrada.
@@ -24,27 +20,17 @@ pub const ATTRIBUTES: &str =
 
 #[derive(Clone)]
 pub struct DirectoryModel {
-    dir_list: gtk::DirectoryList,
+    source: DirectorySource,
     filter_state: Rc<RefCell<Filter>>,
     filter: gtk::CustomFilter,
     sort_spec: Rc<Cell<SortSpec>>,
     sorter: gtk::CustomSorter,
     sorted: gtk::SortListModel,
-    /// Monitor solo para el registro de diagnóstico (R.1).
-    debug_monitor: Rc<RefCell<Option<gio::FileMonitor>>>,
 }
 
 impl DirectoryModel {
     pub fn new(dir: &gio::File, show_hidden: bool) -> Self {
-        let dir_list = gtk::DirectoryList::new(Some(ATTRIBUTES), Some(dir));
-        dir_list.set_monitored(true);
-
-        let items = gtk::MapListModel::new(Some(dir_list.clone()), |obj| {
-            match obj.downcast_ref::<gio::FileInfo>() {
-                Some(info) => FileItem::from_info(info.clone()).upcast(),
-                None => obj.clone(),
-            }
-        });
+        let source = DirectorySource::new(dir);
 
         let filter_state = Rc::new(RefCell::new(Filter::new(show_hidden, "")));
         let filter = gtk::CustomFilter::new(glib::clone!(
@@ -55,7 +41,8 @@ impl DirectoryModel {
                     .is_some_and(|item| filter_state.borrow().matches(&item.entry()))
             }
         ));
-        let filtered = gtk::FilterListModel::new(Some(items), Some(filter.clone()));
+        let filtered =
+            gtk::FilterListModel::new(Some(source.store().clone()), Some(filter.clone()));
         // No incremental: con filtrado/orden incremental la vista conserva la
         // fila visible mientras se reacomodan los lotes y termina desplazada
         // (p. ej. en `archivo_6050`). Ordenar 10 000 entradas de una vez
@@ -74,73 +61,13 @@ impl DirectoryModel {
         let sorted = gtk::SortListModel::new(Some(filtered), Some(sorter.clone()));
         sorted.set_incremental(false);
 
-        let model = Self {
-            dir_list,
+        Self {
+            source,
             filter_state,
             filter,
             sort_spec,
             sorter,
             sorted,
-            debug_monitor: Rc::default(),
-        };
-        if tracing::enabled!(tracing::Level::DEBUG) {
-            model.log_list_changes();
-            model.watch_for_debug(dir);
-        }
-        model
-    }
-
-    /// Registra los cambios que `DirectoryList` aplica (lo que la vista ve).
-    fn log_list_changes(&self) {
-        self.dir_list
-            .connect_items_changed(|list, position, removed, added| {
-                if list.is_loading() {
-                    return; // carga inicial: no es un cambio de la carpeta
-                }
-                let names: Vec<String> = (position..position + added)
-                    .filter_map(|i| list.item(i).and_downcast::<gio::FileInfo>())
-                    .map(|info| info.name().to_string_lossy().into_owned())
-                    .collect();
-                let dir = list.file().map(|d| display_dir(&d)).unwrap_or_default();
-                tracing::debug!("modelo {dir}: posición {position}, -{removed} +{added} {names:?}");
-            });
-    }
-
-    /// Monitor propio de `dir` que solo registra sus eventos.
-    fn watch_for_debug(&self, dir: &gio::File) {
-        let monitor = match dir.monitor_directory(
-            gio::FileMonitorFlags::WATCH_MOVES,
-            None::<&gio::Cancellable>,
-        ) {
-            Ok(monitor) => monitor,
-            Err(err) => {
-                tracing::debug!("sin monitor para {}: {err}", dir.uri());
-                self.debug_monitor.replace(None);
-                return;
-            }
-        };
-        let label = display_dir(dir);
-        tracing::debug!("monitor {label}: vigilando");
-        monitor.connect_changed(move |_, file, other, event| {
-            let name = |f: &gio::File| {
-                f.basename()
-                    .map(|n| n.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| f.uri().to_string())
-            };
-            match other {
-                Some(other) => {
-                    tracing::debug!(
-                        "monitor {label}: {event:?} {} → {}",
-                        name(file),
-                        name(other)
-                    )
-                }
-                None => tracing::debug!("monitor {label}: {event:?} {}", name(file)),
-            }
-        });
-        // Deja de vigilar la carpeta anterior.
-        if let Some(old) = self.debug_monitor.replace(Some(monitor)) {
-            old.cancel();
         }
     }
 
@@ -153,15 +80,18 @@ impl DirectoryModel {
         self.sorted.item(position).and_downcast()
     }
 
-    pub fn directory_list(&self) -> &gtk::DirectoryList {
-        &self.dir_list
+    /// Origen de los datos (estado de carga y errores).
+    pub fn source(&self) -> &DirectorySource {
+        &self.source
     }
 
     pub fn set_directory(&self, dir: &gio::File) {
-        self.dir_list.set_file(Some(dir));
-        if tracing::enabled!(tracing::Level::DEBUG) {
-            self.watch_for_debug(dir);
-        }
+        self.source.set_file(dir);
+    }
+
+    /// Vuelve a leer la carpeta y aplica solo las diferencias (Ctrl+R).
+    pub fn reload(&self) {
+        self.source.resync();
     }
 
     /// Posición (en el modelo ordenado y filtrado) de la entrada cuyo archivo
@@ -204,11 +134,4 @@ impl DirectoryModel {
             self.sorter.changed(gtk::SorterChange::Different);
         }
     }
-}
-
-/// Ruta de `dir` para el registro (o su URI si no es local).
-fn display_dir(dir: &gio::File) -> String {
-    dir.path()
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|| dir.uri().to_string())
 }

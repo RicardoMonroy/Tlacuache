@@ -89,6 +89,7 @@ Referencia visual: OneCommander V3 (tema Nord). No copiar assets ni iconos de On
 | Sidebar | F9 |
 | Filtro rápido | escribir directamente; Esc limpia |
 | Mostrar ocultos | Ctrl+H |
+| Recargar la carpeta (conserva selección y desplazamiento) | Ctrl+R |
 | Ruta editable | Ctrl+L |
 | Buscar desde la carpeta actual (pestaña de resultados) | Ctrl+F; Esc detiene |
 | Vista columnas / detalles / íconos | Ctrl+1 / Ctrl+2 / Ctrl+3 |

@@ -35,6 +35,39 @@ pub mod theme_thumbnail;
 
 use gtk::prelude::*;
 
+/// Repinta la celda de `list_item` cuando su `FileItem` se actualiza en el
+/// sitio (la carpeta se resincronizó; ADR-017). Se llama en `setup` de la
+/// fábrica con el mismo código que `bind`: cada vez que GTK le asigna otro
+/// elemento, se suelta el aviso del anterior y se escucha el del nuevo.
+pub fn refresh_on_item_change(
+    list_item: &gtk::ListItem,
+    refresh: impl Fn(&gtk::ListItem) + 'static,
+) {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use crate::fs::file_item::FileItem;
+
+    let current: Rc<RefCell<Option<(FileItem, gtk::glib::SignalHandlerId)>>> = Rc::default();
+    let refresh = Rc::new(refresh);
+    list_item.connect_item_notify(move |list_item| {
+        if let Some((item, handler)) = current.take() {
+            item.disconnect(handler);
+        }
+        let Some(item) = list_item.item().and_downcast::<FileItem>() else {
+            return;
+        };
+        let weak = list_item.downgrade();
+        let refresh = refresh.clone();
+        let handler = item.connect_changed(move |_| {
+            if let Some(list_item) = weak.upgrade() {
+                refresh(&list_item);
+            }
+        });
+        current.replace(Some((item, handler)));
+    });
+}
+
 /// El foco de teclado está en `widget` o dentro de él.
 pub fn has_focus_within(widget: &impl IsA<gtk::Widget>) -> bool {
     let widget = widget.upcast_ref::<gtk::Widget>();

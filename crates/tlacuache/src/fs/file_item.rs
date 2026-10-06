@@ -2,6 +2,8 @@
 //! `gio::FileInfo` original, para no reconstruirlo en cada comparación.
 
 use std::cell::{Ref, RefCell};
+use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
 
 use gtk::prelude::*;
@@ -16,7 +18,7 @@ mod imp {
     pub struct FileItem {
         pub entry: RefCell<FileEntry>,
         pub info: RefCell<Option<gio::FileInfo>>,
-        /// Archivo, si el elemento no viene de un `DirectoryList`.
+        /// Archivo, si el elemento no viene del listado de una carpeta.
         pub file: RefCell<Option<gio::File>>,
     }
 
@@ -26,7 +28,16 @@ mod imp {
         type Type = super::FileItem;
     }
 
-    impl ObjectImpl for FileItem {}
+    impl ObjectImpl for FileItem {
+        fn signals() -> &'static [glib::subclass::Signal] {
+            static SIGNALS: OnceLock<Vec<glib::subclass::Signal>> = OnceLock::new();
+            SIGNALS.get_or_init(|| {
+                // Se actualizó en el sitio (la carpeta se resincronizó): las
+                // celdas que lo muestran se vuelven a pintar.
+                vec![glib::subclass::Signal::builder("changed").build()]
+            })
+        }
+    }
 }
 
 glib::wrapper! {
@@ -49,6 +60,27 @@ impl FileItem {
         item
     }
 
+    /// Reemplaza sus datos por los de `info` (mismo archivo, leído de
+    /// nuevo) y avisa con `changed`.
+    pub fn update(&self, info: gio::FileInfo) {
+        self.imp().entry.replace(entry_from_info(&info));
+        self.imp().info.replace(Some(info));
+        self.emit_by_name::<()>("changed", &[]);
+    }
+
+    pub fn connect_changed<F: Fn(&Self) + 'static>(&self, f: F) -> glib::SignalHandlerId {
+        self.connect_closure(
+            "changed",
+            false,
+            glib::closure_local!(move |item: &Self| f(item)),
+        )
+    }
+
+    /// Nombre real del archivo (clave única dentro de su carpeta).
+    pub fn key(&self) -> Option<PathBuf> {
+        self.imp().info.borrow().as_ref().map(|info| info.name())
+    }
+
     pub fn entry(&self) -> Ref<'_, FileEntry> {
         self.imp().entry.borrow()
     }
@@ -57,7 +89,7 @@ impl FileItem {
         self.imp().info.borrow().clone()
     }
 
-    /// Archivo de la entrada; `DirectoryList` lo guarda en `standard::file`.
+    /// Archivo de la entrada; el listado lo guarda en `standard::file`.
     pub fn file(&self) -> Option<gio::File> {
         if let Some(file) = self.imp().file.borrow().clone() {
             return Some(file);

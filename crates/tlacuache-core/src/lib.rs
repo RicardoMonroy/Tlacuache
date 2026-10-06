@@ -13,6 +13,7 @@ pub mod filetype;
 pub mod filter;
 pub mod history;
 pub mod keymap;
+pub mod listing_diff;
 pub mod markdown;
 pub mod names;
 pub mod notes;

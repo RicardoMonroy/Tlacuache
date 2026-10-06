@@ -125,8 +125,8 @@ impl IconView {
             move |_, position| view.activate_position(position)
         ));
 
-        let dir_list = model.directory_list();
-        dir_list.connect_error_notify(glib::clone!(
+        let source = model.source();
+        source.connect_error_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,
             move |list| {
@@ -136,11 +136,11 @@ impl IconView {
                 }
             }
         ));
-        dir_list.connect_loading_notify(glib::clone!(
+        source.connect_loading_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,
             move |list| {
-                if !list.is_loading() {
+                if !list.loading() {
                     view.focus_after_load();
                 }
             }
@@ -291,6 +291,13 @@ impl IconView {
         }
     }
 
+    /// Vuelve a leer la carpeta conservando selección y desplazamiento.
+    pub fn reload(&self) {
+        if let Some(model) = self.imp().model.get() {
+            model.reload();
+        }
+    }
+
     fn on_key(&self, key: gdk::Key, mods: gdk::ModifierType) -> glib::Propagation {
         let Some(filter_key) = filter_key(key, mods) else {
             return glib::Propagation::Proceed;
@@ -395,17 +402,21 @@ fn tile_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
         dnd::attach_row_drop(&tile, list_item);
         context_menu::attach_row_menu(&tile, list_item, &selection);
         list_item.set_child(Some(&tile));
+        crate::ui::refresh_on_item_change(list_item, bind_tile);
     });
     factory.connect_bind(|_, obj| {
-        let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        if let (Some(item), Some(tile)) = (
-            list_item.item().and_downcast::<FileItem>(),
-            list_item.child().and_downcast::<FileNameCell>(),
-        ) {
-            tile.set_entry(&item.entry(), item.file().map(|f| f.uri().to_string()));
+        if let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() {
+            bind_tile(list_item);
         }
     });
     factory
+}
+
+fn bind_tile(list_item: &gtk::ListItem) {
+    if let (Some(item), Some(tile)) = (
+        list_item.item().and_downcast::<FileItem>(),
+        list_item.child().and_downcast::<FileNameCell>(),
+    ) {
+        tile.set_entry(&item.entry(), item.file().map(|f| f.uri().to_string()));
+    }
 }

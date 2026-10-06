@@ -303,6 +303,14 @@ impl MillerView {
         }
     }
 
+    /// Vuelve a leer las carpetas de todas las columnas conservando
+    /// selección y desplazamiento.
+    pub fn reload(&self) {
+        for column in self.columns_snapshot() {
+            column.model.reload();
+        }
+    }
+
     fn columns_snapshot(&self) -> Vec<Column> {
         self.imp().columns.borrow().clone()
     }
@@ -427,23 +435,23 @@ impl MillerView {
         ));
         list.add_controller(focus);
 
-        let dir_list = column.model.directory_list();
-        dir_list.connect_loading_notify(glib::clone!(
+        let source = column.model.source();
+        source.connect_loading_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,
             #[weak]
             list,
-            move |dir_list| {
-                if !dir_list.is_loading() {
+            move |source| {
+                if !source.loading() {
                     view.on_column_loaded(&list);
                 }
             }
         ));
-        dir_list.connect_error_notify(glib::clone!(
+        source.connect_error_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,
-            move |dir_list| {
-                if let Some(err) = dir_list.error() {
+            move |source| {
+                if let Some(err) = source.error() {
                     tracing::warn!("error al listar: {err}");
                     window::show_toast_from(&view, &strings::listing_failed(&err));
                 }
@@ -708,26 +716,31 @@ fn row_factory(selection: &gtk::SelectionModel) -> gtk::SignalListItemFactory {
         dnd::attach_row_drop(&row, list_item);
         context_menu::attach_row_menu(&row, list_item, &selection);
         list_item.set_child(Some(&row));
+        crate::ui::refresh_on_item_change(list_item, bind_row);
     });
     factory.connect_bind(|_, obj| {
-        let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        let (Some(item), Some(row)) = (
-            list_item.item().and_downcast::<FileItem>(),
-            list_item.child(),
-        ) else {
-            return;
-        };
-        let cell = row.first_child().and_downcast::<FileNameCell>();
-        let chevron = row.last_child();
-        let entry = item.entry();
-        if let Some(cell) = cell {
-            cell.set_entry(&entry, item.file().map(|f| f.uri().to_string()));
-        }
-        if let Some(chevron) = chevron {
-            chevron.set_visible(entry.is_dir);
+        if let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() {
+            bind_row(list_item);
         }
     });
     factory
+}
+
+/// Pinta la fila con su `FileItem` (nombre, ícono y flecha de carpeta).
+fn bind_row(list_item: &gtk::ListItem) {
+    let (Some(item), Some(row)) = (
+        list_item.item().and_downcast::<FileItem>(),
+        list_item.child(),
+    ) else {
+        return;
+    };
+    let cell = row.first_child().and_downcast::<FileNameCell>();
+    let chevron = row.last_child();
+    let entry = item.entry();
+    if let Some(cell) = cell {
+        cell.set_entry(&entry, item.file().map(|f| f.uri().to_string()));
+    }
+    if let Some(chevron) = chevron {
+        chevron.set_visible(entry.is_dir);
+    }
 }

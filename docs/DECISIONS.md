@@ -94,3 +94,19 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
     - la PTY pertenece al `devpts` del sandbox, así que `tty`/`ttyname` fallan en el shell (afecta, p. ej., a `GPG_TTY=$(tty)`);
     - las carpetas que solo existen en el sandbox (`/app`, el portal de documentos) abren el shell en la carpeta personal.
   - Probado con bash, zsh y fish del sistema desde el SDK de GNOME 51.
+
+## ADR-017 — Listado propio de carpetas con resincronización por diferencias
+- **Contexto**: `gtk::DirectoryList` no se puede modificar desde fuera. Recargar obliga a vaciar la lista y llenarla de nuevo, y eso pierde la selección y el desplazamiento. Además, aplica creaciones, borrados y renombrados, pero ignora los eventos `CHANGED`: el tamaño de un archivo que crece (una descarga) queda viejo (R.1).
+- **Decisión**: `fs::DirectorySource` reemplaza a `DirectoryList`:
+  - **Carga**: un `gio::ListStore` de `FileItem` que se llena de forma asíncrona y por lotes. Mantiene las propiedades `loading` y `error` que ya usaban las vistas.
+  - **Resincronización**: vuelve a leer la carpeta y aplica solo las diferencias que calcula `core::listing_diff` (clave: el nombre real del archivo):
+    - las bajas se quitan y las altas se añaden;
+    - los cambios se aplican en el sitio sobre el mismo `FileItem`. Este emite `changed` para que sus celdas se repinten (`ui::refresh_on_item_change`), y el store avisa `-1 +1` con el mismo objeto para que el filtro y el orden lo reubiquen. Las selecciones de GTK conservan un elemento que sale y vuelve a entrar en el mismo aviso.
+  - **Disparadores**: un monitor propio. Cualquier evento, `CHANGED` incluido, programa una resincronización a los 300 ms y junta los avisos que lleguen mientras tanto. Ctrl+R (R.2) llama a la misma resincronización.
+  - **Vista previa**: ignora las peticiones del mismo objetivo, para que un video o audio no se detenga en cada resincronización.
+- **Consecuencias**:
+  - Recargar no parpadea y conserva la selección y el desplazamiento.
+  - Una descarga aparece sola y su tamaño crece en la vista.
+  - Cada resincronización lee la carpeta entera: con carpetas enormes que cambian sin parar, el costo es una lectura cada 300 ms.
+  - Las carpetas sin monitor (algunos montajes de red o FUSE) solo se actualizan con Ctrl+R hasta la R.4.
+

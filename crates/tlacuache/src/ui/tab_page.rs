@@ -81,6 +81,14 @@ impl PageView {
         }
     }
 
+    fn reload(&self) {
+        match self {
+            Self::Columns(view) => view.reload(),
+            Self::Details(view) => view.reload(),
+            Self::Icons(view) => view.reload(),
+        }
+    }
+
     fn select_when_present(&self, file: &gio::File) {
         match self {
             Self::Columns(view) => view.select_when_present(file),
@@ -201,6 +209,11 @@ mod imp {
             klass.install_action("view.toggle-hidden", None, |page, _, _| {
                 page.toggle_show_hidden();
             });
+            klass.install_action("view.reload", None, |page, _, _| {
+                if let Some(view) = page.view() {
+                    view.reload();
+                }
+            });
             // Estado = propiedad `view-mode`; los botones usan action-target.
             klass.install_property_action("view.mode", "view-mode");
 
@@ -214,6 +227,7 @@ mod imp {
             klass.add_binding_action(gdk::Key::Right, alt, "nav.forward");
             klass.add_binding_action(gdk::Key::l, ctrl, "nav.edit-path");
             klass.add_binding_action(gdk::Key::h, ctrl, "view.toggle-hidden");
+            klass.add_binding_action(gdk::Key::r, ctrl, "view.reload");
             klass.add_binding(gdk::Key::_1, ctrl, |page| {
                 page.set_view_mode(ViewMode::Columns.id());
                 glib::Propagation::Stop
@@ -277,6 +291,7 @@ impl TabPage {
             ("go-previous-symbolic", "nav.back", strings::NAV_BACK),
             ("go-next-symbolic", "nav.forward", strings::NAV_FORWARD),
             ("go-up-symbolic", "nav.up", strings::NAV_UP),
+            ("view-refresh-symbolic", "view.reload", strings::RELOAD),
         ] {
             let button = gtk::Button::from_icon_name(icon);
             button.add_css_class("flat");
@@ -722,7 +737,10 @@ fn folder_menu() -> gio::Menu {
     );
     menu.append_section(
         None,
-        &section(&[(strings::TOGGLE_HIDDEN, "view.toggle-hidden")]),
+        &section(&[
+            (strings::TOGGLE_HIDDEN, "view.toggle-hidden"),
+            (strings::RELOAD_FOLDER, "view.reload"),
+        ]),
     );
     menu.append_section(
         None,

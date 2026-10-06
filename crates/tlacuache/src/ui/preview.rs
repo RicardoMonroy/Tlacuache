@@ -78,6 +78,10 @@ mod imp {
         pub max_text_bytes: Cell<u64>,
         /// Carga pendiente del debounce.
         pub timer: RefCell<Option<glib::SourceId>>,
+        /// Lo último pedido (archivo o carpeta por URI). Pedir lo mismo no
+        /// recarga: la carpeta se resincroniza a menudo (ADR-017) y un video
+        /// o audio en curso no debe detenerse por eso.
+        pub requested: RefCell<Option<(Target<String>, Option<String>)>>,
         /// Carga en curso (se aborta al pedir otra).
         pub task: RefCell<Option<glib::JoinHandle<()>>>,
         /// Medición de carpeta en curso.
@@ -184,7 +188,15 @@ impl PreviewPane {
     /// Muestra `target` tras el debounce; `dir` es la carpeta actual (para
     /// `Target::Directory`).
     pub fn request(&self, target: Target<SelectedInfo>, dir: Option<gio::File>) {
+        let dir_uri = matches!(target, Target::Directory)
+            .then(|| dir.as_ref().map(|d| d.uri().to_string()))
+            .flatten();
+        let key = (target.map(|info| info.file.uri().to_string()), dir_uri);
+        if self.imp().requested.borrow().as_ref() == Some(&key) {
+            return;
+        }
         self.cancel();
+        self.imp().requested.replace(Some(key));
         let id = glib::timeout_add_local_once(
             Duration::from_millis(DEBOUNCE_MS),
             glib::clone!(
@@ -202,6 +214,7 @@ impl PreviewPane {
     /// Descarta la carga pendiente o en curso (al ocultar o cambiar).
     pub fn cancel(&self) {
         let imp = self.imp();
+        imp.requested.replace(None);
         if let Some(id) = imp.timer.take() {
             id.remove();
         }

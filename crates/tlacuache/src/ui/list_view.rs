@@ -148,8 +148,8 @@ impl FileListView {
             move |_, position| view.activate_position(position)
         ));
 
-        let dir_list = model.directory_list();
-        dir_list.connect_error_notify(glib::clone!(
+        let source = model.source();
+        source.connect_error_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,
             move |list| {
@@ -159,11 +159,11 @@ impl FileListView {
                 }
             }
         ));
-        dir_list.connect_loading_notify(glib::clone!(
+        source.connect_loading_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,
             move |list| {
-                if !list.is_loading() {
+                if !list.loading() {
                     view.focus_after_load();
                 }
             }
@@ -330,6 +330,13 @@ impl FileListView {
     pub fn set_show_hidden(&self, show: bool) {
         if let Some(model) = self.imp().model.get() {
             model.set_show_hidden(show);
+        }
+    }
+
+    /// Vuelve a leer la carpeta conservando selección y desplazamiento.
+    pub fn reload(&self) {
+        if let Some(model) = self.imp().model.get() {
+            model.reload();
         }
     }
 
@@ -502,17 +509,14 @@ fn column(id: ColumnId, selection: &gtk::SelectionModel) -> gtk::ColumnViewColum
             dnd::attach_row_drop(&cell, list_item);
             context_menu::attach_row_menu(&cell, list_item, &selection);
             list_item.set_child(Some(&cell));
+            crate::ui::refresh_on_item_change(list_item, move |list_item| {
+                bind_list_item(id, list_item);
+            });
         }
     });
     factory.connect_bind(move |_, obj| {
-        let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() else {
-            return;
-        };
-        if let (Some(item), Some(child)) = (
-            list_item.item().and_downcast::<FileItem>(),
-            list_item.child(),
-        ) {
-            bind_cell(id, &item, &child);
+        if let Some(list_item) = obj.downcast_ref::<gtk::ListItem>() {
+            bind_list_item(id, list_item);
         }
     });
 
@@ -547,6 +551,15 @@ fn cell_widget(id: ColumnId) -> gtk::Widget {
             }
             label.upcast()
         }
+    }
+}
+
+fn bind_list_item(id: ColumnId, list_item: &gtk::ListItem) {
+    if let (Some(item), Some(child)) = (
+        list_item.item().and_downcast::<FileItem>(),
+        list_item.child(),
+    ) {
+        bind_cell(id, &item, &child);
     }
 }
 
