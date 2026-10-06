@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/RicardoMonroy/TlacuacheBrowser/actions/workflows/ci.yml"><img src="https://github.com/RicardoMonroy/TlacuacheBrowser/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/RicardoMonroy/Tlacuache/actions/workflows/ci.yml"><img src="https://github.com/RicardoMonroy/Tlacuache/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
 </p>
 
 ![Tlacuache con el tema Nord](docs/screenshots/nord.png)
@@ -49,7 +49,7 @@ rustup default stable
 cargo run -p tlacuache
 ```
 
-**Debian 13, Ubuntu 26.04 y Fedora 43/44:** descarga el `.deb` o el `.rpm` de la [última versión](https://github.com/RicardoMonroy/TlacuacheBrowser/releases/latest) e instálalo con tu gestor de paquetes, que resuelve las dependencias:
+**Debian 13, Ubuntu 26.04 y Fedora 43/44:** descarga el `.deb` o el `.rpm` de la [última versión](https://github.com/RicardoMonroy/Tlacuache/releases/latest) e instálalo con tu gestor de paquetes, que resuelve las dependencias:
 
 ```bash
 sudo apt install ./tlacuache-browser_*.deb     # Debian / Ubuntu

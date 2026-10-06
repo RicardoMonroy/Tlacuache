@@ -5,7 +5,7 @@ pkgver=0.2.0
 pkgrel=1
 pkgdesc="Gestor de archivos con columnas Miller, doble panel y una terminal integrada en cada panel (GTK4)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/RicardoMonroy/TlacuacheBrowser"
+url="https://github.com/RicardoMonroy/Tlacuache"
 license=('GPL-3.0-or-later')
 depends=('gtk4' 'libadwaita' 'vte4' 'gtksourceview5' 'poppler-glib'
          'gdk-pixbuf2' 'glib2' 'cairo' 'pango' 'gcc-libs' 'glibc')
@@ -20,27 +20,27 @@ source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
 prepare() {
-  cd "TlacuacheBrowser-$pkgver"
+  cd "Tlacuache-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
   cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
 }
 
 build() {
-  cd "TlacuacheBrowser-$pkgver"
+  cd "Tlacuache-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR=target
   cargo build --frozen --release -p tlacuache
 }
 
 check() {
-  cd "TlacuacheBrowser-$pkgver"
+  cd "Tlacuache-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR=target
   cargo test --frozen --workspace
 }
 
 package() {
-  cd "TlacuacheBrowser-$pkgver"
+  cd "Tlacuache-$pkgver"
   install -Dm755 target/release/tlacuache "$pkgdir/usr/bin/tlacuache"
   install -Dm644 "data/$_appid.desktop" "$pkgdir/usr/share/applications/$_appid.desktop"
   install -Dm644 "data/$_appid.metainfo.xml" "$pkgdir/usr/share/metainfo/$_appid.metainfo.xml"

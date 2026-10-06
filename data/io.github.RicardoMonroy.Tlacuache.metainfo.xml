@@ -48,34 +48,34 @@
     <binary>tlacuache</binary>
   </provides>
 
-  <url type="homepage">https://github.com/RicardoMonroy/TlacuacheBrowser</url>
-  <url type="bugtracker">https://github.com/RicardoMonroy/TlacuacheBrowser/issues</url>
-  <url type="vcs-browser">https://github.com/RicardoMonroy/TlacuacheBrowser</url>
-  <url type="contribute">https://github.com/RicardoMonroy/TlacuacheBrowser/blob/main/CONTRIBUTING.md</url>
+  <url type="homepage">https://github.com/RicardoMonroy/Tlacuache</url>
+  <url type="bugtracker">https://github.com/RicardoMonroy/Tlacuache/issues</url>
+  <url type="vcs-browser">https://github.com/RicardoMonroy/Tlacuache</url>
+  <url type="contribute">https://github.com/RicardoMonroy/Tlacuache/blob/main/CONTRIBUTING.md</url>
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/nord.png</image>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/Tlacuache/main/docs/screenshots/nord.png</image>
       <caption>Details view with a terminal, Nord theme</caption>
       <caption xml:lang="es">Vista de detalles con terminal, tema Nord</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/consola.png</image>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/Tlacuache/main/docs/screenshots/consola.png</image>
       <caption>Console theme, styled like a terminal UI</caption>
       <caption xml:lang="es">Tema Consola, al estilo de una interfaz de terminal</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/claro.png</image>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/Tlacuache/main/docs/screenshots/claro.png</image>
       <caption>Light theme</caption>
       <caption xml:lang="es">Tema Claro</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/cyberpunk.png</image>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/Tlacuache/main/docs/screenshots/cyberpunk.png</image>
       <caption>Cyberpunk theme</caption>
       <caption xml:lang="es">Tema Cyberpunk</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/talavera.png</image>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/Tlacuache/main/docs/screenshots/talavera.png</image>
       <caption>Talavera theme, with Mexican tile decor</caption>
       <caption xml:lang="es">Tema Talavera, con decoración de azulejo mexicano</caption>
     </screenshot>
