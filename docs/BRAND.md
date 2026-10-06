@@ -20,8 +20,8 @@ Personalidad: técnica, ágil, con humor mexicano discreto. Nunca infantil.
 
 Instalación de íconos de la app:
 
-- `data/icons/hicolor/scalable/apps/io.github.rmonroy.Tlacuache.svg` → `/usr/share/icons/hicolor/scalable/apps/`
-- `data/icons/hicolor/symbolic/apps/io.github.rmonroy.Tlacuache-symbolic.svg` → `/usr/share/icons/hicolor/symbolic/apps/`
+- `data/icons/hicolor/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg` → `/usr/share/icons/hicolor/scalable/apps/`
+- `data/icons/hicolor/symbolic/apps/io.github.RicardoMonroy.Tlacuache-symbolic.svg` → `/usr/share/icons/hicolor/symbolic/apps/`
 
 Reglas de uso:
 

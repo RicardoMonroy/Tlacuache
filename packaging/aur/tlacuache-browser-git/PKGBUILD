@@ -1,7 +1,7 @@
 # Maintainer: Ricardo Monroy <rmonroy.rodriguez@gmail.com>
 pkgname=tlacuache-browser-git
 _pkgname=tlacuache-browser
-_appid=io.github.rmonroy.Tlacuache
+_appid=io.github.RicardoMonroy.Tlacuache
 pkgver=0.2.0
 pkgrel=1
 pkgdesc="Gestor de archivos con columnas Miller, doble panel y una terminal integrada en cada panel (GTK4)"

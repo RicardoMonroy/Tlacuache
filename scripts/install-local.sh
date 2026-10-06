@@ -7,7 +7,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-APP_ID="io.github.rmonroy.Tlacuache"
+APP_ID="io.github.RicardoMonroy.Tlacuache"
 PREFIX="${XDG_DATA_HOME:-$HOME/.local/share}"
 BIN_DIR="$HOME/.local/bin"
 BIN="$BIN_DIR/tlacuache"

@@ -23,7 +23,7 @@ const BUILTIN: [(&str, &str); 5] = [
 pub const DEFAULT_THEME: &str = "nord";
 
 /// Ruta en el gresource de las decoraciones (`[decor] pattern`).
-const DECOR_RESOURCE: &str = "resource:///io/github/rmonroy/Tlacuache/decor";
+const DECOR_RESOURCE: &str = "resource:///io/github/RicardoMonroy/Tlacuache/decor";
 
 /// Color `#RRGGBB`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -812,7 +812,7 @@ mod tests {
     fn css_variables_cover_decor_and_fonts() {
         let talavera = Theme::builtin("talavera").unwrap().css_variables();
         assert!(talavera.contains(
-            "--tl-decor-image: url(\"resource:///io/github/rmonroy/Tlacuache/decor/talavera-strip.svg\");"
+            "--tl-decor-image: url(\"resource:///io/github/RicardoMonroy/Tlacuache/decor/talavera-strip.svg\");"
         ));
         let nord = Theme::default_theme().css_variables();
         assert!(nord.contains("--tl-decor-image: none;"));

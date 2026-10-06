@@ -33,7 +33,7 @@ pub mod thumbnail;
 pub mod usage;
 
 /// Identificador de la aplicación (D-Bus / desktop file).
-pub const APP_ID: &str = "io.github.rmonroy.Tlacuache";
+pub const APP_ID: &str = "io.github.RicardoMonroy.Tlacuache";
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/io/github/rmonroy/Tlacuache">
+  <gresource prefix="/io/github/RicardoMonroy/Tlacuache">
     <!-- Lo carga ThemeManager (no se usa el style.css automático de adw). -->
     <file>style/base.css</file>
     <!-- Franjas decorativas de los temas (--tl-decor-image). -->
@@ -14,7 +14,7 @@
     <file preprocess="xml-stripblanks">icons/scalable/actions/tl-terminal-sync-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/tl-terminal-toggle-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/actions/tl-view-miller-symbolic.svg</file>
-    <file preprocess="xml-stripblanks">icons/scalable/apps/io.github.rmonroy.Tlacuache.svg</file>
+    <file preprocess="xml-stripblanks">icons/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-archive-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-audio-symbolic.svg</file>
     <file preprocess="xml-stripblanks">icons/scalable/mimetypes/tl-file-code-symbolic.svg</file>

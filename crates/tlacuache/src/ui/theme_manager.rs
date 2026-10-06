@@ -28,7 +28,7 @@ use tlacuache_core::theme::{AgeStyle, IconStyle, SelectionStyle, Theme, Variant}
 
 /// Respaldo si el tema elegido no existe.
 const DEFAULT_ID: &str = "nord";
-const BASE_CSS: &str = "/io/github/rmonroy/Tlacuache/style/base.css";
+const BASE_CSS: &str = "/io/github/RicardoMonroy/Tlacuache/style/base.css";
 
 /// Clases de la ventana que corresponden a flags de `[style]`.
 const FLAG_CLASSES: [&str; 7] = [

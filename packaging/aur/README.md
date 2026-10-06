@@ -5,7 +5,7 @@
 | `tlacuache-browser-git` | La última versión de `main`. |
 | `tlacuache-browser` | La versión etiquetada (`v$pkgver`) desde el tarball de GitHub. |
 
-Instalan `/usr/bin/tlacuache`, el `.desktop` (`io.github.rmonroy.Tlacuache`), los íconos (hicolor scalable y symbolic), la licencia y la documentación. `check()` corre las pruebas del workspace.
+Instalan `/usr/bin/tlacuache`, el `.desktop` (`io.github.RicardoMonroy.Tlacuache`), los íconos (hicolor scalable y symbolic), la licencia y la documentación. `check()` corre las pruebas del workspace.
 
 ## Probar localmente
 

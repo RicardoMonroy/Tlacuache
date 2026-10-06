@@ -4,7 +4,7 @@ Trabajar en orden. Cada tarea = un commit. Marcar `[x]` al cumplir el criterio d
 
 ## Hito 0 — Esqueleto
 - [x] **0.1 Workspace**: crear workspace con `tlacuache-core` y `tlacuache`. CA: `cargo build` y `cargo test` pasan.
-- [x] **0.2 Ventana vacía**: `adw::Application` con app-id `io.github.rmonroy.Tlacuache`, `adw::ApplicationWindow` con HeaderBar. CA: `cargo run` abre ventana.
+- [x] **0.2 Ventana vacía**: `adw::Application` con app-id `io.github.RicardoMonroy.Tlacuache`, `adw::ApplicationWindow` con HeaderBar. CA: `cargo run` abre ventana.
 - [x] **0.3 CSS y tema Nord**: cargar `style.css` desde recursos. CA: fondo y acentos Nord visibles.
 - [x] **0.4 Config**: `core::config` con defaults y lectura de `config.toml`; crear archivo si no existe. CA: pruebas de parseo y defaults.
 - [x] **0.5 CI local**: script `scripts/check.sh` que corre fmt, clippy y tests. CA: script en verde.
@@ -102,9 +102,9 @@ Acordado: primero paquetes nativos para las distribuciones recientes (casi sin c
 - [ ] **9.1 Mínimos de Debian 13**: bajar las features a `gtk4/v4_18`, `libadwaita/v1_7`, `vte4/v0_80`, `sourceview5/v5_16` (ya se comprobó que compila) y documentar los requisitos en `SETUP_ARCH.md` y el README. CA: `scripts/check.sh` en verde y la app funciona igual en Arch.
 - [ ] **9.2 Integración continua**: GitHub Actions que corre `scripts/check.sh` en Arch y compila y prueba en contenedores `debian:trixie`, `ubuntu:26.04` y `fedora:43`. CA: workflow en verde en cada push y PR.
 - [ ] **9.3 `.deb` y `.rpm` en cada release**: metadatos de `cargo-deb` y `cargo-generate-rpm` (binario, `.desktop`, íconos, licencia, dependencias de cada distribución) y un workflow que, al etiquetar `v*`, adjunta los paquetes al release de GitHub. CA: el `.deb` se instala y abre en Debian 13 y Ubuntu 26.04, y el `.rpm` en Fedora 43/44.
-- [ ] **9.4 Metadatos AppStream**: `data/io.github.rmonroy.Tlacuache.metainfo.xml` (descripción, capturas, versiones, licencia, contenido OARS) instalado por todos los paquetes; lo exige Flathub y lo usan GNOME Software y KDE Discover. CA: `appstreamcli validate` sin errores.
+- [ ] **9.4 Metadatos AppStream**: `data/io.github.RicardoMonroy.Tlacuache.metainfo.xml` (descripción, capturas, versiones, licencia, contenido OARS) instalado por todos los paquetes; lo exige Flathub y lo usan GNOME Software y KDE Discover. CA: `appstreamcli validate` sin errores.
 - [ ] **9.5 Terminal dentro de Flatpak**: ADR + detección del sandbox (`/.flatpak-info`); el shell del usuario se lanza en el sistema con `flatpak-spawn --host` (PTY de VTE, carpeta inicial, variables y la integración OSC 7 de bash/zsh en una ruta visible para el sistema); la detección de «programa en primer plano» se adapta, o se degrada con aviso, sin `tcgetpgrp` del PID del sandbox. CA: fuera de Flatpak nada cambia; dentro, la terminal abre tu shell real y el panel sigue sus `cd`.
-- [ ] **9.6 Manifiesto Flatpak**: `io.github.rmonroy.Tlacuache.yml` sobre el runtime de GNOME, compilando lo que el runtime no traiga (poppler, VTE si hiciera falta) y las crates vendorizadas sin red; permisos mínimos razonados (sistema de archivos, `org.freedesktop.Flatpak` para la terminal, GVfs para unidades remotas, caché de miniaturas compartida). CA: `flatpak-builder --user --install` instala y la app funciona: navegar, copiar, papelera, vista previa, terminal, miniaturas.
+- [ ] **9.6 Manifiesto Flatpak**: `io.github.RicardoMonroy.Tlacuache.yml` sobre el runtime de GNOME, compilando lo que el runtime no traiga (poppler, VTE si hiciera falta) y las crates vendorizadas sin red; permisos mínimos razonados (sistema de archivos, `org.freedesktop.Flatpak` para la terminal, GVfs para unidades remotas, caché de miniaturas compartida). CA: `flatpak-builder --user --install` instala y la app funciona: navegar, copiar, papelera, vista previa, terminal, miniaturas.
 - [ ] **9.7 Envío a Flathub**: PR al repositorio de Flathub con el manifiesto, la revisión de permisos y las capturas. Lo hace el autor con su cuenta. CA: publicado en Flathub.
 
 Más adelante, si hay usuarios que lo pidan: COPR (Fedora), PPA (Ubuntu) u OBS (varias distribuciones) para tener actualizaciones automáticas.

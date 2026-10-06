@@ -71,3 +71,8 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
 - **Contexto**: la 8.8 pide notas por carpeta. Guardarlas como archivo oculto dentro de cada carpeta las haría viajar con ella, pero ensucia repositorios y no funciona en carpetas de solo lectura o remotas.
 - **Decisión**: un archivo por carpeta en `~/.local/share/tlacuache/notes/<md5(uri)>.md`, con una cabecera con la URI (`core::notes`). Se editan en la vista previa de la carpeta (guardado automático; vaciar = borrar) y la barra de estado indica si la carpeta actual tiene nota. Al mover, renombrar (también en lote) o restaurar carpetas desde Tlacuache, las notas de la carpeta y sus subcarpetas se reubican; el deshacer las devuelve.
 - **Consecuencias**: no se toca el contenido de las carpetas del usuario. Si una carpeta se mueve fuera de Tlacuache, su nota queda huérfana (sigue en el almacén y reaparece si la carpeta vuelve a su ruta).
+
+## ADR-015 — App-id `io.github.RicardoMonroy.Tlacuache`
+- **Contexto**: el app-id era `io.github.rmonroy.Tlacuache`, pero el repositorio se publicó en `github.com/RicardoMonroy/TlacuacheBrowser`. Flathub exige que un id `io.github.<usuario>.…` corresponda a la cuenta de GitHub que lo publica.
+- **Decisión**: el app-id pasa a `io.github.RicardoMonroy.Tlacuache` antes del primer push: `.desktop`, íconos de la app, nombre en D-Bus y ruta de recursos (`/io/github/RicardoMonroy/Tlacuache`, la que GTK deriva del id).
+- **Consecuencias**: la configuración, la sesión, los temas y las notas no cambian (viven en `~/.config/tlacuache`, `~/.local/state/tlacuache` y `~/.local/share/tlacuache`). Un paquete instalado con el id viejo debe desinstalarse antes de instalar el nuevo para no duplicar el lanzador.

@@ -84,7 +84,7 @@ Convención de nombres: `--tl-<clave con guiones>`.
 - `[age]`: `hour` → `--tl-age-hour`, `chip_fg` → `--tl-age-chip-fg`
 - `[filetypes]`: `code` → `--tl-ft-code`
 - `[style]`: `--tl-radius: 8px`, `--tl-border-width: 1px`, `--tl-row-height: 26px`, `--tl-font-mono: "JetBrains Mono"`
-- `[decor]`: `--tl-decor-image: url("resource:///io/github/rmonroy/Tlacuache/decor/talavera-strip.svg")`. Si el tema no tiene `[decor]`, el valor es `none`.
+- `[decor]`: `--tl-decor-image: url("resource:///io/github/RicardoMonroy/Tlacuache/decor/talavera-strip.svg")`. Si el tema no tiene `[decor]`, el valor es `none`.
 
 Además, para que los widgets nativos de libadwaita sigan el tema, se sobrescriben sus variables CSS: ventana, vista, headerbar, sidebar, card, popover, diálogo, acento y colores de estado. **Antes de escribir los nombres, verifica la lista exacta en la página "CSS Variables" de la documentación de libadwaita de la versión instalada** (libadwaita 1.6 o posterior); no los inventes.
 
@@ -121,7 +121,7 @@ dark = "nord"
 
 ### 5.5 Íconos
 
-- Los íconos van en el gresource bajo `/io/github/rmonroy/Tlacuache/icons/scalable/{actions,mimetypes}/`. `gtk::Application` añade automáticamente `<resource_base_path>/icons` al tema de íconos; verifica que el `resource_base_path` coincida con el app-id.
+- Los íconos van en el gresource bajo `/io/github/RicardoMonroy/Tlacuache/icons/scalable/{actions,mimetypes}/`. `gtk::Application` añade automáticamente `<resource_base_path>/icons` al tema de íconos; verifica que el `resource_base_path` coincida con el app-id.
 - En la factory de filas, al ícono se le añade la clase `tl-ft-<categoría>`. El color sale del tema.
 
 ## 6. Añadir un tema nuevo (guía para usuarios y comunidad)
