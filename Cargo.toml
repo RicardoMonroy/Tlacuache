@@ -7,6 +7,8 @@ version = "0.2.0"
 edition = "2024"
 authors = ["Ricardo Monroy <rmonroy.rodriguez@gmail.com>"]
 license = "GPL-3.0-or-later"
+repository = "https://github.com/RicardoMonroy/TlacuacheBrowser"
+homepage = "https://github.com/RicardoMonroy/TlacuacheBrowser"
 # Lo exige gtk-rs 0.22 (comprobado compilando con 1.92).
 rust-version = "1.92"
 

@@ -49,7 +49,14 @@ rustup default stable
 cargo run -p tlacuache
 ```
 
-Desde AUR (con tu ayudante habitual, como `paru` o `yay`):
+**Debian 13, Ubuntu 26.04 y Fedora 43/44:** descarga el `.deb` o el `.rpm` de la [última versión](https://github.com/RicardoMonroy/TlacuacheBrowser/releases/latest) e instálalo con tu gestor de paquetes, que resuelve las dependencias:
+
+```bash
+sudo apt install ./tlacuache-browser_*.deb     # Debian / Ubuntu
+sudo dnf install ./tlacuache-browser-*.rpm     # Fedora
+```
+
+**Arch Linux**, desde AUR (con tu ayudante habitual, como `paru` o `yay`):
 
 ```bash
 paru -S tlacuache-browser        # versión publicada

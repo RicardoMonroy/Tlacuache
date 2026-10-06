@@ -17,7 +17,7 @@ makepkg -si          # compila, prueba e instala
 ## Publicar una versión
 
 1. Subir el repositorio a `https://github.com/RicardoMonroy/TlacuacheBrowser`.
-2. Etiquetar y publicar: `git tag v0.2.0 && git push origin v0.2.0` (y crear el release en GitHub).
+2. Etiquetar y publicar: `git tag v0.2.0 && git push origin v0.2.0`. El workflow `Release` construye el `.deb` y el `.rpm`, los prueba instalándolos y crea el release de GitHub con ambos adjuntos.
 3. En `tlacuache-browser/`: `updpkgsums` (pone el SHA-256 real del tarball) y `makepkg --printsrcinfo > .SRCINFO`.
 4. Para cada paquete, clonar su repositorio de AUR y copiar `PKGBUILD` y `.SRCINFO`:
 

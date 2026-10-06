@@ -6,6 +6,8 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
 tlacuache-core.workspace = true
@@ -26,3 +28,47 @@ glib-build-tools.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# Paquetes .deb y .rpm (9.3), generados en la CI al publicar una versión
+# (`.github/workflows/release.yml`). Las rutas `../../` salen del crate a la
+# raíz del repositorio; `target/release/` la resuelve cada herramienta.
+
+[package.metadata.deb]
+name = "tlacuache-browser"
+maintainer = "Ricardo Monroy <rmonroy.rodriguez@gmail.com>"
+copyright = "2026, Ricardo Monroy"
+license-file = ["../../LICENSE", "0"]
+extended-description = """\
+Gestor de archivos para Linux con columnas Miller, doble panel, vista previa \
+(imágenes, texto y código, PDF, video, Markdown) y una terminal real integrada \
+en cada panel, sincronizada con la carpeta actual. Temas que cambian en vivo."""
+section = "utils"
+priority = "optional"
+depends = "$auto"
+recommends = "gstreamer1.0-plugins-good, gstreamer1.0-libav, fonts-jetbrains-mono"
+assets = [
+    ["target/release/tlacuache", "usr/bin/", "755"],
+    ["../../data/io.github.RicardoMonroy.Tlacuache.desktop", "usr/share/applications/", "644"],
+    ["../../data/icons/hicolor/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg", "usr/share/icons/hicolor/scalable/apps/", "644"],
+    ["../../data/icons/hicolor/symbolic/apps/io.github.RicardoMonroy.Tlacuache-symbolic.svg", "usr/share/icons/hicolor/symbolic/apps/", "644"],
+    ["../../README.md", "usr/share/doc/tlacuache-browser/README.md", "644"],
+    ["../../docs/THEMES.md", "usr/share/doc/tlacuache-browser/THEMES.md", "644"],
+]
+
+[package.metadata.generate-rpm]
+name = "tlacuache-browser"
+summary = "Gestor de archivos con columnas Miller, doble panel y terminal integrada"
+assets = [
+    { source = "target/release/tlacuache", dest = "/usr/bin/tlacuache", mode = "755" },
+    { source = "../../data/io.github.RicardoMonroy.Tlacuache.desktop", dest = "/usr/share/applications/io.github.RicardoMonroy.Tlacuache.desktop", mode = "644" },
+    { source = "../../data/icons/hicolor/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg", dest = "/usr/share/icons/hicolor/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg", mode = "644" },
+    { source = "../../data/icons/hicolor/symbolic/apps/io.github.RicardoMonroy.Tlacuache-symbolic.svg", dest = "/usr/share/icons/hicolor/symbolic/apps/io.github.RicardoMonroy.Tlacuache-symbolic.svg", mode = "644" },
+    { source = "../../LICENSE", dest = "/usr/share/licenses/tlacuache-browser/LICENSE", mode = "644", doc = true },
+    { source = "../../README.md", dest = "/usr/share/doc/tlacuache-browser/README.md", mode = "644", doc = true },
+    { source = "../../docs/THEMES.md", dest = "/usr/share/doc/tlacuache-browser/THEMES.md", mode = "644", doc = true },
+]
+
+[package.metadata.generate-rpm.recommends]
+gstreamer1-plugins-good = "*"
+jetbrains-mono-fonts = "*"
+

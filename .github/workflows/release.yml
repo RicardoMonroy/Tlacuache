@@ -1,0 +1,114 @@
+# Paquetes .deb y .rpm (9.3). Con una etiqueta `v*` se construyen, se
+# prueban instalándolos en contenedores limpios y se adjuntan al release de
+# GitHub. A mano (workflow_dispatch) hace lo mismo sin publicar: los
+# paquetes quedan como artefactos de la ejecución.
+#
+# - .deb: se construye en Debian 13 (bibliotecas mínimas) y sirve también
+#   para Ubuntu 26.04 (mismos sonames, glibc más nueva).
+# - .rpm: se construye en Fedora 43 y sirve para Fedora 43 y 44.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deb:
+    name: Paquete .deb (Debian 13)
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - uses: actions/checkout@v7
+      - name: Dependencias
+        run: bash scripts/ci-setup.sh debian
+      - name: cargo-deb
+        run: cargo install cargo-deb --locked --version 3.8.0
+      - name: Construir el .deb
+        run: cargo deb -p tlacuache -- --locked
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb
+          path: target/debian/*.deb
+          if-no-files-found: error
+
+  rpm:
+    name: Paquete .rpm (Fedora 43)
+    runs-on: ubuntu-latest
+    container: fedora:43
+    steps:
+      - uses: actions/checkout@v7
+      - name: Dependencias
+        run: |
+          bash scripts/ci-setup.sh fedora
+          dnf install -y rpm-build binutils
+      - name: cargo-generate-rpm
+        run: cargo install cargo-generate-rpm --locked --version 0.21.0
+      - name: Construir el .rpm
+        run: |
+          cargo build --release --locked -p tlacuache
+          strip -s target/release/tlacuache
+          cargo generate-rpm -p crates/tlacuache
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rpm
+          path: target/generate-rpm/*.rpm
+          if-no-files-found: error
+
+  install:
+    name: Instalar en ${{ matrix.image }}
+    needs: [deb, rpm]
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { image: "debian:trixie", kind: deb }
+          - { image: "ubuntu:26.04", kind: deb }
+          - { image: "fedora:43", kind: rpm }
+          - { image: "fedora:44", kind: rpm }
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.kind }}
+          path: pkg
+      - name: Instalar el paquete
+        run: |
+          if [ "${{ matrix.kind }}" = deb ]; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y ./pkg/*.deb
+          else
+            dnf install -y ./pkg/*.rpm /usr/bin/ldd
+          fi
+      - name: Comprobar lo instalado
+        run: |
+          test -x /usr/bin/tlacuache
+          test -f /usr/share/applications/io.github.RicardoMonroy.Tlacuache.desktop
+          test -f /usr/share/icons/hicolor/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg
+          # Todas las bibliotecas del binario se resuelven.
+          if ldd /usr/bin/tlacuache | grep "not found"; then exit 1; fi
+
+  publish:
+    name: Publicar el release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: pkg
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: pkg/*
+          generate_release_notes: true
