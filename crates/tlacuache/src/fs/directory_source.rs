@@ -9,18 +9,22 @@
 //! - **Monitor propio**: cualquier evento de la carpeta (también `CHANGED`,
 //!   que `DirectoryList` ignoraba) programa una resincronización tras una
 //!   pausa corta; así una descarga aparece sola y su tamaño crece en la vista.
+//! - **Revisión periódica** (R.4): las carpetas que no avisan (sin monitor,
+//!   remotas o FUSE, como OneDrive) se resincronizan cada pocos segundos,
+//!   solo mientras su vista está en pantalla (`set_visible`).
 //!
 //! Con `RUST_LOG=tlacuache=debug` se registran los eventos del monitor y lo
 //! que cambia en cada resincronización (diagnóstico de R.1).
 
 use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gtk::prelude::*;
 use gtk::subclass::prelude::*;
 use gtk::{gio, glib};
 use tlacuache_core::entry::FileEntry;
+use tlacuache_core::folder_watch::{needs_polling, poll_interval};
 use tlacuache_core::listing_diff::diff_listing;
 
 use super::file_item::{FileItem, entry_from_info};
@@ -54,6 +58,13 @@ mod imp {
         pub dirty: Cell<bool>,
         pub monitor: RefCell<Option<gio::FileMonitor>>,
         pub resync_timer: RefCell<Option<glib::SourceId>>,
+        /// La carpeta no avisa de sus cambios: se revisa periódicamente.
+        pub polled: Cell<bool>,
+        /// Alguna vista la muestra en pantalla.
+        pub visible: Cell<bool>,
+        pub poll_timer: RefCell<Option<glib::SourceId>>,
+        /// Lo que tardó la última lectura (fija el ritmo de revisión).
+        pub last_read: Cell<Duration>,
     }
 
     impl Default for DirectorySource {
@@ -68,6 +79,10 @@ mod imp {
                 dirty: Cell::default(),
                 monitor: RefCell::default(),
                 resync_timer: RefCell::default(),
+                polled: Cell::default(),
+                visible: Cell::default(),
+                poll_timer: RefCell::default(),
+                last_read: Cell::default(),
             }
         }
     }
@@ -135,13 +150,19 @@ impl DirectorySource {
             #[weak(rename_to = source)]
             self,
             async move {
+                let started = Instant::now();
                 let mut fresh = Vec::new();
                 match read_dir(&dir, |batch| fresh.extend(batch)).await {
                     Ok(()) => source.apply(fresh),
-                    // Se repite con el siguiente aviso o recarga; la vista
-                    // conserva lo que tenía.
+                    // Se repite con el siguiente aviso, revisión o recarga;
+                    // la vista conserva lo que tenía. En carpetas remotas
+                    // (sin red, p. ej.) no se llena el registro de avisos.
+                    Err(err) if source.imp().polled.get() => {
+                        tracing::debug!("no se pudo releer {}: {err}", dir.uri());
+                    }
                     Err(err) => tracing::warn!("no se pudo releer {}: {err}", dir.uri()),
                 }
+                source.imp().last_read.set(started.elapsed());
                 source.finish_task();
             }
         ));
@@ -158,6 +179,7 @@ impl DirectorySource {
             #[weak(rename_to = source)]
             self,
             async move {
+                let started = Instant::now();
                 let store = source.store().clone();
                 let result = read_dir(&dir, |batch| {
                     let items: Vec<FileItem> = batch.into_iter().map(FileItem::from_info).collect();
@@ -168,6 +190,7 @@ impl DirectorySource {
                     source.imp().error.replace(Some(err));
                     source.notify_error();
                 }
+                source.imp().last_read.set(started.elapsed());
                 source.imp().loading.set(false);
                 source.notify_loading();
                 source.finish_task();
@@ -184,6 +207,89 @@ impl DirectorySource {
         if imp.dirty.replace(false) {
             self.resync();
         }
+        self.update_polling();
+    }
+
+    /// Alguna vista muestra (o dejó de mostrar) la carpeta en pantalla. Al
+    /// volver a verse, una carpeta revisada periódicamente se lee enseguida.
+    pub fn set_visible(&self, visible: bool) {
+        let imp = self.imp();
+        if imp.visible.replace(visible) == visible {
+            return;
+        }
+        if visible && imp.polled.get() {
+            self.resync();
+        }
+        self.update_polling();
+    }
+
+    /// Programa la siguiente revisión si la carpeta lo necesita y se ve; si
+    /// no, quita la programada. Con una lectura en curso, se programa al
+    /// terminar (`finish_task`).
+    fn update_polling(&self) {
+        let imp = self.imp();
+        if !(imp.polled.get() && imp.visible.get()) {
+            if let Some(timer) = imp.poll_timer.take() {
+                timer.remove();
+            }
+            return;
+        }
+        if imp.poll_timer.borrow().is_some() || imp.busy.get() {
+            return;
+        }
+        let timer = glib::timeout_add_local_once(
+            poll_interval(imp.last_read.get()),
+            glib::clone!(
+                #[weak(rename_to = source)]
+                self,
+                move || {
+                    source.imp().poll_timer.replace(None);
+                    source.resync();
+                }
+            ),
+        );
+        imp.poll_timer.replace(Some(timer));
+    }
+
+    /// Decide si `dir` se revisa periódicamente según su sistema de archivos
+    /// (consulta asíncrona; `monitored`: se pudo crear su monitor).
+    fn check_polling(&self, dir: &gio::File, monitored: bool) {
+        let dir = dir.clone();
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = source)]
+            self,
+            async move {
+                let attributes = format!(
+                    "{},{}",
+                    gio::FILE_ATTRIBUTE_FILESYSTEM_TYPE,
+                    gio::FILE_ATTRIBUTE_FILESYSTEM_REMOTE
+                );
+                let info = dir
+                    .query_filesystem_info_future(&attributes, glib::Priority::DEFAULT)
+                    .await;
+                // Se cambió de carpeta mientras tanto.
+                if !source.file().is_some_and(|f| f.equal(&dir)) {
+                    return;
+                }
+                let (remote, fs_type) = match &info {
+                    Ok(info) => (
+                        info.boolean(gio::FILE_ATTRIBUTE_FILESYSTEM_REMOTE),
+                        info.attribute_string(gio::FILE_ATTRIBUTE_FILESYSTEM_TYPE)
+                            .map(|t| t.to_string()),
+                    ),
+                    Err(_) => (false, None),
+                };
+                let polled = needs_polling(monitored, remote, fs_type.as_deref());
+                if polled {
+                    tracing::debug!(
+                        "revisión periódica de {} (tipo {fs_type:?}, remoto {remote}, monitor {monitored})",
+                        source.label()
+                    );
+                }
+                source.imp().polled.set(polled);
+                source.update_polling();
+            }
+        ));
     }
 
     /// Aplica la lectura nueva `fresh` al store: cambios en el sitio, bajas
@@ -245,9 +351,11 @@ impl DirectorySource {
             Ok(monitor) => monitor,
             Err(err) => {
                 tracing::debug!("sin monitor para {}: {err}", dir.uri());
+                self.check_polling(dir, false);
                 return;
             }
         };
+        self.check_polling(dir, true);
         monitor.connect_changed(glib::clone!(
             #[weak(rename_to = source)]
             self,
@@ -312,6 +420,10 @@ impl DirectorySource {
             monitor.cancel();
         }
         if let Some(timer) = imp.resync_timer.take() {
+            timer.remove();
+        }
+        imp.polled.set(false);
+        if let Some(timer) = imp.poll_timer.take() {
             timer.remove();
         }
     }

@@ -11,6 +11,7 @@ pub mod entry;
 pub mod favorites;
 pub mod filetype;
 pub mod filter;
+pub mod folder_watch;
 pub mod history;
 pub mod keymap;
 pub mod listing_diff;

@@ -126,6 +126,7 @@ impl IconView {
         ));
 
         let source = model.source();
+        crate::ui::track_visibility(&grid, source);
         source.connect_error_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,

@@ -35,6 +35,26 @@ pub mod theme_thumbnail;
 
 use gtk::prelude::*;
 
+/// Avisa al listado de `source` si `widget` (la lista que lo muestra) está
+/// en pantalla: las carpetas que no avisan de sus cambios solo se revisan
+/// mientras se ven (R.4). Una pestaña de fondo o un panel oculto no están
+/// mapeados.
+pub fn track_visibility(
+    widget: &impl IsA<gtk::Widget>,
+    source: &crate::fs::directory_source::DirectorySource,
+) {
+    widget.connect_map(gtk::glib::clone!(
+        #[weak]
+        source,
+        move |_| source.set_visible(true)
+    ));
+    widget.connect_unmap(gtk::glib::clone!(
+        #[weak]
+        source,
+        move |_| source.set_visible(false)
+    ));
+}
+
 /// Repinta la celda de `list_item` cuando su `FileItem` se actualiza en el
 /// sitio (la carpeta se resincronizó; ADR-017). Se llama en `setup` de la
 /// fábrica con el mismo código que `bind`: cada vez que GTK le asigna otro

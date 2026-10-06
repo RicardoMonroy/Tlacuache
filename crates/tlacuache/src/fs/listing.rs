@@ -89,6 +89,12 @@ impl DirectoryModel {
         self.source.set_file(dir);
     }
 
+    /// La vista muestra (o dejó de mostrar) la carpeta: las que no avisan
+    /// de sus cambios solo se revisan mientras se ven (R.4).
+    pub fn set_visible(&self, visible: bool) {
+        self.source.set_visible(visible);
+    }
+
     /// Vuelve a leer la carpeta y aplica solo las diferencias (Ctrl+R).
     pub fn reload(&self) {
         self.source.resync();

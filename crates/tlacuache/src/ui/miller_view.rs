@@ -436,6 +436,7 @@ impl MillerView {
         list.add_controller(focus);
 
         let source = column.model.source();
+        crate::ui::track_visibility(list, source);
         source.connect_loading_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,

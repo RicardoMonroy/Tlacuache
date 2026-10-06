@@ -108,5 +108,5 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
   - Recargar no parpadea y conserva la selección y el desplazamiento.
   - Una descarga aparece sola y su tamaño crece en la vista.
   - Cada resincronización lee la carpeta entera: con carpetas enormes que cambian sin parar, el costo es una lectura cada 300 ms.
-  - Las carpetas sin monitor (algunos montajes de red o FUSE) solo se actualizan con Ctrl+R hasta la R.4.
+  - Revisión periódica (R.4): las carpetas sin monitor, remotas o FUSE se resincronizan cada 3 a 30 s, según lo que tardó la última lectura, y solo mientras su lista está en pantalla (mapeada). Se incluye FUSE porque gio lo informa como `fuse` sin marcarlo remoto (onedriver, rclone) y sus cambios suelen venir de otro equipo; `fuseblk` (discos NTFS) no se revisa.
 

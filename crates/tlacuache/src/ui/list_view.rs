@@ -149,6 +149,7 @@ impl FileListView {
         ));
 
         let source = model.source();
+        crate::ui::track_visibility(&column_view, source);
         source.connect_error_notify(glib::clone!(
             #[weak(rename_to = view)]
             self,
