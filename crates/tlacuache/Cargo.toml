@@ -44,7 +44,10 @@ Gestor de archivos para Linux con columnas Miller, doble panel, vista previa \
 en cada panel, sincronizada con la carpeta actual. Temas que cambian en vivo."""
 section = "utils"
 priority = "optional"
-depends = "$auto"
+# `$auto` (dpkg-shlibdeps) deduce los mínimos de las funciones que usa el
+# binario y no ve que los temas necesitan GTK 4.16 y libadwaita 1.6
+# (variables CSS): se fijan los mínimos declarados (9.1).
+depends = "$auto, libgtk-4-1 (>= 4.18), libadwaita-1-0 (>= 1.7)"
 recommends = "gstreamer1.0-plugins-good, gstreamer1.0-libav, fonts-jetbrains-mono"
 assets = [
     ["target/release/tlacuache", "usr/bin/", "755"],
@@ -67,6 +70,11 @@ assets = [
     { source = "../../README.md", dest = "/usr/share/doc/tlacuache-browser/README.md", mode = "644", doc = true },
     { source = "../../docs/THEMES.md", dest = "/usr/share/doc/tlacuache-browser/THEMES.md", mode = "644", doc = true },
 ]
+
+# Las dependencias automáticas (por soname) no llevan versión: mínimos de 9.1.
+[package.metadata.generate-rpm.requires]
+gtk4 = ">= 4.18"
+libadwaita = ">= 1.7"
 
 [package.metadata.generate-rpm.recommends]
 gstreamer1-plugins-good = "*"
