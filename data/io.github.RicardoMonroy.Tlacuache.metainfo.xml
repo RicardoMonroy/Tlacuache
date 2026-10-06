@@ -115,12 +115,20 @@
     <release version="0.2.0" date="2026-10-06" type="stable">
       <description>
         <p>First public release.</p>
+        <p xml:lang="es">Primera versión pública.</p>
         <ul>
           <li>Preview of PDF, video, audio and rendered Markdown</li>
+          <li xml:lang="es">Vista previa de PDF, video, audio y Markdown renderizado</li>
           <li>Icon grid view with freedesktop thumbnails</li>
+          <li xml:lang="es">Vista de íconos con miniaturas freedesktop</li>
           <li>Recursive search, bulk rename and per-folder notes</li>
+          <li xml:lang="es">Búsqueda recursiva, renombrado masivo y notas por carpeta</li>
+          <li>Folders stay up to date by themselves, including growing downloads and cloud or network mounts; Ctrl+R reloads without losing the selection</li>
+          <li xml:lang="es">Las carpetas se mantienen al día solas, incluidas las descargas en curso y los montajes en la nube o en red; Ctrl+R recarga sin perder la selección</li>
           <li>Five themes, user themes and a preferences dialog</li>
-          <li>Packages for Arch (AUR), Debian, Ubuntu and Fedora</li>
+          <li xml:lang="es">Cinco temas, temas propios y un diálogo de preferencias</li>
+          <li>Packages for Debian, Ubuntu and Fedora</li>
+          <li xml:lang="es">Paquetes para Debian, Ubuntu y Fedora</li>
         </ul>
       </description>
     </release>

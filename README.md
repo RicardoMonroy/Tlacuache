@@ -56,14 +56,13 @@ sudo apt install ./tlacuache-browser_*.deb     # Debian / Ubuntu
 sudo dnf install ./tlacuache-browser-*.rpm     # Fedora
 ```
 
-**Arch Linux**, desde AUR (con tu ayudante habitual, como `paru` o `yay`):
+**Arch Linux:** con el PKGBUILD del repositorio (la publicación en AUR está pendiente):
 
 ```bash
-paru -S tlacuache-browser        # versión publicada
-paru -S tlacuache-browser-git    # lo último de main
+cd packaging/aur/tlacuache-browser-git && makepkg -si
 ```
 
-O con el PKGBUILD del repositorio: `cd packaging/aur/tlacuache-browser-git && makepkg -si` (ver [`packaging/aur/README.md`](packaging/aur/README.md)).
+Ver [`packaging/aur/README.md`](packaging/aur/README.md).
 
 Para instalar solo para tu usuario, sin paquete, en `~/.local`:
 
