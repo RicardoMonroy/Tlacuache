@@ -35,9 +35,9 @@ Se eligen en Preferencias (Ctrl+,) o en el menú principal (F10), y se aplican a
 
 Para crear el tuyo, copia `crates/tlacuache-core/themes/nord.toml` a `~/.config/tlacuache/themes/mitema.toml`, cambia `id` y `name`, y ajusta los colores. Si el tema no alcanza el contraste mínimo, Tlacuache lo aplica igual y te dice qué pares fallan. Guía completa en [`docs/THEMES.md`](docs/THEMES.md).
 
-## Compilar e instalar (Arch Linux)
+## Compilar e instalar
 
-Dependencias y detalles en [`docs/SETUP_ARCH.md`](docs/SETUP_ARCH.md).
+Requiere GTK ≥ 4.18, libadwaita ≥ 1.7, VTE ≥ 0.80, GtkSourceView ≥ 5.16 y Rust ≥ 1.92: Arch, Debian 13, Ubuntu 26.04 LTS y Fedora 43 o posteriores. Dependencias por distribución en [`docs/SETUP_ARCH.md`](docs/SETUP_ARCH.md). En Arch:
 
 ```bash
 sudo pacman -S --needed rustup base-devel pkgconf gtk4 libadwaita vte4 gtksourceview5 ttf-jetbrains-mono

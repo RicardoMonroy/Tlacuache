@@ -7,17 +7,21 @@ version = "0.2.0"
 edition = "2024"
 authors = ["Ricardo Monroy <rmonroy.rodriguez@gmail.com>"]
 license = "GPL-3.0-or-later"
+# Lo exige gtk-rs 0.22 (comprobado compilando con 1.92).
+rust-version = "1.92"
 
 # gtk4 0.11, libadwaita 0.9, vte4 0.10 y sourceview5 0.11 comparten glib/gio 0.22.
-# Features alineadas con las bibliotecas del sistema en Arch:
-# gtk 4.22, libadwaita 1.9, vte 0.84, gtksourceview 5.20.
-# vte4 0.10 requiere gtk4 con feature >= v4_10 (gtk::Accessible); la aporta `v4_22`.
+# Features = versiones mínimas de las bibliotecas del sistema (9.1): las de
+# Debian 13 (gtk 4.18, libadwaita 1.7, vte 0.80, gtksourceview 5.16), para
+# empaquetar también en Ubuntu 26.04 y Fedora 43+. Piso real del código:
+# GTK 4.16 y libadwaita 1.6 (variables CSS de los temas).
+# vte4 0.10 requiere gtk4 con feature >= v4_10 (gtk::Accessible); la aporta `v4_18`.
 [workspace.dependencies]
 tlacuache-core = { path = "crates/tlacuache-core" }
-gtk = { package = "gtk4", version = "0.11.5", features = ["v4_22"] }
-adw = { package = "libadwaita", version = "0.9.2", features = ["v1_9"] }
-vte = { package = "vte4", version = "0.10.0", features = ["v0_84"] }
-sourceview5 = { version = "0.11.2", features = ["v5_18"] }
+gtk = { package = "gtk4", version = "0.11.5", features = ["v4_18"] }
+adw = { package = "libadwaita", version = "0.9.2", features = ["v1_7"] }
+vte = { package = "vte4", version = "0.10.0", features = ["v0_80"] }
+sourceview5 = { version = "0.11.2", features = ["v5_16"] }
 # Vista previa de PDF (8.1). Usa glib/gio/cairo 0.22 como gtk4 0.11.
 poppler = { package = "poppler-rs", version = "0.26.0" }
 # Directo solo para activar features de la glib del sistema (2.88):
