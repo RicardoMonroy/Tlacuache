@@ -22,6 +22,7 @@ Instalación de íconos de la app:
 
 - `data/icons/hicolor/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg` → `/usr/share/icons/hicolor/scalable/apps/`
 - `data/icons/hicolor/symbolic/apps/io.github.RicardoMonroy.Tlacuache-symbolic.svg` → `/usr/share/icons/hicolor/symbolic/apps/`
+- `data/io.github.RicardoMonroy.Tlacuache.metainfo.xml` → `/usr/share/metainfo/`: descripción, capturas y versiones para las tiendas de apps (AppStream, 9.4). Valida con `appstreamcli validate`.
 
 Reglas de uso:
 

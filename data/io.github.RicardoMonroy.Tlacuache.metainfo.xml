@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Metadatos AppStream (9.4): los usan GNOME Software, KDE Discover y Flathub.
+     Validar con: appstreamcli validate data/io.github.RicardoMonroy.Tlacuache.metainfo.xml -->
+<component type="desktop-application">
+  <id>io.github.RicardoMonroy.Tlacuache</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Tlacuache Browser</name>
+  <summary>File manager with a terminal in every pane</summary>
+  <summary xml:lang="es">Gestor de archivos con una terminal en cada panel</summary>
+
+  <developer id="io.github.ricardomonroy">
+    <name>Ricardo Monroy</name>
+  </developer>
+
+  <description>
+    <p>
+      Tlacuache Browser is a keyboard-friendly file manager that combines Miller columns,
+      one or two panes and a rich preview with something most graphical file managers lack:
+      a real terminal integrated in every pane, kept in sync with the current folder.
+    </p>
+    <p xml:lang="es">
+      Tlacuache Browser es un gestor de archivos pensado para el teclado que combina columnas
+      Miller, uno o dos paneles y una vista previa completa con algo que casi ningún gestor
+      gráfico ofrece: una terminal real integrada en cada panel, sincronizada con la carpeta actual.
+    </p>
+    <ul>
+      <li>Miller columns, a detailed list with color-coded file ages, and an icon grid with thumbnails</li>
+      <li xml:lang="es">Columnas Miller, lista detallada con la edad de los archivos por colores y cuadrícula de íconos con miniaturas</li>
+      <li>One or two panes with tabs, history, an editable path bar and a type-to-filter search</li>
+      <li xml:lang="es">Uno o dos paneles con pestañas, historial, barra de ruta editable y filtro al escribir</li>
+      <li>A terminal per pane: the pane follows the shell’s cd and the shell follows the pane</li>
+      <li xml:lang="es">Una terminal por panel: el panel sigue los cd del shell y el shell sigue al panel</li>
+      <li>Preview of images, text and code, PDF, video, audio and rendered Markdown</li>
+      <li xml:lang="es">Vista previa de imágenes, texto y código, PDF, video, audio y Markdown renderizado</li>
+      <li>Background file operations with progress, conflict handling, undo and trash by default</li>
+      <li xml:lang="es">Operaciones de archivos en segundo plano con progreso, conflictos, deshacer y papelera por defecto</li>
+      <li>Recursive search, bulk rename with regular expressions and per-folder notes</li>
+      <li xml:lang="es">Búsqueda recursiva, renombrado masivo con expresiones regulares y notas por carpeta</li>
+      <li>Five live-switchable themes, plus your own themes in TOML</li>
+      <li xml:lang="es">Cinco temas que cambian en vivo, y temas propios en TOML</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.RicardoMonroy.Tlacuache.desktop</launchable>
+  <provides>
+    <binary>tlacuache</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/RicardoMonroy/TlacuacheBrowser</url>
+  <url type="bugtracker">https://github.com/RicardoMonroy/TlacuacheBrowser/issues</url>
+  <url type="vcs-browser">https://github.com/RicardoMonroy/TlacuacheBrowser</url>
+  <url type="contribute">https://github.com/RicardoMonroy/TlacuacheBrowser/blob/main/CONTRIBUTING.md</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/nord.png</image>
+      <caption>Details view with a terminal, Nord theme</caption>
+      <caption xml:lang="es">Vista de detalles con terminal, tema Nord</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/consola.png</image>
+      <caption>Console theme, styled like a terminal UI</caption>
+      <caption xml:lang="es">Tema Consola, al estilo de una interfaz de terminal</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/claro.png</image>
+      <caption>Light theme</caption>
+      <caption xml:lang="es">Tema Claro</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/cyberpunk.png</image>
+      <caption>Cyberpunk theme</caption>
+      <caption xml:lang="es">Tema Cyberpunk</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/RicardoMonroy/TlacuacheBrowser/main/docs/screenshots/talavera.png</image>
+      <caption>Talavera theme, with Mexican tile decor</caption>
+      <caption xml:lang="es">Tema Talavera, con decoración de azulejo mexicano</caption>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#88C0D0</color>
+    <color type="primary" scheme_preference="dark">#2E3440</color>
+  </branding>
+
+  <content_rating type="oars-1.1" />
+
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+
+  <keywords>
+    <keyword>file manager</keyword>
+    <keyword>files</keyword>
+    <keyword>folders</keyword>
+    <keyword>terminal</keyword>
+    <keyword>miller columns</keyword>
+    <keyword>dual pane</keyword>
+    <keyword xml:lang="es">gestor de archivos</keyword>
+    <keyword xml:lang="es">archivos</keyword>
+    <keyword xml:lang="es">carpetas</keyword>
+    <keyword xml:lang="es">terminal</keyword>
+    <keyword xml:lang="es">columnas miller</keyword>
+    <keyword xml:lang="es">doble panel</keyword>
+  </keywords>
+
+  <releases>
+    <release version="0.2.0" date="2026-10-06" type="stable">
+      <description>
+        <p>First public release.</p>
+        <ul>
+          <li>Preview of PDF, video, audio and rendered Markdown</li>
+          <li>Icon grid view with freedesktop thumbnails</li>
+          <li>Recursive search, bulk rename and per-folder notes</li>
+          <li>Five themes, user themes and a preferences dialog</li>
+          <li>Packages for Arch (AUR), Debian, Ubuntu and Fedora</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

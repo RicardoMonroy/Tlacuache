@@ -92,6 +92,7 @@ jobs:
         run: |
           test -x /usr/bin/tlacuache
           test -f /usr/share/applications/io.github.RicardoMonroy.Tlacuache.desktop
+          test -f /usr/share/metainfo/io.github.RicardoMonroy.Tlacuache.metainfo.xml
           test -f /usr/share/icons/hicolor/scalable/apps/io.github.RicardoMonroy.Tlacuache.svg
           # Todas las bibliotecas del binario se resuelven.
           if ldd /usr/bin/tlacuache | grep "not found"; then exit 1; fi

@@ -21,7 +21,7 @@ image_for() {
 # Lo mismo que hacen los pasos del workflow tras instalar dependencias.
 steps_for() {
     case "$1" in
-        arch) echo 'scripts/check.sh && python scripts/check-theme-contrast.py crates/tlacuache-core/themes' ;;
+        arch) echo 'scripts/check.sh && python scripts/check-theme-contrast.py crates/tlacuache-core/themes && appstreamcli validate --no-net --explain data/io.github.RicardoMonroy.Tlacuache.metainfo.xml && desktop-file-validate data/io.github.RicardoMonroy.Tlacuache.desktop' ;;
         *) echo 'cargo build --locked --workspace --all-targets && cargo test --locked --workspace' ;;
     esac
 }

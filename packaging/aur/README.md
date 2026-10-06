@@ -28,4 +28,4 @@ makepkg -si          # compila, prueba e instala
    ```
 
    Requiere una cuenta de AUR con la llave SSH registrada.
-5. En cada versión nueva: subir `pkgver` (y `version` en `Cargo.toml`), repetir los pasos 2–4 y reiniciar `pkgrel=1`.
+5. En cada versión nueva: subir `pkgver` (y `version` en `Cargo.toml`), añadir la versión con su fecha y novedades en `<releases>` de `data/io.github.RicardoMonroy.Tlacuache.metainfo.xml` (la muestran GNOME Software, Discover y Flathub), repetir los pasos 2–4 y reiniciar `pkgrel=1`.

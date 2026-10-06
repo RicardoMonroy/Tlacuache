@@ -7,7 +7,8 @@ set -euo pipefail
 case "${1:-}" in
     arch)
         pacman -Syu --noconfirm --needed base-devel git rust python \
-            gtk4 libadwaita vte4 gtksourceview5 poppler-glib zsh fish
+            gtk4 libadwaita vte4 gtksourceview5 poppler-glib zsh fish \
+            appstream desktop-file-utils
         ;;
     debian)
         # Debian 13 trae Rust 1.85: se instala con rustup la versión mínima

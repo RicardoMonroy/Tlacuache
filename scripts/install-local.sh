@@ -14,6 +14,7 @@ BIN="$BIN_DIR/tlacuache"
 DESKTOP="$PREFIX/applications/$APP_ID.desktop"
 ICON="$PREFIX/icons/hicolor/scalable/apps/$APP_ID.svg"
 ICON_SYMBOLIC="$PREFIX/icons/hicolor/symbolic/apps/$APP_ID-symbolic.svg"
+METAINFO="$PREFIX/metainfo/$APP_ID.metainfo.xml"
 
 refresh_caches() {
     if command -v gtk-update-icon-cache >/dev/null && [ -f "$PREFIX/icons/hicolor/index.theme" ]; then
@@ -25,7 +26,7 @@ refresh_caches() {
 }
 
 if [[ "${1:-}" == "--uninstall" ]]; then
-    rm -f "$BIN" "$DESKTOP" "$ICON" "$ICON_SYMBOLIC"
+    rm -f "$BIN" "$DESKTOP" "$ICON" "$ICON_SYMBOLIC" "$METAINFO"
     refresh_caches
     echo "Tlacuache desinstalado de ~/.local"
     exit 0
@@ -36,6 +37,7 @@ cargo build --release -p tlacuache
 install -Dm755 target/release/tlacuache "$BIN"
 install -Dm644 "data/icons/hicolor/scalable/apps/$APP_ID.svg" "$ICON"
 install -Dm644 "data/icons/hicolor/symbolic/apps/$APP_ID-symbolic.svg" "$ICON_SYMBOLIC"
+install -Dm644 "data/$APP_ID.metainfo.xml" "$METAINFO"
 # Ruta absoluta en Exec: el lanzador puede no tener ~/.local/bin en su PATH.
 sed "s|^Exec=tlacuache |Exec=$BIN |" "data/$APP_ID.desktop" | install -Dm644 /dev/stdin "$DESKTOP"
 refresh_caches

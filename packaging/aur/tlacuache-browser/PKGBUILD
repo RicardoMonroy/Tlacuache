@@ -43,6 +43,7 @@ package() {
   cd "TlacuacheBrowser-$pkgver"
   install -Dm755 target/release/tlacuache "$pkgdir/usr/bin/tlacuache"
   install -Dm644 "data/$_appid.desktop" "$pkgdir/usr/share/applications/$_appid.desktop"
+  install -Dm644 "data/$_appid.metainfo.xml" "$pkgdir/usr/share/metainfo/$_appid.metainfo.xml"
   install -Dm644 "data/icons/hicolor/scalable/apps/$_appid.svg" \
     "$pkgdir/usr/share/icons/hicolor/scalable/apps/$_appid.svg"
   install -Dm644 "data/icons/hicolor/symbolic/apps/$_appid-symbolic.svg" \

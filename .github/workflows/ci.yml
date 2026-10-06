@@ -35,6 +35,10 @@ jobs:
         run: bash scripts/check.sh
       - name: Contraste de los temas
         run: python scripts/check-theme-contrast.py crates/tlacuache-core/themes
+      - name: Metadatos AppStream y .desktop
+        run: |
+          appstreamcli validate --no-net --explain data/io.github.RicardoMonroy.Tlacuache.metainfo.xml
+          desktop-file-validate data/io.github.RicardoMonroy.Tlacuache.desktop
 
   distros:
     name: ${{ matrix.name }} (compilación y pruebas)
