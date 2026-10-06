@@ -5,7 +5,7 @@ pkgver=0.2.0
 pkgrel=1
 pkgdesc="Gestor de archivos con columnas Miller, doble panel y una terminal integrada en cada panel (GTK4)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/rmonroy/TlacuacheBrowser"
+url="https://github.com/RicardoMonroy/TlacuacheBrowser"
 license=('GPL-3.0-or-later')
 depends=('gtk4' 'libadwaita' 'vte4' 'gtksourceview5' 'poppler-glib'
          'gdk-pixbuf2' 'glib2' 'cairo' 'pango' 'gcc-libs' 'glibc')
