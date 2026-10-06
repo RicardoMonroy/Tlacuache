@@ -7,18 +7,24 @@
 //! primer plano (grupo en primer plano del PTY = PID del shell). Si hay un
 //! programa corriendo o la carpeta no es local, muestra «Carpeta
 //! desincronizada» con un botón para sincronizar.
+//!
+//! Dentro de Flatpak (ADR-016) el shell se lanza en el sistema con
+//! `flatpak-spawn --host` y, como `tcgetpgrp` no ve sus procesos, la
+//! integración del shell avisa en un archivo de estado si espera órdenes.
 
 use std::cell::{Cell, OnceCell, RefCell};
 use std::os::fd::AsRawFd;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use glib::subclass::Signal;
 use gtk::{gdk, gio, glib, pango};
+use tlacuache_core::APP_ID;
 use tlacuache_core::config::{self, Config};
-use tlacuache_core::shell::{self, ShellKind, cd_command, paste_paths};
+use tlacuache_core::shell::{self, ShellKind, ShellState, cd_command, paste_paths};
 use tlacuache_core::theme::Theme;
 use vte::prelude::*;
 
@@ -29,6 +35,18 @@ use crate::{strings, window};
 const FALLBACK_SHELL: &str = "/bin/bash";
 /// Líneas de historial.
 const SCROLLBACK_LINES: i64 = 10_000;
+/// Variables que VTE define para su hijo y que hay que pasar a mano al
+/// shell del sistema (flatpak-spawn no reenvía el entorno del sandbox).
+const HOST_TERM_ENV: [&str; 2] = ["TERM=xterm-256color", "COLORTERM=truecolor"];
+
+/// ¿El shell espera órdenes?
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Foreground {
+    Shell,
+    Busy,
+    /// Dentro de Flatpak sin integración: no se puede saber.
+    Unknown,
+}
 
 mod imp {
     use super::*;
@@ -46,6 +64,10 @@ mod imp {
         pub desync: gtk::Revealer,
         /// `[terminal]` de la config (fuente al cambiar de tema).
         pub settings: OnceCell<config::Terminal>,
+        /// El shell corre en el sistema (Flatpak, ADR-016).
+        pub host: Cell<bool>,
+        /// Archivo de estado de la integración (solo con `host`).
+        pub state_file: RefCell<Option<PathBuf>>,
     }
 
     #[glib::object_subclass]
@@ -139,7 +161,10 @@ impl TerminalView {
         terminal.connect_child_exited(glib::clone!(
             #[weak(rename_to = view)]
             self,
-            move |_, _status| view.emit_by_name::<()>("exited", &[])
+            move |_, _status| {
+                view.remove_state_file();
+                view.emit_by_name::<()>("exited", &[]);
+            }
         ));
 
         // Copiar/pegar como en las terminales: Ctrl+Shift+C / Ctrl+Shift+V.
@@ -203,7 +228,9 @@ impl TerminalView {
             #[weak(rename_to = view)]
             self,
             move |_| {
-                view.apply_pending();
+                glib::spawn_future_local(async move {
+                    view.apply_pending(false).await;
+                });
             }
         ));
         terminal.add_controller(focus);
@@ -243,9 +270,11 @@ impl TerminalView {
             #[weak(rename_to = view)]
             self,
             move |_| {
-                if !view.apply_pending() {
-                    window::show_toast_from(&view, strings::TERMINAL_BUSY);
-                }
+                glib::spawn_future_local(async move {
+                    if !view.apply_pending(true).await {
+                        window::show_toast_from(&view, strings::TERMINAL_BUSY);
+                    }
+                });
             }
         ));
         let pill = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -262,9 +291,34 @@ impl TerminalView {
         revealer.clone()
     }
 
-    /// El shell está esperando órdenes (no hay otro programa en primer
-    /// plano en la terminal).
-    pub fn is_shell_in_foreground(&self) -> bool {
+    /// ¿El shell está esperando órdenes? Dentro de Flatpak lo dice el
+    /// archivo de estado de la integración; fuera, el grupo en primer plano
+    /// del PTY.
+    async fn foreground(&self) -> Foreground {
+        let imp = self.imp();
+        if imp.host.get() {
+            let Some(path) = imp.state_file.borrow().clone() else {
+                return Foreground::Unknown;
+            };
+            // Sin archivo todavía: el shell aún no muestra su primer prompt.
+            return match gio::File::for_path(path).load_contents_future().await {
+                Ok((bytes, _)) => match ShellState::parse(&String::from_utf8_lossy(&bytes)) {
+                    Some(ShellState::Prompt) => Foreground::Shell,
+                    _ => Foreground::Busy,
+                },
+                Err(_) => Foreground::Busy,
+            };
+        }
+        if self.is_shell_in_foreground() {
+            Foreground::Shell
+        } else {
+            Foreground::Busy
+        }
+    }
+
+    /// Fuera de Flatpak: no hay otro programa en primer plano en la
+    /// terminal.
+    fn is_shell_in_foreground(&self) -> bool {
         let imp = self.imp();
         let (Some(terminal), Some(pid)) = (imp.terminal.get(), imp.shell_pid.get()) else {
             return false;
@@ -295,14 +349,31 @@ impl TerminalView {
             return;
         }
         imp.pending_dir.replace(Some(dir.clone()));
-        if !self.apply_pending() {
-            self.set_desync(true);
-        }
+        glib::spawn_future_local(glib::clone!(
+            #[weak(rename_to = view)]
+            self,
+            async move {
+                // Otra llamada pudo sincronizar mientras tanto.
+                if !view.apply_pending(false).await && view.imp().pending_dir.borrow().is_some() {
+                    view.set_desync(true);
+                }
+            }
+        ));
     }
 
-    /// Envía el `cd` pendiente si se puede. Devuelve `true` si quedó
-    /// sincronizada.
-    fn apply_pending(&self) -> bool {
+    /// Envía el `cd` pendiente si se puede. `requested`: lo pidió el usuario
+    /// (botón Sincronizar), así que se envía también si no se puede saber
+    /// si el shell está libre. Devuelve `true` si quedó sincronizada.
+    async fn apply_pending(&self, requested: bool) -> bool {
+        if self.imp().pending_dir.borrow().is_none() {
+            return true;
+        }
+        let ready = match self.foreground().await {
+            Foreground::Shell => true,
+            Foreground::Unknown => requested,
+            Foreground::Busy => false,
+        };
+        // La carpeta pendiente se lee después de esperar: pudo cambiar.
         let imp = self.imp();
         let Some(dir) = imp.pending_dir.borrow().clone() else {
             return true;
@@ -310,7 +381,7 @@ impl TerminalView {
         let (Some(path), Some(terminal)) = (dir.path(), imp.terminal.get()) else {
             return false;
         };
-        if !self.is_shell_in_foreground() {
+        if !ready {
             return false;
         }
         // Ctrl+E y Ctrl+U limpian lo escrito a medias; el espacio inicial
@@ -325,60 +396,111 @@ impl TerminalView {
     }
 
     fn spawn(&self, config: &Config, dir: Option<&gio::File>) {
-        let shell = resolve_shell(&config.terminal.shell);
-        let _ = self.imp().shell.set(shell.clone());
         // Solo carpetas locales: VTE necesita una ruta del sistema.
         let cwd_path = dir.and_then(gio::File::path).unwrap_or_else(glib::home_dir);
         self.imp()
             .current_dir
             .replace(Some(gio::File::for_path(&cwd_path)));
         let cwd = cwd_path.to_string_lossy().into_owned();
-        let integration = if config.terminal.shell_integration {
-            shell_name(&shell)
-        } else {
-            None
-        };
+        let host = in_flatpak();
+        self.imp().host.set(host);
+        let configured = config.terminal.shell.trim().to_owned();
+        let with_integration = config.terminal.shell_integration;
+        let dir = integration_dir(host);
 
         glib::spawn_future_local(glib::clone!(
             #[weak(rename_to = view)]
             self,
             async move {
+                // Dentro de Flatpak `$SHELL` es el `/bin/sh` del sandbox: el
+                // shell de inicio de sesión se pregunta al sistema.
+                let shell = if host && configured.is_empty() {
+                    host_login_shell().await
+                } else {
+                    resolve_shell(&configured)
+                };
+                let _ = view.imp().shell.set(shell.clone());
+                let integration = if with_integration {
+                    shell_name(&shell, host)
+                } else {
+                    None
+                };
+                if host && integration.is_some() {
+                    view.imp().state_file.replace(Some(new_state_file(&dir)));
+                }
                 let mut argv = vec![shell.clone()];
                 let mut env = Vec::new();
                 // Los archivos de integración se escriben fuera del hilo de
                 // GTK. Si falla, se lanza el shell normal (sin seguir sus `cd`).
-                match integration {
-                    Some("bash") => match gio::spawn_blocking(write_bash_rc).await {
-                        Ok(Ok(rc)) => argv.extend(["--rcfile".to_owned(), rc]),
-                        Ok(Err(err)) => tracing::warn!("sin integración de bash: {err}"),
-                        Err(_) => tracing::warn!("sin integración de bash: falló el hilo"),
-                    },
-                    Some("zsh") => match gio::spawn_blocking(write_zsh_env).await {
-                        Ok(Ok(dir)) => {
-                            // El ZDOTDIR del usuario se restaura en nuestro .zshenv.
-                            let user = std::env::var("ZDOTDIR").unwrap_or_default();
-                            env.push(format!("{}={user}", shell::ZSH_USER_ZDOTDIR_VAR));
-                            env.push(format!("ZDOTDIR={dir}"));
+                let written = match integration {
+                    Some(name) => {
+                        let writer = move || {
+                            if host {
+                                remove_stale_state_files(&dir);
+                            }
+                            write_integration(name, &dir)
+                        };
+                        match gio::spawn_blocking(writer).await {
+                            Ok(Ok(path)) => Some((name, path)),
+                            Ok(Err(err)) => {
+                                tracing::warn!("sin integración de {name}: {err}");
+                                None
+                            }
+                            Err(_) => {
+                                tracing::warn!("sin integración de {name}: falló el hilo");
+                                None
+                            }
                         }
-                        Ok(Err(err)) => tracing::warn!("sin integración de zsh: {err}"),
-                        Err(_) => tracing::warn!("sin integración de zsh: falló el hilo"),
-                    },
-                    _ => {}
+                    }
+                    None => None,
+                };
+                match written {
+                    Some(("bash", rc)) => argv.extend(["--rcfile".to_owned(), rc]),
+                    Some(("zsh", dir)) => {
+                        // El ZDOTDIR del usuario se restaura en nuestro .zshenv.
+                        let user = std::env::var("ZDOTDIR").unwrap_or_default();
+                        env.push(format!("{}={user}", shell::ZSH_USER_ZDOTDIR_VAR));
+                        env.push(format!("ZDOTDIR={dir}"));
+                    }
+                    Some(("fish", file)) => argv.extend([
+                        "--init-command".to_owned(),
+                        format!("source {}", shell::quote(&file, ShellKind::Fish)),
+                    ]),
+                    _ => {
+                        // Sin integración no hay quién escriba el estado.
+                        view.imp().state_file.replace(None);
+                    }
                 }
-                view.launch(&cwd, &argv, &env);
+                if host {
+                    if let Some(state) = view.imp().state_file.borrow().as_ref() {
+                        env.push(format!("{}={}", shell::STATE_FILE_VAR, state.display()));
+                    }
+                    env.extend(HOST_TERM_ENV.map(str::to_owned));
+                    let host_dir = host_visible_dir(&cwd_path);
+                    argv = shell::host_command(&argv, &host_dir.to_string_lossy(), &env);
+                    env.clear();
+                }
+                view.launch(&cwd, &argv, &env, host);
             }
         ));
     }
 
-    /// `env`: variables que se añaden al entorno heredado.
-    fn launch(&self, cwd: &str, argv: &[String], env: &[String]) {
+    /// `env`: variables que se añaden al entorno heredado. `host`: `argv` es
+    /// un `flatpak-spawn --host`; la PTY no se vuelve su terminal de control
+    /// para que la tome el shell del sistema.
+    fn launch(&self, cwd: &str, argv: &[String], env: &[String], host: bool) {
         let Some(terminal) = self.terminal() else {
             return;
         };
         let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
         let env: Vec<&str> = env.iter().map(String::as_str).collect();
+        let flags = if host {
+            vte::PtyFlags::NO_CTTY
+        } else {
+            vte::PtyFlags::DEFAULT
+        };
         terminal.spawn_async(
-            vte::PtyFlags::DEFAULT,
+            flags,
             Some(cwd),
             &argv,
             &env,
@@ -402,6 +524,17 @@ impl TerminalView {
                 }
             ),
         );
+    }
+
+    /// Borra el archivo de estado del shell que terminó (sin esperar).
+    fn remove_state_file(&self) {
+        if let Some(path) = self.imp().state_file.take() {
+            glib::spawn_future_local(async move {
+                let _ = gio::File::for_path(path)
+                    .delete_future(glib::Priority::LOW)
+                    .await;
+            });
+        }
     }
 
     /// Terminal → panel: el shell informó su carpeta (OSC 7). Si es la que
@@ -456,39 +589,137 @@ impl TerminalView {
     }
 }
 
-/// `bash` o `zsh` si el shell tiene integración propia (fish emite OSC 7
-/// por sí mismo).
-fn shell_name(shell: &str) -> Option<&'static str> {
+/// `bash` o `zsh` si el shell tiene integración propia. fish emite OSC 7
+/// por sí mismo; dentro de Flatpak también la necesita para el archivo de
+/// estado.
+fn shell_name(shell: &str, host: bool) -> Option<&'static str> {
     match Path::new(shell).file_name().and_then(|n| n.to_str()) {
         Some("bash") => Some("bash"),
         Some("zsh") => Some("zsh"),
+        Some("fish") if host => Some("fish"),
         _ => None,
     }
 }
 
-/// Escribe el rcfile de integración en `$XDG_RUNTIME_DIR/tlacuache/` y
-/// devuelve su ruta. E/S bloqueante: se llama desde un hilo de trabajo.
-fn write_bash_rc() -> std::io::Result<String> {
-    let dir = glib::user_runtime_dir().join("tlacuache");
-    std::fs::create_dir_all(&dir)?;
-    let path = dir.join("bash-integration.rc");
-    std::fs::write(&path, shell::BASH_INTEGRATION_RC)?;
-    Ok(path.to_string_lossy().into_owned())
+/// Shell de inicio de sesión del usuario en el sistema (dentro de Flatpak),
+/// con `getent passwd`. Se pregunta una vez; si falla, `/bin/bash`.
+async fn host_login_shell() -> String {
+    static SHELL: OnceLock<String> = OnceLock::new();
+    if let Some(shell) = SHELL.get() {
+        return shell.clone();
+    }
+    let shell = query_host_shell().await.unwrap_or_else(|| {
+        tracing::warn!("no se pudo saber el shell del sistema; se usa {FALLBACK_SHELL}");
+        FALLBACK_SHELL.to_owned()
+    });
+    SHELL.get_or_init(|| shell).clone()
 }
 
-/// Escribe el `.zshenv` de integración en `$XDG_RUNTIME_DIR/tlacuache/zsh/`
-/// y devuelve esa carpeta (el `ZDOTDIR` con el que se lanza zsh). E/S
-/// bloqueante: se llama desde un hilo de trabajo.
-fn write_zsh_env() -> std::io::Result<String> {
-    let dir = glib::user_runtime_dir().join("tlacuache").join("zsh");
-    std::fs::create_dir_all(&dir)?;
-    std::fs::write(dir.join(".zshenv"), shell::ZSH_INTEGRATION_ZSHENV)?;
-    Ok(dir.to_string_lossy().into_owned())
+async fn query_host_shell() -> Option<String> {
+    let user = glib::user_name();
+    let argv: [&std::ffi::OsStr; 5] = [
+        "flatpak-spawn".as_ref(),
+        "--host".as_ref(),
+        "getent".as_ref(),
+        "passwd".as_ref(),
+        user.as_os_str(),
+    ];
+    let process = gio::Subprocess::newv(&argv, gio::SubprocessFlags::STDOUT_PIPE).ok()?;
+    let (stdout, _) = process.communicate_utf8_future(None).await.ok()?;
+    shell::login_shell(stdout?.as_str()).map(str::to_owned)
+}
+
+/// ¿Corre dentro de Flatpak? Se consulta una vez.
+fn in_flatpak() -> bool {
+    static IN_FLATPAK: OnceLock<bool> = OnceLock::new();
+    *IN_FLATPAK.get_or_init(|| Path::new("/.flatpak-info").exists())
+}
+
+/// Carpeta de los archivos de integración y de estado. Dentro de Flatpak,
+/// `$XDG_RUNTIME_DIR/app/<app-id>/`, que el sistema ve en la misma ruta.
+fn integration_dir(host: bool) -> PathBuf {
+    let runtime = glib::user_runtime_dir();
+    if host {
+        let id = std::env::var("FLATPAK_ID").unwrap_or_else(|_| APP_ID.to_owned());
+        runtime.join("app").join(id).join("tlacuache")
+    } else {
+        runtime.join("tlacuache")
+    }
+}
+
+/// Prefijo de los archivos de estado de esta ejecución. No se usa el PID:
+/// dentro del sandbox siempre es el mismo (Flatpak tiene su propio espacio
+/// de PIDs).
+fn state_prefix() -> &'static str {
+    static PREFIX: OnceLock<String> = OnceLock::new();
+    PREFIX.get_or_init(|| format!("state-{}-", glib::uuid_string_random()))
+}
+
+/// Ruta de un archivo de estado nuevo (uno por terminal).
+fn new_state_file(dir: &Path) -> PathBuf {
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+    let n = NEXT.fetch_add(1, Ordering::Relaxed);
+    dir.join(format!("{}{n}", state_prefix()))
+}
+
+/// Borra los archivos de estado de ejecuciones anteriores (la app terminó
+/// sin que sus shells terminaran antes). E/S bloqueante: hilo de trabajo.
+fn remove_stale_state_files(dir: &Path) {
+    let ours = state_prefix();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with("state-") && !name.starts_with(ours) {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+}
+
+/// Carpeta inicial del shell del sistema: las rutas que solo existen en el
+/// sandbox (`/app`, el portal de documentos) se cambian por la carpeta
+/// personal.
+fn host_visible_dir(dir: &Path) -> PathBuf {
+    let doc_portal = glib::user_runtime_dir().join("doc");
+    if dir.starts_with("/app") || dir.starts_with(&doc_portal) {
+        glib::home_dir()
+    } else {
+        dir.to_owned()
+    }
+}
+
+/// Escribe el archivo de integración de `shell` en `dir` y devuelve lo que
+/// se le pasa al shell: el rcfile (bash), la carpeta para `ZDOTDIR` (zsh) o
+/// el archivo a cargar (fish). E/S bloqueante: se llama desde un hilo de
+/// trabajo.
+fn write_integration(shell: &str, dir: &Path) -> std::io::Result<String> {
+    let path = match shell {
+        "bash" => {
+            std::fs::create_dir_all(dir)?;
+            let path = dir.join("bash-integration.rc");
+            std::fs::write(&path, shell::BASH_INTEGRATION_RC)?;
+            path
+        }
+        "zsh" => {
+            let zdotdir = dir.join("zsh");
+            std::fs::create_dir_all(&zdotdir)?;
+            std::fs::write(zdotdir.join(".zshenv"), shell::ZSH_INTEGRATION_ZSHENV)?;
+            zdotdir
+        }
+        _ => {
+            std::fs::create_dir_all(dir)?;
+            let path = dir.join("fish-integration.fish");
+            std::fs::write(&path, shell::FISH_INTEGRATION)?;
+            path
+        }
+    };
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// Shell de la config, si no `$SHELL`, si no `/bin/bash`.
 fn resolve_shell(configured: &str) -> String {
-    let configured = configured.trim();
     if !configured.is_empty() {
         return configured.to_owned();
     }

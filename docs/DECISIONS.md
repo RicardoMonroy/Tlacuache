@@ -77,3 +77,20 @@ Formato: contexto → decisión → consecuencias. Añadir nuevas al final con n
 - **Decisión**: el app-id pasa a `io.github.RicardoMonroy.Tlacuache` antes del primer push: `.desktop`, íconos de la app, nombre en D-Bus y ruta de recursos (`/io/github/RicardoMonroy/Tlacuache`, la que GTK deriva del id).
 - **Consecuencias**: la configuración, la sesión, los temas y las notas no cambian (viven en `~/.config/tlacuache`, `~/.local/state/tlacuache` y `~/.local/share/tlacuache`). Un paquete instalado con el id viejo debe desinstalarse antes de instalar el nuevo para no duplicar el lanzador.
 - **Actualización (2026-10-06)**: Flathub calcula la URL del repositorio a partir del id (`io.github.RicardoMonroy.Tlacuache` → `github.com/RicardoMonroy/Tlacuache`) y exige que exista. Se renombró el repositorio de `TlacuacheBrowser` a `Tlacuache` en lugar de cambiar el id otra vez; GitHub redirige las URLs viejas.
+
+## ADR-016 — Terminal dentro de Flatpak con `flatpak-spawn --host`
+- **Contexto**: dentro del sandbox de Flatpak, un shell lanzado normalmente sería el `/bin/sh` del runtime, sin las herramientas, la configuración ni los programas del usuario. Además, `$SHELL` y `/etc/passwd` del sandbox dicen `/bin/sh`, y el sandbox tiene su propio espacio de PIDs: `tcgetpgrp` devuelve 0 para cualquier proceso del sistema, así que no sirve para saber si hay un programa en primer plano.
+- **Decisión**: si existe `/.flatpak-info`, la terminal lanza `flatpak-spawn --host --watch-bus --directory=… --env=… <shell>`. Detalles:
+  - **PTY**: VTE la crea con `NO_CTTY`, para que no sea la terminal de control de `flatpak-spawn`; el servicio de Flatpak en el sistema hace `setsid` y `TIOCSCTTY` sobre ella para el shell.
+  - **Shell**: si la config no fija uno, el de inicio de sesión se pregunta al sistema con `getent passwd`.
+  - **Variables**: `TERM` y `COLORTERM` se pasan a mano.
+  - **Archivos de integración**: van en `$XDG_RUNTIME_DIR/app/<app-id>/tlacuache`, que el sistema ve en la misma ruta.
+  - **¿Programa en primer plano?**: en lugar de `tcgetpgrp`, la integración (bash, zsh y también fish) escribe `prompt`/`busy` en un archivo de estado por terminal (`TLACUACHE_STATE_FILE`). Usa el prompt y `PS0`, `preexec` o `fish_preexec`. La app lo lee de forma asíncrona antes de mandar un `cd`.
+  - **Sin integración** (otro shell, o integración apagada): no se manda el `cd` automático; la pastilla «Carpeta desincronizada» sí lo envía al pulsar Sincronizar.
+- **Consecuencias**:
+  - Fuera de Flatpak nada cambia: no se define la variable y los scripts no escriben el estado.
+  - El paquete Flatpak necesita `--talk-name=org.freedesktop.Flatpak`, un permiso que Flathub revisa y que se justifica por la terminal.
+  - Limitaciones conocidas:
+    - la PTY pertenece al `devpts` del sandbox, así que `tty`/`ttyname` fallan en el shell (afecta, p. ej., a `GPG_TTY=$(tty)`);
+    - las carpetas que solo existen en el sandbox (`/app`, el portal de documentos) abren el shell en la carpeta personal.
+  - Probado con bash, zsh y fish del sistema desde el SDK de GNOME 51.

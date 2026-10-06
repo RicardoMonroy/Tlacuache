@@ -111,8 +111,18 @@ Acordado: primero paquetes nativos para las distribuciones recientes (casi sin c
 - [x] **9.2 Integración continua**: GitHub Actions que corre `scripts/check.sh` en Arch y compila y prueba en contenedores `debian:trixie`, `ubuntu:26.04` y `fedora:43`. CA: workflow en verde en cada push y PR.
 - [x] **9.3 `.deb` y `.rpm` en cada release**: metadatos de `cargo-deb` y `cargo-generate-rpm` (binario, `.desktop`, íconos, licencia, dependencias de cada distribución) y un workflow que, al etiquetar `v*`, adjunta los paquetes al release de GitHub. CA: el `.deb` se instala y abre en Debian 13 y Ubuntu 26.04, y el `.rpm` en Fedora 43/44.
 - [x] **9.4 Metadatos AppStream**: `data/io.github.RicardoMonroy.Tlacuache.metainfo.xml` (descripción, capturas, versiones, licencia, contenido OARS) instalado por todos los paquetes; lo exige Flathub y lo usan GNOME Software y KDE Discover. CA: `appstreamcli validate` sin errores.
-- [ ] **9.5 Terminal dentro de Flatpak**: ADR + detección del sandbox (`/.flatpak-info`); el shell del usuario se lanza en el sistema con `flatpak-spawn --host` (PTY de VTE, carpeta inicial, variables y la integración OSC 7 de bash/zsh en una ruta visible para el sistema); la detección de «programa en primer plano» se adapta, o se degrada con aviso, sin `tcgetpgrp` del PID del sandbox. CA: fuera de Flatpak nada cambia; dentro, la terminal abre tu shell real y el panel sigue sus `cd`.
-- [ ] **9.6 Manifiesto Flatpak**: `io.github.RicardoMonroy.Tlacuache.yml` sobre el runtime de GNOME, compilando lo que el runtime no traiga (poppler, VTE si hiciera falta) y las crates vendorizadas sin red; permisos mínimos razonados (sistema de archivos, `org.freedesktop.Flatpak` para la terminal, GVfs para unidades remotas, caché de miniaturas compartida). CA: `flatpak-builder --user --install` instala y la app funciona: navegar, copiar, papelera, vista previa, terminal, miniaturas.
-- [ ] **9.7 Envío a Flathub**: PR al repositorio de Flathub con el manifiesto, la revisión de permisos y las capturas. Lo hace el autor con su cuenta. CA: publicado en Flathub.
+- [x] **9.5 Terminal dentro de Flatpak**: ADR-016 + detección del sandbox (`/.flatpak-info`); el shell del usuario (de `getent passwd` en el sistema) se lanza con `flatpak-spawn --host` (PTY sin terminal de control, carpeta inicial, variables y la integración OSC 7 de bash/zsh en `$XDG_RUNTIME_DIR/app/<app-id>/`); como `tcgetpgrp` no ve los procesos del sistema, la integración (también fish) avisa en un archivo de estado si el shell espera órdenes; sin integración, el `cd` solo se manda con el botón Sincronizar. CA: fuera de Flatpak nada cambia; dentro, la terminal abre tu shell real y el panel sigue sus `cd`.
+- [ ] **9.6 Manifiesto Flatpak (lo escribe el autor)**: la política de Flathub prohíbe manifiestos generados o asistidos por IA, así que este archivo lo escribe el autor a mano. Requisitos que debe cumplir la app (ya probados en el SDK de GNOME 51):
+  - el runtime de GNOME no trae VTE ni poppler: hay que compilarlos en el manifiesto (VTE con GnuTLS, si no avisa que el historial se guarda sin cifrar);
+  - las crates de Rust deben ir vendorizadas, sin red al compilar;
+  - permisos: `--talk-name=org.freedesktop.Flatpak` para la terminal (ADR-016), acceso al sistema de archivos, GVfs para unidades remotas y la caché de miniaturas compartida.
+
+  CA: `flatpak-builder --user --install` instala la app y funciona: navegar, copiar, papelera, vista previa, terminal, miniaturas.
+- [ ] **9.7 Envío a Flathub (lo hace el autor)**: PR al repositorio de Flathub con el manifiesto, la revisión de permisos y las capturas, abierto por el autor con su cuenta. Flathub exige:
+  - declarar el código, la documentación y el empaquetado hechos con IA;
+  - que la IA no abra el PR ni escriba sus textos ni las respuestas a revisores;
+  - para gestores de archivos y terminales, que los envíe el propio autor comprometiéndose a darle soporte a Flatpak.
+
+  CA: publicado en Flathub.
 
 Más adelante, si hay usuarios que lo pidan: COPR (Fedora), PPA (Ubuntu) u OBS (varias distribuciones) para tener actualizaciones automáticas.

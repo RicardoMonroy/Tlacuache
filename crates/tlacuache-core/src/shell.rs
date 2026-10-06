@@ -95,8 +95,15 @@ __tlacuache_urlencode() {
 __tlacuache_osc7() {
     local status=$?
     printf '\e]7;file://%s%s\e\\' "${HOSTNAME:-localhost}" "$(__tlacuache_urlencode "$PWD")"
+    [[ -n "${TLACUACHE_STATE_FILE-}" ]] && printf prompt 2>/dev/null >| "$TLACUACHE_STATE_FILE"
     return $status
 }
+
+# Solo dentro de Flatpak (ADR-016): avisa que se ejecuta una orden.
+if [[ -n "${TLACUACHE_STATE_FILE-}" ]]; then
+    __tlacuache_busy() { printf busy 2>/dev/null >| "$TLACUACHE_STATE_FILE"; }
+    PS0='$(__tlacuache_busy)'"${PS0-}"
+fi
 
 if [[ "$(declare -p PROMPT_COMMAND 2>/dev/null)" == "declare -a"* ]]; then
     PROMPT_COMMAND=(__tlacuache_osc7 "${PROMPT_COMMAND[@]}")
@@ -141,8 +148,86 @@ if [[ -o interactive ]]; then
     }
     autoload -Uz add-zsh-hook
     add-zsh-hook precmd __tlacuache_osc7
+
+    # Solo dentro de Flatpak (ADR-016): prompt mostrado / orden en curso.
+    if [[ -n "${TLACUACHE_STATE_FILE-}" ]]; then
+        __tlacuache_prompt() {
+            local ret=$?
+            print -n prompt 2>/dev/null >| "$TLACUACHE_STATE_FILE"
+            return $ret
+        }
+        __tlacuache_busy() { print -n busy 2>/dev/null >| "$TLACUACHE_STATE_FILE" }
+        add-zsh-hook precmd __tlacuache_prompt
+        add-zsh-hook preexec __tlacuache_busy
+    fi
 fi
 "#;
+
+/// Variable con la ruta del archivo de estado del shell. Solo se define
+/// dentro de Flatpak (ADR-016), donde `tcgetpgrp` no ve los procesos del
+/// sistema: los ganchos de integración escriben `prompt` al mostrar el
+/// prompt y `busy` al empezar a ejecutar una orden.
+pub const STATE_FILE_VAR: &str = "TLACUACHE_STATE_FILE";
+
+/// Lo último que escribió la integración en el archivo de estado.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellState {
+    /// El shell espera órdenes.
+    Prompt,
+    /// Hay una orden en curso.
+    Busy,
+}
+
+impl ShellState {
+    /// `None` si el archivo está vacío o tiene otra cosa (el shell aún no
+    /// ha mostrado su primer prompt).
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.trim() {
+            "prompt" => Some(Self::Prompt),
+            "busy" => Some(Self::Busy),
+            _ => None,
+        }
+    }
+}
+
+/// Integración para fish dentro de Flatpak (ADR-016). fish ya emite OSC 7
+/// por sí mismo; esto solo añade el archivo de estado. Se carga con
+/// `fish --init-command 'source <archivo>'`.
+pub const FISH_INTEGRATION: &str = r#"# Generado por Tlacuache. Avisa a Tlacuache si fish espera órdenes o
+# ejecuta una (solo dentro de Flatpak).
+if set -q TLACUACHE_STATE_FILE
+    function __tlacuache_prompt --on-event fish_prompt
+        printf prompt 2>/dev/null >"$TLACUACHE_STATE_FILE"
+    end
+    function __tlacuache_busy --on-event fish_preexec
+        printf busy 2>/dev/null >"$TLACUACHE_STATE_FILE"
+    end
+end
+"#;
+
+/// Shell de inicio de sesión de una línea de `getent passwd` (séptimo
+/// campo), si es una ruta absoluta.
+pub fn login_shell(passwd_line: &str) -> Option<&str> {
+    let shell = passwd_line.lines().next()?.split(':').nth(6)?;
+    shell.starts_with('/').then_some(shell)
+}
+
+/// Orden que lanza `argv` en el sistema desde el sandbox de Flatpak con
+/// `flatpak-spawn --host` (ADR-016), en la carpeta `dir` y con las variables
+/// `env` (`NOMBRE=valor`). `--watch-bus` termina el shell si Tlacuache se
+/// cierra. flatpak-spawn solo acepta las opciones en la forma `--opción=valor`
+/// y toma como orden el primer argumento que no empieza por `-`.
+pub fn host_command(argv: &[String], dir: &str, env: &[String]) -> Vec<String> {
+    let mut command = vec![
+        "flatpak-spawn".to_owned(),
+        "--host".to_owned(),
+        "--watch-bus".to_owned(),
+        format!("--directory={dir}"),
+    ];
+    command.extend(env.iter().map(|var| format!("--env={var}")));
+    command.extend(argv.iter().cloned());
+    command
+}
 
 #[cfg(test)]
 mod tests {
@@ -404,6 +489,198 @@ mod tests {
         for expected in ["ENV-USUARIO", "RC-USUARIO", "GANCHO-USUARIO"] {
             assert!(all.contains(expected), "falta {expected}: {all:?}");
         }
+    }
+
+    /// Lanza `shell` interactivo con el archivo de estado definido y le
+    /// pasa `script` por la entrada estándar. Devuelve `None` si el shell no
+    /// está instalado.
+    fn run_with_state(
+        shell: &str,
+        args: &[&str],
+        env: &[(&str, &std::path::Path)],
+        script: &str,
+    ) -> Option<std::process::Output> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let mut command = Command::new(shell);
+        command
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        for (key, value) in env {
+            command.env(key, value);
+        }
+        let mut child = command.spawn().ok()?;
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(script.as_bytes())
+            .unwrap();
+        Some(child.wait_with_output().unwrap())
+    }
+
+    /// bash: `busy` mientras corre una orden y `prompt` al volver al prompt
+    /// (el `PROMPT_COMMAND` del usuario corre después del nuestro y lo ve).
+    #[test]
+    fn bash_integration_reports_prompt_and_busy() {
+        let Ok(home) = tempfile::tempdir() else {
+            return;
+        };
+        let rc = home.path().join("tlacuache.rc");
+        let state = home.path().join("state");
+        let log = home.path().join("log");
+        std::fs::write(&rc, BASH_INTEGRATION_RC).unwrap();
+        std::fs::write(
+            home.path().join(".bashrc"),
+            "PROMPT_COMMAND='cat \"$TLACUACHE_STATE_FILE\" >> ~/log; echo >> ~/log'\n",
+        )
+        .unwrap();
+        let script = "cat \"$TLACUACHE_STATE_FILE\" >> ~/log; echo >> ~/log\nexit\n";
+        let Some(output) = run_with_state(
+            "bash",
+            &["--rcfile", &rc.to_string_lossy(), "-i"],
+            &[("HOME", home.path()), (STATE_FILE_VAR, &state)],
+            script,
+        ) else {
+            return; // sin bash
+        };
+        assert!(output.status.success());
+        // Prompt inicial, la orden, el prompt siguiente.
+        let log = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(log, "prompt\nbusy\nprompt\n", "{output:?}");
+    }
+
+    #[test]
+    fn zsh_integration_reports_prompt_and_busy() {
+        let (Ok(home), Ok(ours)) = (tempfile::tempdir(), tempfile::tempdir()) else {
+            return;
+        };
+        std::fs::write(ours.path().join(".zshenv"), ZSH_INTEGRATION_ZSHENV).unwrap();
+        let state = home.path().join("state");
+        let log = home.path().join("log");
+        // El gancho del usuario se añade después del nuestro.
+        std::fs::write(
+            home.path().join(".zshrc"),
+            "__mio() { cat \"$TLACUACHE_STATE_FILE\" >> ~/log; echo >> ~/log }\nadd-zsh-hook precmd __mio\n",
+        )
+        .unwrap();
+        let script = "cat \"$TLACUACHE_STATE_FILE\" >> ~/log; echo >> ~/log\nexit\n";
+        let Some(output) = run_with_state(
+            "zsh",
+            &["-i"],
+            &[
+                ("HOME", home.path()),
+                ("ZDOTDIR", ours.path()),
+                (STATE_FILE_VAR, &state),
+            ],
+            script,
+        ) else {
+            return; // sin zsh
+        };
+        assert!(output.status.success());
+        let log = std::fs::read_to_string(&log).unwrap();
+        assert_eq!(log, "prompt\nbusy\nprompt\n", "{output:?}");
+    }
+
+    /// fish sin terminal no muestra prompts: se emiten sus eventos a mano.
+    #[test]
+    fn fish_integration_reports_prompt_and_busy() {
+        use std::process::Command;
+
+        let Ok(dir) = tempfile::tempdir() else {
+            return;
+        };
+        let file = dir.path().join("tlacuache.fish");
+        let state = dir.path().join("state");
+        std::fs::write(&file, FISH_INTEGRATION).unwrap();
+        let script = format!(
+            "source {}; emit fish_prompt; cat $TLACUACHE_STATE_FILE; echo; emit fish_preexec; cat $TLACUACHE_STATE_FILE",
+            quote(&file.to_string_lossy(), FISH)
+        );
+        let Ok(output) = Command::new("fish")
+            .args(["--no-config", "-c", &script])
+            .env(STATE_FILE_VAR, &state)
+            .output()
+        else {
+            return; // sin fish
+        };
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            "prompt\nbusy",
+            "{output:?}"
+        );
+    }
+
+    /// Sin la variable, la integración no escribe ningún archivo de estado
+    /// (fuera de Flatpak nada cambia).
+    #[test]
+    fn integration_without_state_var_writes_nothing() {
+        let Ok(home) = tempfile::tempdir() else {
+            return;
+        };
+        let rc = home.path().join("tlacuache.rc");
+        std::fs::write(&rc, BASH_INTEGRATION_RC).unwrap();
+        let Some(output) = run_with_state(
+            "bash",
+            &["--rcfile", &rc.to_string_lossy(), "-i"],
+            &[("HOME", home.path())],
+            "echo \"PS0=[${PS0-}]\"\nexit\n",
+        ) else {
+            return;
+        };
+        assert!(String::from_utf8_lossy(&output.stdout).contains("PS0=[]"));
+        // Solo el rcfile y el historial de bash.
+        for entry in std::fs::read_dir(home.path()).unwrap() {
+            let name = entry.unwrap().file_name();
+            assert!(
+                name == "tlacuache.rc" || name == ".bash_history",
+                "archivo inesperado: {name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn login_shell_from_passwd() {
+        assert_eq!(
+            login_shell("ana:x:1000:1000:Ana:/home/ana:/usr/bin/zsh\n"),
+            Some("/usr/bin/zsh")
+        );
+        assert_eq!(login_shell("ana:x:1000:1000::/home/ana:"), None);
+        assert_eq!(login_shell("ana:x:1000"), None);
+        assert_eq!(login_shell(""), None);
+    }
+
+    #[test]
+    fn shell_state_parse() {
+        assert_eq!(ShellState::parse("prompt"), Some(ShellState::Prompt));
+        assert_eq!(ShellState::parse("busy\n"), Some(ShellState::Busy));
+        assert_eq!(ShellState::parse(""), None);
+        assert_eq!(ShellState::parse("otro"), None);
+    }
+
+    #[test]
+    fn host_command_puts_options_before_the_shell() {
+        let argv = ["/usr/bin/zsh".to_owned(), "-l".to_owned()];
+        let env = [
+            "TERM=xterm-256color".to_owned(),
+            "ZDOTDIR=/run/a b".to_owned(),
+        ];
+        assert_eq!(
+            host_command(&argv, "/home/ana/con espacio", &env),
+            [
+                "flatpak-spawn",
+                "--host",
+                "--watch-bus",
+                "--directory=/home/ana/con espacio",
+                "--env=TERM=xterm-256color",
+                "--env=ZDOTDIR=/run/a b",
+                "/usr/bin/zsh",
+                "-l",
+            ]
+        );
     }
 
     #[test]
