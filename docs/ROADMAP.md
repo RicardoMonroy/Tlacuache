@@ -96,6 +96,14 @@ Orden acordado: completar la vista previa, luego vistas, búsqueda, renombrado, 
 - [x] **8.8 Notas por carpeta**: almacén central (ADR-014), editor en la vista previa de la carpeta con guardado automático e indicador en la barra de estado; las notas siguen a las carpetas movidas o renombradas desde Tlacuache. CA: escribir una nota, cambiar de carpeta, reiniciar y verla igual; renombrar la carpeta y que la nota la siga.
 - [x] **8.9 PKGBUILD para AUR** (el `.desktop` y el ícono existen desde la 7.1). CA: `makepkg -si` instala y la app aparece en el lanzador; la publicación en AUR la hace el autor.
 
+## Pendientes: carpetas siempre al día
+Surgió al usar la app instalada (2026-10-06): con **Opera** descargando en `~/Downloads`, los archivos no aparecieron hasta salir y volver a entrar en la carpeta. Simulando Firefox (archivo de 0 bytes + `.part` renombrado) y Chrome (`.crdownload` renombrado) contra `Gtk.DirectoryList` y la misma cadena de modelos, todo aparece; Opera debe usar otro patrón. Además, GTK ignora el evento `CHANGED` (el tamaño de un archivo que crece no se actualiza).
+
+- [ ] **R.1 Diagnóstico de eventos**: con `RUST_LOG=tlacuache=debug`, registrar cada evento del monitor de la carpeta (tipo, archivo, otro archivo) para identificar el patrón de Opera. CA: el log muestra la secuencia exacta de una descarga.
+- [ ] **R.2 Recargar a mano**: Ctrl+R y un botón en la barra del panel; conserva la selección y el desplazamiento si los elementos siguen ahí. CA: un archivo creado fuera de la app aparece al recargar.
+- [ ] **R.3 Resincronizar tras cambios**: un monitor propio de la carpeta; ante cualquier evento (incluidos `CHANGED` y `CHANGES_DONE_HINT`), tras una pausa corta, comparar el listado real con el modelo y aplicar las diferencias (altas, bajas, tamaño y fecha) sin perder selección ni desplazamiento. CA: una descarga con Opera aparece sola y su tamaño se actualiza mientras crece.
+- [ ] **R.4 Carpetas sin aviso de cambios**: en montajes de red o FUSE (OneDrive, sshfs, SFTP), revisión periódica ligera solo mientras la carpeta está visible. CA: un archivo creado en el remoto aparece en pocos segundos sin recargar.
+
 ## Hito 9 — Empaquetado para otras distribuciones
 Acordado: primero paquetes nativos para las distribuciones recientes (casi sin costo), luego Flatpak para todas las demás. Versiones consultadas el 2026-10-05: Debian 13 trae GTK 4.18 / libadwaita 1.7 / VTE 0.80 / GtkSourceView 5.16; Ubuntu 26.04 LTS y Fedora 44, GTK 4.22 / libadwaita 1.9; Fedora 43, GTK 4.20 / libadwaita 1.8; Ubuntu 24.04 LTS (GTK 4.14) queda fuera de los paquetes nativos y se cubre con Flatpak. Piso real: GTK ≥ 4.16 y libadwaita ≥ 1.6 (variables CSS de los temas). Requiere el repositorio publicado en GitHub (9.2 en adelante).
 
