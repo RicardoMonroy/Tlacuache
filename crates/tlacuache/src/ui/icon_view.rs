@@ -155,6 +155,15 @@ impl IconView {
 
         // Clic en la zona vacía: sin selección.
         crate::ui::unselect_on_background_click(&scrolled, selection.upcast_ref());
+        // Presionar sobre un archivo lo arrastra; el recuadro, desde el vacío.
+        crate::ui::rubberband_only_on_background(
+            &scrolled,
+            glib::clone!(
+                #[weak]
+                grid,
+                move |enable| grid.set_enable_rubberband(enable)
+            ),
+        );
         // Clic derecho en la zona vacía: sin selección y menú de carpeta.
         context_menu::attach_background_menu(
             &scrolled,

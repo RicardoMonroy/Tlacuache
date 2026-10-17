@@ -114,7 +114,8 @@ impl FileListView {
         let column_view = gtk::ColumnView::new(Some(selection.clone()));
         column_view.add_css_class("file-list");
         column_view.add_css_class("data-table");
-        // Selección por rectángulo arrastrando con el ratón.
+        // Selección por rectángulo arrastrando desde la zona vacía (ver
+        // `rubberband_only_on_background`).
         column_view.set_enable_rubberband(true);
 
         // Solo la última columna se expande: si se expandiera "Nombre", GTK
@@ -180,6 +181,15 @@ impl FileListView {
 
         // Clic en la zona vacía: sin selección.
         crate::ui::unselect_on_background_click(&scrolled, selection.upcast_ref());
+        // Presionar sobre un archivo lo arrastra; el recuadro, desde el vacío.
+        crate::ui::rubberband_only_on_background(
+            &scrolled,
+            glib::clone!(
+                #[weak]
+                column_view,
+                move |enable| column_view.set_enable_rubberband(enable)
+            ),
+        );
         // Clic derecho en la zona vacía: sin selección y menú de carpeta.
         context_menu::attach_background_menu(
             &scrolled,

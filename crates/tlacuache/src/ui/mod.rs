@@ -67,6 +67,31 @@ pub fn unselect_on_background_click(
     scrolled.add_controller(click);
 }
 
+/// Recuadro de selección solo desde la zona vacía: presionar sobre un
+/// archivo y mover el ratón lo arrastra (a otra carpeta, panel o app).
+///
+/// GTK arranca el arrastre de un archivo solo si el ratón se mueve al menos
+/// 100 ms después de presionar (`MIN_TIME_TO_DND` en `gtkdragsource.c`),
+/// pero el recuadro empieza de inmediato: un gesto rápido de «presionar y
+/// jalar» seleccionaba en lugar de arrastrar. Así que en cada clic, antes de
+/// que la lista lo vea (fase de captura en `scrolled`, su ancestro), se
+/// activa el recuadro solo si el clic cae en la zona vacía.
+/// `set_rubberband` es `set_enable_rubberband` de la lista.
+pub fn rubberband_only_on_background(
+    scrolled: &gtk::ScrolledWindow,
+    set_rubberband: impl Fn(bool) + 'static,
+) {
+    let press = gtk::GestureClick::new();
+    press.set_button(gtk::gdk::BUTTON_PRIMARY);
+    press.set_propagation_phase(gtk::PropagationPhase::Capture);
+    press.connect_pressed(gtk::glib::clone!(
+        #[weak]
+        scrolled,
+        move |_, _, x, y| set_rubberband(is_background(scrolled.upcast_ref(), x, y))
+    ));
+    scrolled.add_controller(press);
+}
+
 /// ¿Bajo (`x`, `y`) de `widget` no hay una fila, un mosaico, el encabezado
 /// de columnas ni la barra de desplazamiento? GTK no reclama el clic simple
 /// sobre una fila, así que también llega aquí y hay que distinguirlo.
