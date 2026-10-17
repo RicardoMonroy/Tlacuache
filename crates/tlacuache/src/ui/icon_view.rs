@@ -153,6 +153,8 @@ impl IconView {
             .child(&grid)
             .build();
 
+        // Clic en la zona vacía: sin selección.
+        crate::ui::unselect_on_background_click(&scrolled, selection.upcast_ref());
         // Clic derecho en la zona vacía: sin selección y menú de carpeta.
         context_menu::attach_background_menu(
             &scrolled,

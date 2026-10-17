@@ -35,6 +35,64 @@ pub mod theme_thumbnail;
 
 use gtk::prelude::*;
 
+/// Clic izquierdo en la zona vacía de una vista (sin una fila debajo):
+/// quita la selección y deja el foco en la lista, como en otros gestores
+/// de archivos. Con Ctrl o Shift no hace nada (se está ampliando la
+/// selección).
+pub fn unselect_on_background_click(
+    scrolled: &gtk::ScrolledWindow,
+    selection: &gtk::SelectionModel,
+) {
+    let click = gtk::GestureClick::new();
+    click.set_button(gtk::gdk::BUTTON_PRIMARY);
+    click.connect_pressed(gtk::glib::clone!(
+        #[weak]
+        scrolled,
+        #[weak]
+        selection,
+        move |gesture, _, x, y| {
+            let modifiers =
+                gtk::gdk::ModifierType::CONTROL_MASK | gtk::gdk::ModifierType::SHIFT_MASK;
+            if gesture.current_event_state().intersects(modifiers)
+                || !is_background(scrolled.upcast_ref(), x, y)
+            {
+                return;
+            }
+            if let Some(list) = scrolled.child() {
+                list.grab_focus();
+            }
+            selection.unselect_all();
+        }
+    ));
+    scrolled.add_controller(click);
+}
+
+/// ¿Bajo (`x`, `y`) de `widget` no hay una fila, un mosaico, el encabezado
+/// de columnas ni la barra de desplazamiento? GTK no reclama el clic simple
+/// sobre una fila, así que también llega aquí y hay que distinguirlo.
+fn is_background(widget: &gtk::Widget, x: f64, y: f64) -> bool {
+    let Some(mut picked) = widget.pick(x, y, gtk::PickFlags::DEFAULT) else {
+        return false;
+    };
+    loop {
+        // Nombres CSS de GTK: filas de ListView/ColumnView, mosaicos de
+        // GridView, encabezado de ColumnView y barras de desplazamiento.
+        if matches!(
+            picked.css_name().as_str(),
+            "row" | "child" | "header" | "scrollbar"
+        ) {
+            return false;
+        }
+        if &picked == widget {
+            return true;
+        }
+        match picked.parent() {
+            Some(parent) => picked = parent,
+            None => return true,
+        }
+    }
+}
+
 /// Avisa al listado de `source` si `widget` (la lista que lo muestra) está
 /// en pantalla: las carpetas que no avisan de sus cambios solo se revisan
 /// mientras se ven (R.4). Una pestaña de fondo o un panel oculto no están
