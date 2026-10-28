@@ -297,22 +297,54 @@ pub fn update_favorites_toml(
 /// texto no es TOML válido (en ese caso no hay que tocar el archivo).
 pub fn update_theme_toml(text: &str, theme: &Theme) -> Result<String, toml_edit::TomlError> {
     let mut doc: toml_edit::DocumentMut = text.parse()?;
-    if !doc.contains_table("theme") {
-        doc.insert("theme", toml_edit::Item::Table(toml_edit::Table::new()));
-    }
-    let table = &mut doc["theme"];
     // Una config vieja puede traer `color_scheme` (antes de ADR-009).
-    if let Some(table) = table.as_table_mut() {
+    if let Some(table) = doc.get_mut("theme").and_then(|t| t.as_table_mut()) {
         table.remove("color_scheme");
     }
-    for (key, value) in [
-        ("name", toml_edit::value(theme.name.as_str())),
-        ("follow_system", toml_edit::value(theme.follow_system)),
-        ("light", toml_edit::value(theme.light.as_str())),
-        ("dark", toml_edit::value(theme.dark.as_str())),
-    ] {
+    set_values(
+        &mut doc,
+        "theme",
+        [
+            ("name", toml_edit::value(theme.name.as_str())),
+            ("follow_system", toml_edit::value(theme.follow_system)),
+            ("light", toml_edit::value(theme.light.as_str())),
+            ("dark", toml_edit::value(theme.dark.as_str())),
+        ],
+    );
+    Ok(doc.to_string())
+}
+
+/// Reescribe las claves de `[general]` (Preferencias), igual que
+/// [`update_theme_toml`]: conserva comentarios y el resto, y falla sin tocar
+/// nada si el texto no es TOML válido.
+pub fn update_general_toml(text: &str, general: &General) -> Result<String, toml_edit::TomlError> {
+    let mut doc: toml_edit::DocumentMut = text.parse()?;
+    set_values(
+        &mut doc,
+        "general",
+        [
+            ("show_hidden", toml_edit::value(general.show_hidden)),
+            ("dual_pane", toml_edit::value(general.dual_pane)),
+            ("confirm_trash", toml_edit::value(general.confirm_trash)),
+            ("default_view", toml_edit::value(general.default_view.id())),
+        ],
+    );
+    Ok(doc.to_string())
+}
+
+/// Pone `values` en la tabla `name` (la crea si falta), conservando el
+/// comentario al final de cada línea que ya existía.
+fn set_values<const N: usize>(
+    doc: &mut toml_edit::DocumentMut,
+    name: &str,
+    values: [(&str, toml_edit::Item); N],
+) {
+    if !doc.contains_table(name) {
+        doc.insert(name, toml_edit::Item::Table(toml_edit::Table::new()));
+    }
+    let table = &mut doc[name];
+    for (key, value) in values {
         match table.get_mut(key).and_then(|item| item.as_value_mut()) {
-            // Conserva el comentario al final de la línea.
             Some(old) => {
                 let decor = old.decor().clone();
                 let mut new = value
@@ -324,7 +356,6 @@ pub fn update_theme_toml(text: &str, theme: &Theme) -> Result<String, toml_edit:
             None => table[key] = value,
         }
     }
-    Ok(doc.to_string())
 }
 
 fn write_template(path: &Path) -> io::Result<()> {
@@ -497,6 +528,28 @@ mod tests {
         assert_eq!(Config::from_toml(&template).unwrap().theme, theme);
 
         assert!(update_theme_toml("[theme", &theme).is_err());
+    }
+
+    #[test]
+    fn update_general_keeps_comments_and_other_sections() {
+        let general = General {
+            show_hidden: true,
+            dual_pane: false,
+            confirm_trash: true,
+            default_view: ViewMode::Icons,
+        };
+        let template = update_general_toml(DEFAULT_TEMPLATE, &general).unwrap();
+        assert!(template.contains("default_view = \"icons\"   # columns (Miller)"));
+        let config = Config::from_toml(&template).unwrap();
+        assert_eq!(config.general, general);
+        assert_eq!(config.theme, Theme::default());
+
+        let created = update_general_toml("[theme]\nname = \"claro\"\n", &general).unwrap();
+        let config = Config::from_toml(&created).unwrap();
+        assert_eq!(config.general, general);
+        assert_eq!(config.theme.name, "claro");
+
+        assert!(update_general_toml("[general", &general).is_err());
     }
 
     #[test]
