@@ -3,10 +3,13 @@
 use std::cmp::Ordering;
 use std::time::SystemTime;
 
+use serde::{Deserialize, Serialize};
+
 use crate::entry::FileEntry;
 use crate::text::strip_accent;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum SortKey {
     #[default]
     Name,
@@ -15,14 +18,16 @@ pub enum SortKey {
     Modified,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum SortDirection {
     #[default]
     Ascending,
     Descending,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SortSpec {
     pub key: SortKey,
     pub direction: SortDirection,

@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::config::ViewMode;
+use crate::sort::SortSpec;
 
 pub const FILE_NAME: &str = "session.toml";
 
@@ -95,6 +96,8 @@ pub struct TabSession {
     pub uri: String,
     pub view: ViewMode,
     pub show_hidden: bool,
+    /// Orden de la lista; sin la tabla `sort` (sesiones viejas), por nombre ascendente.
+    pub sort: SortSpec,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -186,12 +189,14 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sort::{SortDirection, SortKey};
 
     fn tab(uri: &str) -> TabSession {
         TabSession {
             uri: uri.to_owned(),
             view: ViewMode::Columns,
             show_hidden: false,
+            sort: SortSpec::default(),
         }
     }
 
@@ -216,6 +221,10 @@ mod tests {
                             uri: "file:///home/ana/dev".into(),
                             view: ViewMode::Details,
                             show_hidden: true,
+                            sort: SortSpec {
+                                key: SortKey::Size,
+                                direction: SortDirection::Descending,
+                            },
                         },
                     ],
                     preview: true,
@@ -301,6 +310,23 @@ mod tests {
         let mut session = sample();
         session.window.dual_pane = false;
         assert_eq!(session.sanitized().window.active_pane, 0);
+    }
+
+    #[test]
+    fn tab_sort_is_written_and_old_sessions_sort_by_name() {
+        let text = sample().to_toml().unwrap();
+        assert!(text.contains("key = \"size\"") && text.contains("direction = \"descending\""));
+        let old = Session::from_toml("[[panes]]\n[[panes.tabs]]\nuri = \"file:///\"\n").unwrap();
+        assert_eq!(old.panes[0].tabs[0].sort, SortSpec::default());
+        let partial = Session::from_toml(
+            "[[panes]]\n[[panes.tabs]]\nuri = \"file:///\"\n[panes.tabs.sort]\nkey = \"modified\"\n",
+        )
+        .unwrap();
+        assert_eq!(partial.panes[0].tabs[0].sort.key, SortKey::Modified);
+        assert_eq!(
+            partial.panes[0].tabs[0].sort.direction,
+            SortDirection::Ascending
+        );
     }
 
     #[test]

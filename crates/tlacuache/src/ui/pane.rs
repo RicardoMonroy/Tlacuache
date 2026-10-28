@@ -620,6 +620,7 @@ impl Pane {
                     uri: page.directory()?.uri().to_string(),
                     view: page.mode(),
                     show_hidden: page.show_hidden(),
+                    ..TabSession::default()
                 })
             })
             .collect();
